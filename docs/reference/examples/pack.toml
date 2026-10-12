@@ -1,0 +1,60 @@
+# Worked examples for the design document, not a curated pack (see README.md).
+# The regions files named below are not included here.
+[pack]
+name = "examples"
+version = "0.1.0"
+code_prefix = ["CRU", "ERA5", "GLORYS", "CROC", "BIO", "UAS", "EPI"]
+license = "CC-BY-4.0"
+files = ["rules.geojson"]
+
+# The axes, facets and plugin dimensions the records use; they must agree with the
+# Index the pack is loaded into (section 5.4).
+[axes.resolution]
+unit = "km"
+description = "horizontal grid spacing"
+
+[axes.altitude_agl]
+unit = "m"
+description = "height above ground level"
+
+[facets]
+names = ["product", "variable", "version", "model", "activity", "basis_of_record"]
+
+[dimensions]
+names = []  # plugin dimensions, such as "basin"; their code is registered in Python
+
+[products.cru_ts]
+aliases = ["CRUTS", "CRU TS"]
+variables = ["pre", "tmp"]
+resolution = [0.5, "deg"]
+calendar = "standard"
+version = "4.07"
+coverage = { time = ["1901-01-01", "2022-12-31"] }
+grid = { lon = [-180.0, 180.0, 0.5], lat = [-90.0, 90.0, 0.5] }  # cell edges
+
+[products.era5]
+variables = ["pre", "t2m", "skt", "siconc"]  # pack names; ERA5 itself calls precipitation "tp"
+resolution = [0.25, "deg"]
+version = "ERA5"
+coverage = { time = ["1940-01-01", ".."] }
+
+[products.glorys]
+aliases = ["GLORYS12V1", "GLORYS12"]
+variables = ["thetao", "so", "uo", "vo", "zos"]
+resolution = [0.083, "deg"]
+coverage = { time = ["1993-01-01", ".."] }
+
+[products.gbif]
+variables = ["occurrence"]
+
+[products.demo_ili]  # fictional surveillance feed
+variables = ["ili_cases"]
+coverage = { time = ["2015-01-01", ".."], box = { west = 170, width = 20, south = -25, north = -10 } }
+
+[regions.ar6]
+file = "regions/ar6_land.geojson"  # IPCC AR6 reference regions
+id_property = "abbrev"
+
+[regions.ne]
+file = "regions/ne_lakes.geojson"  # named lakes, e.g. caspian_sea
+id_property = "slug"

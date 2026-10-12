@@ -1,0 +1,42 @@
+[build-system]
+requires = ["setuptools>=77.0.3", "setuptools-scm>=8"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "queryearth"
+dynamic = ["version"]
+description = "Match rules scoped by area, time and other dimensions to a request, and get caveats, coverage gaps and recommendations."
+readme = "README.md"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+authors = [{ name = "Manish Venumuddula" }]
+requires-python = ">=3.11"
+dependencies = ["numpy", "shapely>=2.1"]
+keywords = ["geospatial", "advisories", "data quality", "rules", "earth science"]
+classifiers = [
+    "Development Status :: 2 - Pre-Alpha",
+    "Intended Audience :: Science/Research",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Topic :: Scientific/Engineering :: GIS",
+]
+
+[project.optional-dependencies]
+test = ["pytest", "jsonschema"]
+
+[project.urls]
+Repository = "https://github.com/CROCODILE-CESM/queryearth"
+
+[tool.setuptools.packages.find]
+include = ["queryearth*"]
+
+[tool.setuptools_scm]
+version_file = "queryearth/_version.py"
+local_scheme = "no-local-version"  # TestPyPI rejects local versions such as +g1a2b3c
+fallback_version = "0.0.0"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.black]
+target-version = ["py311"]
