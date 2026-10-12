@@ -261,6 +261,6 @@ def test_finding_to_dict_is_json_ready():
     assert out["code"] == "CROC102" and out["product"] is None
 
 
-def test_rule_from_feature_arrives_with_pack_loading():
-    with pytest.raises(NotImplementedError):
+def test_rule_from_feature_needs_properties_and_a_geometry():
+    with pytest.raises(ValueError, match="properties and a geometry"):
         qe.Rule.from_feature({"type": "Feature"}, qe.Index())

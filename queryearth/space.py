@@ -15,6 +15,7 @@ import logging
 import math
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
+from functools import cached_property
 from typing import Any, Literal
 
 import numpy as np
@@ -29,6 +30,7 @@ __all__ = [
     "cell_mask",
     "cells",
     "comparable",
+    "deferred",
     "features",
     "from_grid",
     "lat_band",
@@ -331,6 +333,48 @@ def polygon(shape: Any, pole: Literal["auto", "north", "south"] = "auto") -> Spa
     return _finish(geometry, tuple(poles))
 
 
+class _Deferred(Space):
+    """A polygon normalised on first use; until then envelope bounds it (9.2)."""
+
+    def __init__(self, shape: Any, envelope: tuple[float, ...]) -> None:
+        object.__setattr__(self, "kind", "polygon")
+        object.__setattr__(self, "shape", shape)
+        object.__setattr__(self, "envelope", envelope)
+
+    @cached_property
+    def built(self) -> Space:
+        return polygon(self.shape)
+
+    geometry = property(lambda self: self.built.geometry)
+    area_km2 = property(lambda self: self.built.area_km2)
+    poles = property(lambda self: self.built.poles)
+
+
+def deferred(shape: Any) -> Space:
+    """polygon(shape), built on first use when its rings need only repair (9.2).
+
+    Rings inside [-180, 180] x [-90, 90] that never step 180 degrees in longitude
+    need no unwrapping, pole closure or split, so their vertices' envelope bounds
+    the result. Any other shape, well formed or not, is normalised now.
+    """
+    try:
+        rings = [np.asarray(r, dtype=float) for p in _polygon_rings(shape) for r in p]
+        xy = np.concatenate([r[:, :2] for r in rings])
+        steps = np.concatenate([np.diff(r[:, 0], append=r[0, 0]) for r in rings])
+    except (ValueError, TypeError, IndexError):
+        return polygon(shape)
+    if (
+        min(len(r) for r in rings) < 4
+        or xy.shape[1] != 2
+        or not np.isfinite(xy).all()
+        or np.abs(xy[:, 0]).max() > 180.0
+        or np.abs(xy[:, 1]).max() > 90.0
+        or np.abs(steps).max() >= 180.0
+    ):
+        return polygon(shape)
+    return _Deferred(shape, (*xy.min(0), *xy.max(0)))
+
+
 def _winds(row: Sequence[float]) -> bool:
     """Whether a row of nodes, closed on itself, goes once around the globe."""
     steps = [wrap_lon(b - a) for a, b in zip(row[:-1], row[1:])]
@@ -625,8 +669,10 @@ def ring_area_km2(coords: Any) -> float:
 
 def area_km2(geometry: shapely.Geometry) -> float:
     """Spherical area of the polygon parts of a geometry, holes subtracted."""
+    if shapely.get_type_id(geometry) not in (3, 6) or not shapely.is_valid(geometry):
+        geometry = _polygonal(geometry)  # valid (multi)polygons have no overlaps
     total = 0.0
-    for part in shapely.get_parts(_polygonal(geometry)):
+    for part in shapely.get_parts(geometry):
         holes = sum(abs(ring_area_km2(h.coords)) for h in part.interiors)
         total += abs(ring_area_km2(part.exterior.coords)) - holes
     return total

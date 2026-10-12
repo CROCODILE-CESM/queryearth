@@ -67,6 +67,67 @@ class Prefilter(Protocol):
     def candidates(self, query: Any) -> set[int]: ...
 
 
+# ---- plugin schemas -------------------------------------------------------------
+_TYPES = dict(object=Mapping, array=(list, tuple), string=str, boolean=bool)
+_TYPES |= {"number": (int, float), "integer": int, "null": type(None)}
+_KEYWORDS = set(
+    "type enum pattern minLength minimum maximum items minItems maxItems properties "
+    "required additionalProperties anyOf oneOf not title description $comment".split()
+)
+
+
+def schema_problem(value: Any, schema: Any) -> str | None:
+    """Why a record's value fails a plugin dimension's schema, or None.
+
+    Implements the JSON Schema keywords in _KEYWORDS, which plugin schemas are
+    limited to; any other keyword raises ValueError rather than pass silently.
+    """
+    if isinstance(schema, bool):
+        return None if schema else f"{value!r} is not allowed here"
+    if set(schema) - _KEYWORDS:
+        raise ValueError(f"unsupported schema keywords {set(schema) - _KEYWORDS}")
+    kinds = schema.get("type", list(_TYPES))
+    kinds = [kinds] if isinstance(kinds, str) else kinds
+    number = isinstance(value, (int, float)) and not isinstance(value, bool)
+    numeric = ("number", "integer")
+    if not any(
+        isinstance(value, _TYPES[k]) for k in kinds if number or k not in numeric
+    ):
+        return f"{value!r} is not of type {kinds}"
+    if "enum" in schema and value not in schema["enum"]:
+        return f"{value!r} is not one of {schema['enum']}"
+    if isinstance(value, str) and (
+        len(value) < schema.get("minLength", 0)
+        or not re.search(schema.get("pattern", ""), value)
+    ):
+        return f"{value!r} does not match {schema}"
+    if number and not (
+        schema.get("minimum", -math.inf) <= value <= schema.get("maximum", math.inf)
+    ):
+        return f"{value!r} is out of range"
+    nested: list[tuple[Any, Any]] = []
+    if isinstance(value, (list, tuple)):
+        if not schema.get("minItems", 0) <= len(value) <= schema.get("maxItems", 1e9):
+            return f"{value!r} has the wrong number of items"
+        nested += [(v, schema.get("items", True)) for v in value]
+    if isinstance(value, Mapping):
+        if [k for k in schema.get("required", ()) if k not in value]:
+            return f"{dict(value)!r} lacks one of {schema['required']}"
+        props = schema.get("properties", {})
+        extra = schema.get("additionalProperties", True)
+        nested += [(v, props.get(k, extra)) for k, v in value.items()]
+    problem = next(filter(None, (schema_problem(v, sub) for v, sub in nested)), None)
+    if problem:
+        return problem
+    if not any(schema_problem(value, s) is None for s in schema.get("anyOf", [True])):
+        return f"{value!r} matches none of anyOf"
+    if sum(schema_problem(value, s) is None for s in schema.get("oneOf", [True])) != 1:
+        return f"{value!r} does not match exactly one of oneOf"
+    if "not" in schema and schema_problem(value, schema["not"]) is None:
+        return f"{value!r} matches a schema it must not"
+    return None
+
+
 def _number(value: Any, what: str) -> float:
     if isinstance(value, bool) or not isinstance(value, (int, float, np.number)):
         raise ValueError(f"{what} must be a number, not {value!r}")

@@ -4,7 +4,8 @@ queryearth.time holds civil-date keys, intervals and calendars, and
 queryearth.space normalised shapes, cells and closed-set measures (imported as
 ``from queryearth import space as sp``). The rule engine is at the top level:
 an Index of dimensions, products, regions and rules answers queries with
-Finding objects. See docs/design.md for the design.
+Finding objects, and emit() reports findings under a policy. See docs/design.md
+for the design.
 """
 
 try:
@@ -21,8 +22,19 @@ from queryearth.dimensions import (
     Prefilter,
     Versions,
 )
-from queryearth.errors import DuplicateCodeError, UnknownNameError
-from queryearth.index import Index
+from queryearth.emit import (
+    AdvisoryError,
+    AdvisoryWarning,
+    InfoAdvisory,
+    Policy,
+    SevereAdvisory,
+    Sink,
+    WarningAdvisory,
+    emit,
+    policy,
+)
+from queryearth.errors import DuplicateCodeError, LoadError, UnknownNameError
+from queryearth.index import Index, PointResult, ScoreFn, Suitability, default_score
 from queryearth.model import (
     Action,
     AxisOverlap,
@@ -53,6 +65,8 @@ from queryearth.time import (
 
 __all__ = [
     "Action",
+    "AdvisoryError",
+    "AdvisoryWarning",
     "Axis",
     "AxisOverlap",
     "CheckResult",
@@ -64,11 +78,15 @@ __all__ = [
     "DuplicateCodeError",
     "Finding",
     "Index",
+    "InfoAdvisory",
     "Interval",
     "Kind",
     "Labels",
+    "LoadError",
     "Match",
     "Outcome",
+    "PointResult",
+    "Policy",
     "Prefilter",
     "Product",
     "Query",
@@ -77,17 +95,25 @@ __all__ = [
     "RuleFunc",
     "RuleKind",
     "Scope",
+    "ScoreFn",
+    "SevereAdvisory",
     "Severity",
+    "Sink",
     "Space",
     "Status",
     "Suggestion",
+    "Suitability",
     "TimeSpec",
     "UnknownNameError",
     "Versions",
+    "WarningAdvisory",
     "__version__",
     "civil_key",
+    "default_score",
+    "emit",
     "from_bounds",
     "interval",
     "parse_time",
+    "policy",
     "space",
 ]

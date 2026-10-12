@@ -20,6 +20,7 @@ from typing import TYPE_CHECKING, Any, ClassVar, Protocol
 import numpy as np
 
 from queryearth import space as sp
+from queryearth.dimensions import schema_problem
 from queryearth.model import Finding, Match, Outcome, Query, Scope, Severity
 from queryearth.space import Space
 from queryearth.time import Interval, TimeSpec, overlap, parse_time, time_fraction
@@ -47,6 +48,11 @@ def check_code(code: Any) -> None:
         )
     if re.fullmatch(r"QE-?[0-9]+", code):
         raise ValueError(f"{code!r} uses the prefix QE, which is reserved")
+
+
+def code_prefix(code: str) -> str:
+    """The prefix a valid code belongs to: CRU for CRU001, ERA5 for ERA5-014."""
+    return code.rsplit("-", 1)[0] if "-" in code else code.rstrip("0123456789")
 
 
 class RuleKind(Protocol):
@@ -249,9 +255,22 @@ def computed_findings(
 
 
 # ---- static records ---------------------------------------------------------------
+_CRS84 = "http://www.opengis.net/def/crs/OGC/0/CRS84"
+_FEATURE_KEYS = set(
+    "type id geometry time place bbox properties featureType coordRefSys conformsTo".split()
+)
+_RULE_KEYS = tuple(f.name for f in dataclasses.fields(Outcome)) + tuple(
+    "region_ref created updated withdrawn supersedes aliases".split()
+)
+_RECORD_KEYS = set(_RULE_KEYS) | set(
+    "facets axes dimensions box periods recurrence calendar time_start time_end".split()
+)
+_EXTENSION = re.compile(r"x_[a-z0-9_]+")
+
+
 @dataclass(frozen=True, kw_only=True)
 class Rule(Outcome):
-    """A static record, built in Python and registered with Index.add(rule).
+    """A static record: one GeoJSON Feature (Rule.from_feature) or built in Python.
 
     Index.add checks its names and resolves region_ref; evaluate() then runs
     against that Index (a rule added to a second Index is added as a copy).
@@ -264,6 +283,7 @@ class Rule(Outcome):
     withdrawn: str | None = None  # kept for history, never matched
     supersedes: tuple[str, ...] = ()
     aliases: tuple[str, ...] = ()
+    extensions: Mapping[str, Any] = field(default_factory=dict)  # x_* properties
 
     def __post_init__(self) -> None:
         Outcome.__post_init__(self)
@@ -280,13 +300,90 @@ class Rule(Outcome):
             )
         if self.region_ref and self.scope.space is not None:
             raise ValueError(f"{self.code}: give region_ref or a space, not both")
+        object.__setattr__(self, "extensions", dict(self.extensions))
 
     @classmethod
     def from_feature(cls, feature: Mapping[str, Any], index: Index) -> Rule:
-        """Read one GeoJSON record against an Index (arrives with pack loading)."""
-        raise NotImplementedError(
-            "Rule.from_feature arrives with pack loading; build a Rule(...) for now"
+        """Read one GeoJSON record (section 5); Index.add then checks its names.
+
+        Checks by hand what reference/schema.json states, and plugin dimension
+        values against their schemas; errors name the record's code.
+        """
+        props = feature.get("properties") if isinstance(feature, Mapping) else None
+        code = props.get("code") if isinstance(props, Mapping) else None
+        try:
+            return cls._read(feature, props, index)
+        except (ValueError, TypeError, KeyError) as err:
+            if not isinstance(code, str) or str(err).startswith(f"{code}:"):
+                raise
+            raise type(err)(f"{code}: {err}") from err
+
+    @classmethod
+    def _read(cls, feature: Any, props: Any, index: Index) -> Rule:
+        if not isinstance(feature, Mapping) or feature.get("type") != "Feature":
+            raise ValueError("a record is a GeoJSON Feature")
+        if not isinstance(props, Mapping) or "geometry" not in feature:
+            raise ValueError("a record has properties and a geometry (null for none)")
+        unknown = sorted(set(feature) - _FEATURE_KEYS) + sorted(
+            k for k in props if k not in _RECORD_KEYS and not _EXTENSION.fullmatch(k)
         )
+        missing = [
+            k
+            for k in ("code", "kind", "title", "message", "severity")
+            if k not in props
+        ]
+        if unknown or missing:
+            raise ValueError(
+                f"unknown members {unknown}" if unknown else f"missing {missing}"
+            )
+        if (
+            feature.get("place") is not None
+            or feature.get("coordRefSys", _CRS84) != _CRS84
+        ):
+            raise ValueError(f"place must be null, and coordRefSys {_CRS84}")
+        for code in (props["code"], *props.get("supersedes", ())):
+            check_code(code)
+        if props["severity"] not in ("info", "warning", "severe"):
+            raise ValueError(
+                f"severity is info, warning or severe, not {props['severity']!r}"
+            )
+        if props.get("status") == "reviewed" and not props.get("references"):
+            raise ValueError("a reviewed record cites at least one reference (Q54)")
+        box, geometry = props.get("box"), feature["geometry"]
+        if (box is not None or "region_ref" in props) and geometry is not None:
+            raise ValueError("a record with a box or a region_ref has a null geometry")
+        if box is not None and "region_ref" in props:
+            raise ValueError("give a box or a region_ref, not both")
+        space = None if geometry is None else sp.deferred(geometry)
+        if box is not None:
+            if (
+                not isinstance(box, Mapping)
+                or set(box) != {"west", "width", "south", "north"}
+                or not all(type(v) in (int, float) for v in box.values())
+                or not -180.0 <= box["west"] < 180.0
+            ):
+                raise ValueError(f"a box is {{west, width, south, north}}, not {box!r}")
+            space = sp.box_arc(**box)
+        for key in ("facets", "axes", "dimensions"):
+            if not isinstance(props.get(key, {}), Mapping):
+                raise ValueError(f"{key} is an object")
+        for name, value in props.get("facets", {}).items():
+            if not isinstance(value, (list, Mapping)):  # no bare strings in records
+                raise ValueError(f"facet {name!r} is a list of patterns or an object")
+        for name, value in props.get("dimensions", {}).items():
+            problem = schema_problem(value, index._dimension(name, "dims")[0].schema)
+            if problem:
+                raise ValueError(f"dimension {name!r}: {problem}")
+        scope = Scope(
+            space,
+            parse_time(feature.get("time"), **props),
+            props.get("axes", {}),
+            props.get("facets", {}),
+            props.get("dimensions", {}),
+        )
+        fields = {k: props[k] for k in _RULE_KEYS if k in props}
+        extensions = {k: v for k, v in props.items() if k.startswith("x_")}
+        return cls(**fields, scope=scope, extensions=extensions)
 
     def evaluate(self, query: Query) -> list[Finding]:
         """Findings for one query part (section 4.3)."""

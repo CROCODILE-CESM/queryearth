@@ -14,21 +14,34 @@ from __future__ import annotations
 import copy
 import dataclasses
 import functools
+import math
+import os
 import re
 import threading
 import types
-from collections.abc import Callable, Iterable, Mapping
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from fnmatch import fnmatchcase
-from typing import Any
+from typing import Any, NamedTuple
 
 import numpy as np
 import shapely
 
+from queryearth import packs
 from queryearth import space as sp
 from queryearth.dimensions import Axis, Labels, Patterns, Versions, is_glob
 from queryearth.errors import DuplicateCodeError, UnknownNameError
-from queryearth.model import Coverage, Finding, Product, Query, Request, Scope, time_of
+from queryearth.model import (
+    Coverage,
+    Finding,
+    Product,
+    Query,
+    Request,
+    Scope,
+    Severity,
+    severity_of,
+    time_of,
+)
 from queryearth.rules import (
     Binding,
     CompiledScope,
@@ -36,14 +49,16 @@ from queryearth.rules import (
     FunctionRule,
     Rule,
     RuleFunc,
+    binding_of,
     check_code,
     computed_findings,
+    make_findings,
     match_scope,
 )
 from queryearth.space import Space
 from queryearth.time import DAY, Interval, TimeSpec, overlap, time_fraction
 
-__all__ = ["Index"]
+__all__ = ["Index", "PointResult", "ScoreFn", "Suitability", "default_score"]
 
 _SLUG = re.compile(r"[a-z][a-z0-9_]*")
 _REGION = re.compile(r"[a-z][a-z0-9_.-]*:[A-Za-z0-9_.+-]+")
@@ -109,6 +124,7 @@ class Index:
         self._regions: dict[str, Space] = {}  # "namespace:id" -> polygon
         self._entries: list[_Entry] = []
         self._codes: dict[str, int] = {}
+        self._packs: dict[str, tuple[str, ...]] = {}  # loaded pack -> its prefixes
         self._tables_cache: Any = None
         self._last: tuple[Any, Any] = (None, None)  # the last query parsed
         for axis in axes:
@@ -186,14 +202,27 @@ class Index:
                 raise ValueError(f"region {ref} is already declared")
 
     def add(self, rule: Any) -> None:
-        """Add a Rule, a ComputedRule instance or any RuleKind.
+        """Add a Rule, a ComputedRule instance, any RuleKind or a record mapping.
 
-        Names are checked and values parsed now; a reused code raises
-        DuplicateCodeError, except that redefining a computed rule with the same
-        qualified name (re-running a notebook cell) replaces it (Q10).
+        A mapping is a GeoJSON Feature or a FeatureCollection, added whole or not
+        at all (LoadError). A reused code raises DuplicateCodeError, except that
+        redefining a computed rule with the same qualified name replaces it (Q10).
         """
         if isinstance(rule, Mapping):
-            rule = Rule.from_feature(rule, self)
+            packs.add_mapping(self, rule)
+        else:
+            self._add(rule, "python")
+
+    def load_pack(self, path: str | os.PathLike[str]) -> list[str]:
+        """Load a data-only pack directory (section 5.4); returns the codes loaded.
+
+        Raises LoadError listing every problem with its file, the feature's
+        position and its code, and then leaves the Index as it was.
+        """
+        return packs.load_pack(self, path)
+
+    def _add(self, rule: Any, source: str) -> None:
+        """Index.add; source names a record's pack ("python" from Python)."""
         if isinstance(rule, ComputedRule):
             form, get = "computed", rule.meta.get
             scope = Scope(
@@ -231,7 +260,7 @@ class Index:
         if form == "computed":
             rule.scope = scope
         if form in ("record", "computed"):
-            source = "python" if form == "record" else "computed"
+            source = source if form == "record" else "computed"
             object.__setattr__(rule, "_qe_binding", Binding(self, compiled, source))
         lifecycle = bool(get("withdrawn", None)), _strings(get("supersedes", ()))
         entry = _Entry(rule, form, compiled, qualname, *lifecycle)
@@ -305,21 +334,21 @@ class Index:
         )
         return Patterns(any_of, tuple(map(resolve, patterns.none_of)))
 
+    def _region(self, refs: tuple[str, ...], owner: str) -> Space:
+        """The union of named regions, as region_ref names them."""
+        missing = [r for r in refs if r not in self._regions]
+        if missing:
+            raise UnknownNameError(f"{owner}: undeclared regions {missing}")
+        if len(refs) == 1:
+            return self._regions[refs[0]]
+        parts = [self._regions[r].geometry for r in refs]
+        geometry = shapely.orient_polygons(shapely.union_all(parts))
+        return Space("polygon", geometry=geometry, area_km2=sp.area_km2(geometry))
+
     def _compile(
         self, scope: Scope, refs: tuple[str, ...], requires: tuple[str, ...], code: str
     ) -> CompiledScope:
-        space = scope.space
-        if refs:
-            missing = [r for r in refs if r not in self._regions]
-            if missing:
-                raise UnknownNameError(f"{code}: undeclared regions {missing}")
-            space = self._regions[refs[0]]
-            if len(refs) > 1:
-                parts = [self._regions[r].geometry for r in refs]
-                geometry = shapely.orient_polygons(shapely.union_all(parts))
-                space = Space(
-                    "polygon", geometry=geometry, area_km2=sp.area_km2(geometry)
-                )
+        space = self._region(refs, code) if refs else scope.space
         if space is not None and space.kind not in ("polygon", "features"):
             raise ValueError(f"{code}: a rule space is an area or object ids")
         values = {}
@@ -470,6 +499,30 @@ class Index:
     def _run(self, part: _Part, conditional: bool) -> list[Finding]:
         """Prune one part's rules with the vectorised tables, then evaluate the rest."""
         query, tables = part.query, self._tables()
+        found: list[Finding] = []
+        for i in np.flatnonzero(self._alive(part, conditional)):
+            entry = tables.entries[i]
+            if entry.form != "hooked":
+                found += entry.rule.evaluate(query)
+                continue
+            matched = match_scope(self, entry.scope, query)
+            if matched is not None:
+                match, details = matched
+                rule = entry.rule
+                found += computed_findings(
+                    rule.outcome, match, query, details, rule.outcomes
+                )
+        found += self._coverage(part)
+        return [f for f in found if conditional or not f.conditional_on]
+
+    def _alive(
+        self, part: _Part, conditional: bool, context: bool = True
+    ) -> np.ndarray:
+        """The rules one part evaluates that survive the prefilters (stages 1 to 4).
+
+        context=False keeps rules whose Query.context keys are missing.
+        """
+        query, tables = part.query, self._tables()
         alive = tables.active.copy()
         if part.rules != "all":
             alive &= (
@@ -518,27 +571,13 @@ class Index:
             omitted(placed)
         elif placed.any():
             alive[placed & ~self._space_candidates(tables, query.space)] = False
-        if not conditional:
+        if context and not conditional:
             for i in np.flatnonzero(alive & hard):
                 if any(
                     k not in query.context for k in tables.entries[i].scope.requires
                 ):
                     alive[i] = False
-        found: list[Finding] = []
-        for i in np.flatnonzero(alive):
-            entry = tables.entries[i]
-            if entry.form != "hooked":
-                found += entry.rule.evaluate(query)
-                continue
-            matched = match_scope(self, entry.scope, query, parsed)
-            if matched is not None:
-                match, details = matched
-                rule = entry.rule
-                found += computed_findings(
-                    rule.outcome, match, query, details, rule.outcomes
-                )
-        found += self._coverage(part)
-        return [f for f in found if conditional or not f.conditional_on]
+        return alive
 
     def _space_candidates(self, tables: Any, space: Space) -> np.ndarray:
         """Rules whose space may meet the query's; object-id rules are kept."""
@@ -555,7 +594,7 @@ class Index:
                 lon, lat = space.points[0][ok], space.points[1][ok]
             seam = np.abs(lon) == 180.0  # +180 and -180 are one meridian
             targets = [
-                shapely.envelope(shapely.multipoints(np.c_[x, y]))
+                shapely.box(x.min(), y.min(), x.max(), y.max())
                 for x, y in ((lon, lat), (-lon[seam], lat[seam]))
                 if x.size
             ]
@@ -657,6 +696,140 @@ class Index:
             )
         return found
 
+    # ---- the inverse query (section 10) ---------------------------------------------
+    def suitable(
+        self,
+        query: Query,
+        variable: str,
+        *,
+        products: Sequence[str] | None = None,
+        score: ScoreFn | None = None,
+        include_dropped: bool = False,
+    ) -> list[Suitability]:
+        """The products that can serve a request, fewest known concerns first.
+
+        Not a quality ranking: empty findings mean only that no registered rule
+        matched, and a product ranks higher simply because less has been written
+        about it (see rule_counts()). Each candidate is judged on one request
+        added to the query (section 10.1); one entirely outside its coverage is
+        dropped, or listed last with include_dropped=True.
+        """
+        given = [n for n in _PER_REQUEST if n in query.facets or n in query.dims]
+        if query.requests or given:
+            raise ValueError(
+                "suitable() adds one request per product, so the query gives no "
+                f"requests and none of the facets {list(_PER_REQUEST)}"
+            )
+        if products is None:
+            names = sorted(
+                n for n, p in self._products.items() if variable in p.variables
+            )
+        else:
+            names = list(dict.fromkeys(self._product(p) for p in products))
+            lacking = [n for n in names if variable not in self._products[n].variables]
+            if lacking:
+                raise ValueError(f"products {lacking} do not offer {variable!r}")
+        ranked, dropped = [], []
+        for name in names:
+            product = self._products[name]
+            one = self._make_query(query, {"requests": (Request(name, (variable,)),)})
+            found = _sorted(self._run(self._expand(one)[1], False))
+            if any(f.kind == "coverage" and f.action == "do_not_use" for f in found):
+                outside = tuple(f for f in found if f.kind == "coverage")
+                dropped.append(Suitability(product, (), outside))
+                continue
+            rank = tuple(
+                float(v) for v in (score or default_score)(product, one, found)
+            )
+            ranked.append(Suitability(product, rank, tuple(found)))
+        self._last = (None, None)
+        ranked.sort(key=lambda s: (s.score, s.product.name))
+        return ranked + dropped if include_dropped else ranked
+
+    # ---- the bulk path (section 9.3) ------------------------------------------------
+    def query_points(
+        self, lon: Any, lat: Any, weights: Any = None, **fields: Any
+    ) -> PointResult:
+        """Masks and weighted fractions over many points (section 9.3).
+
+        fields are those of query() but space, context and Request.support: the
+        points are every request's support. NaN points are inside no rule. A
+        computed rule takes part through its mask(lon, lat, query) hook, called
+        with the flat arrays, and is otherwise listed in skipped.
+        """
+        conditional = fields.pop("include_conditional", False)
+        if "space" in fields or "context" in fields:
+            raise TypeError("the points are the space, and there is no context")
+        shape = np.shape(lon)
+        points = sp.weighted_points(lon, lat, weights)
+        x, y, w = points.points
+        valid = np.isfinite(x) & np.isfinite(y)
+        query = self._make_query(None, dict(fields, space=points))
+        if any(r.support is not None for r in query.requests):
+            raise ValueError("the points are the support of every request; give none")
+        inside, total = _point_tester(x, y, valid), w[valid].sum()
+        tables = self._tables()
+        found: list[Finding] = []
+        masks: dict[tuple[str | None, str], np.ndarray] = {}
+        fractions: dict[tuple[str | None, str], float] = {}
+        skipped = []
+
+        def keep(key: tuple[str | None, str], mask: np.ndarray) -> float:
+            masks[key] = mask.reshape(shape)
+            fractions[key] = float(w[mask].sum() / total)
+            return fractions[key]
+
+        for part in self._expand(query):
+            q = part.query
+            product = q.facets["product"][0] if q.request is not None else None
+            flat = dataclasses.replace(q, space=None)
+            for i in np.flatnonzero(self._alive(part, conditional, context=False)):
+                entry = tables.entries[i]
+                rule, key = entry.rule, (product, entry.rule.code)
+                if entry.form in ("hooked", "foreign"):  # no outcome to mask
+                    skipped.append(key)
+                    continue
+                scope = dataclasses.replace(entry.scope, requires=())
+                ids = scope.space is not None and scope.space.kind == "features"
+                if not ids:  # ids against points stay conditional on space
+                    scope = dataclasses.replace(scope, space=None)
+                matched = match_scope(self, scope, q if ids else flat)
+                if matched is None:
+                    continue
+                match, details = matched
+                space = entry.scope.space
+                mask = valid.copy() if space is None or ids else inside(space.geometry)
+                if not mask.any():
+                    continue
+                computed = entry.form == "computed"
+                if not match.conditional_on:  # conditional findings get no mask
+                    if computed:
+                        hooked = rule.mask(x, y, q)
+                        if hooked is None:
+                            skipped.append(key)
+                            continue
+                        mask &= np.asarray(hooked, bool).reshape(-1)
+                        if not mask.any():
+                            continue
+                    fraction = keep(key, mask)
+                    match = dataclasses.replace(match, area_fraction=fraction)
+                outcome = rule.outcome if computed else rule
+                source = binding_of(rule).source
+                found += make_findings(
+                    outcome, match, q, source=source, details=details
+                )
+            for f in self._coverage(part):
+                found.append(f)
+                if not f.conditional_on:
+                    cover = part.coverage.space
+                    if f.code == "QE001" and cover.kind != "empty":
+                        keep((f.product, f.code), valid & ~inside(cover.geometry))
+                    else:
+                        keep((f.product, f.code), valid.copy())
+        self._last = (None, None)
+        found = _sorted(f for f in found if conditional or not f.conditional_on)
+        return PointResult(tuple(found), masks, fractions, tuple(skipped), shape)
+
     # ---- tables (section 9.1, "Index internals") ----------------------------------
     def _tables(self) -> Any:
         """The prefilter arrays, rebuilt on the first query after any change."""
@@ -713,7 +886,8 @@ class Index:
         envelopes, owner = [], []
         for i, s in enumerate(spaces):
             if s is not None and s.kind == "polygon":
-                parts = shapely.get_parts(s.geometry)
+                box = getattr(s, "envelope", None)  # sp.deferred: not yet built
+                parts = [shapely.box(*box)] if box else shapely.get_parts(s.geometry)
                 envelopes += list(shapely.envelope(parts))
                 owner += [i] * len(parts)
         t.owner = np.array(owner, dtype=np.intp)
@@ -736,3 +910,124 @@ def _sorted(findings: Iterable[Finding]) -> list[Finding]:
     return sorted(
         findings, key=lambda f: (-f.severity, _KINDS[f.kind], f.code, part(f))
     )
+
+
+def _point_tester(
+    x: np.ndarray, y: np.ndarray, valid: np.ndarray
+) -> Callable[[shapely.Geometry], np.ndarray]:
+    """inside(geometry): closed-set membership of the points (section 9.3).
+
+    Points in 64 x 64 tiles a shape covers need no test; those in tiles it only
+    touches are tested with intersects_xy. Seam and pole points go through
+    sp.points_mask, so the bulk path agrees with Index.query there too.
+    """
+    edge = valid & ((np.abs(x) == 180.0) | (np.abs(y) == 90.0))
+    rest = np.flatnonzero(valid & ~edge)
+    edge = np.flatnonzero(edge)
+    tree = None
+    if rest.size:
+        bins = [
+            np.minimum((v - v.min()) * (64 / max(np.ptp(v), 1e-300)), 63).astype(int)
+            for v in (x[rest], y[rest])
+        ]
+        tile = bins[0] * 64 + bins[1]
+        order = np.argsort(tile, kind="stable")
+        tile, rest = tile[order], rest[order]
+        first = np.flatnonzero(np.r_[True, tile[1:] != tile[:-1]])  # non-empty tiles
+        count = np.diff(np.r_[first, tile.size])
+        px, py = x[rest], y[rest]
+        low = [np.minimum.reduceat(v, first) - 1e-9 for v in (px, py)]
+        high = [np.maximum.reduceat(v, first) + 1e-9 for v in (px, py)]
+        tree = shapely.STRtree(shapely.box(low[0], low[1], high[0], high[1]))
+
+    def points_of(tiles: np.ndarray) -> np.ndarray:
+        n = count[tiles]
+        return rest[np.repeat(first[tiles] - np.cumsum(n) + n, n) + np.arange(n.sum())]
+
+    def inside(geometry: shapely.Geometry) -> np.ndarray:
+        if not shapely.is_prepared(geometry):
+            shapely.prepare(geometry)
+        out = np.zeros(x.shape, bool)
+        if tree is not None:
+            covered = tree.query(geometry, predicate="covers")
+            touched = tree.query(geometry, predicate="intersects")
+            out[points_of(covered)] = True
+            near = points_of(np.setdiff1d(touched, covered, assume_unique=True))
+            out[near] = shapely.intersects_xy(geometry, x[near], y[near])
+        out[edge] = sp.points_mask(geometry, x[edge], y[edge])
+        return out
+
+    return inside
+
+
+# ---- results of the bulk path and the inverse query -------------------------------
+@dataclass(frozen=True, eq=False)
+class PointResult:
+    """What Index.query_points found, keyed by (product, code), product None
+    on the base query. Masks are shaped like lon; conditional findings have none.
+    """
+
+    findings: tuple[Finding, ...]
+    masks: Mapping[tuple[str | None, str], np.ndarray]
+    fractions: Mapping[tuple[str | None, str], float]
+    skipped: tuple[tuple[str | None, str], ...] = ()
+    shape: tuple[int, ...] = ()  # the shape of lon
+
+    def any(self, min_severity: Severity | str | int = Severity.WARNING) -> np.ndarray:
+        """Points inside some definite finding at or above min_severity."""
+        floor = severity_of(min_severity)
+        out = np.zeros(self.shape, bool)
+        for f in self.findings:
+            key = (f.product, f.code)
+            if f.severity >= floor and key in self.masks:
+                out |= self.masks[key]
+        return out
+
+
+class Suitability(NamedTuple):
+    """A product ranked by Index.suitable; a low score is not "good data"."""
+
+    product: Product
+    score: tuple[float, ...]  # for ordering only; () for a dropped product
+    findings: tuple[Finding, ...]  # this product's definite findings
+
+
+ScoreFn = Callable[[Product, Query, Sequence[Finding]], tuple[float, ...]]
+_WEIGHTS = {Severity.INFO: 1.0, Severity.WARNING: 2.0, Severity.SEVERE: 4.0}
+
+
+def default_score(
+    product: Product, query: Query, findings: Sequence[Finding]
+) -> tuple[float, float, float]:
+    """(worst, burden, misfit): lower means fewer known concerns (section 10.2).
+
+    Counts definite caveat and coverage findings not below their min_overlap;
+    burden weighs severities 1, 2, 4 by area and time fractions (1.0 if None).
+    """
+    counted = [
+        f
+        for f in findings
+        if not f.conditional_on
+        and f.kind in ("caveat", "coverage")
+        and (f.area_fraction is None or f.area_fraction >= f.min_overlap)
+    ]
+    worst = max((int(f.severity) for f in counted), default=0)
+    burden = sum(
+        _WEIGHTS[f.severity]
+        * (1.0 if f.area_fraction is None else f.area_fraction)
+        * (1.0 if f.time_fraction is None else f.time_fraction)
+        for f in counted
+    )
+    misfit = 0.0
+    space = query.space
+    if product.resolution is not None and space is not None and space.area_km2:
+        size, unit = product.resolution
+        if unit == "deg":  # an equal-area square at the centroid latitude
+            lat = math.radians(shapely.centroid(space.geometry).y)
+            width = math.radians(size)
+            size = sp.R_KM * math.sqrt(
+                width * 2.0 * math.cos(lat) * math.sin(width / 2)
+            )
+        if size > 0.0:
+            misfit = max(0.0, math.log2(size / math.sqrt(space.area_km2)))
+    return float(worst), round(burden, 3), misfit
