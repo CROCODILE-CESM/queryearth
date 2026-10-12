@@ -716,7 +716,8 @@ def time_fraction(part: TimeSpec | None, query: TimeSpec | None) -> float | None
 
     None when the query has no time or an open end, and for a standard or
     gregorian query starting before 1582-10-15, where proleptic durations would
-    be wrong (Q19); julian durations use the julian day table (Q20).
+    be wrong (Q19); julian durations use the julian day table (Q20). A month
+    recurrence on either side is expanded before durations are measured.
     """
     if query is None:
         return None
@@ -729,6 +730,8 @@ def time_fraction(part: TimeSpec | None, query: TimeSpec | None) -> float | None
         query = overlap(query, query)
         if query is None:
             return None
+    if part is not None and part.months is not None:
+        part = overlap(part, part)  # bounded, since it lies inside a bounded query
     total = _duration(query.calendar, query.intervals)
     if total == 0:
         return None

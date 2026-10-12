@@ -470,3 +470,13 @@ def test_timespec_and_interval_checks():
     assert hash(interval("2020-01-01", "2020-01-31")) == hash(
         interval("2020-01-01", "2020-01-31")
     )
+
+
+def test_time_fraction_expands_months_on_the_part():
+    query = TimeSpec(
+        interval("2020-11-15", "2021-03-10").intervals, frozenset({12, 1, 2})
+    )
+    assert (
+        time_fraction(query, query) == 1.0
+    )  # was 1.289: the part's months were ignored
+    assert time_fraction(overlap(None, query), query) == 1.0
