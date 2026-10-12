@@ -22,7 +22,7 @@ pytest
 black .
 ```
 
-Versions come from git tags through setuptools-scm. Every push to `main` publishes a development version to TestPyPI, and every GitHub release publishes to PyPI.
+Versions come from git tags through setuptools-scm. Every push to `main` builds the package, and every GitHub release tagged `vX.Y.Z` publishes version X.Y.Z to PyPI.
 
 ## Licence
 

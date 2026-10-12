@@ -32,7 +32,7 @@ include = ["queryearth*"]
 
 [tool.setuptools_scm]
 version_file = "queryearth/_version.py"
-local_scheme = "no-local-version"  # TestPyPI rejects local versions such as +g1a2b3c
+local_scheme = "no-local-version"  # package indexes reject local versions such as +g1a2b3c
 fallback_version = "0.0.0"
 
 [tool.pytest.ini_options]
