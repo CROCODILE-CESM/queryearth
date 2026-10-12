@@ -591,7 +591,7 @@ Inside the code every interval is half-open, [start, end), with `None` for an op
 
 Adding a day never needs month lengths. Past the last day of a month, the sum lands on "day 0" of the next month or "month 0" of the next year; no real instant uses those slots, so the sum comes after every second of the day and before the next real day, and overlap tests are exact without a calendar. Two intervals [a, b) and [c, d) overlap when a < d and c < b; unions and intersections are computed by sorting and sweeping. Half-open intervals also stop a boundary day from matching twice.
 
-When a finding writes `time_overlap`, each [start, end) goes back to closed wire form: the start's date, and the day before the end, with the calendar naming the last day of the previous month when the end falls on day 0 or day 1. The output is at day precision unless either side used timestamps. `time_fraction` is the overlap's length in days divided by the query's length in days, measured in the query's calendar. It is None when the query has an open end, and for `julian`.
+When a finding writes `time_overlap`, each [start, end) goes back to closed wire form: the start's date, and the day before the end, with the calendar naming the last day of the previous month when the end falls on day 0 or day 1. The output is at day precision unless either side used timestamps. `time_fraction` is the overlap's length in days divided by the query's length in days, measured in the query's calendar. It is None when the query has an open end, and for a `standard` or `gregorian` query that starts before 15 October 1582 (Q19); `julian` has its own day table (Q20).
 
 ### Month recurrence in full
 

@@ -1,8 +1,7 @@
 name: Tests
 
 on:
-  push:
-    branches: [main]
+  push:  # every branch, so feature branches are tested before a pull request
   pull_request:
 
 jobs:

@@ -22,7 +22,7 @@ classifiers = [
 ]
 
 [project.optional-dependencies]
-test = ["pytest", "jsonschema"]
+test = ["pytest", "jsonschema", "cftime", "pandas", "pyproj"]
 
 [project.urls]
 Repository = "https://github.com/CROCODILE-CESM/queryearth"
