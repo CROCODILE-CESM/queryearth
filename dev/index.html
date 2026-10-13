@@ -6,14 +6,14 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>queryearth &mdash; queryearth 0.0.2.dev3</title>
+  <title>queryearth &mdash; queryearth 0.0.2.dev5</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
 
   
       <script src="_static/jquery.js?v=5d32c60e"></script>
       <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="_static/documentation_options.js?v=389fa3a0"></script>
+      <script src="_static/documentation_options.js?v=576eb774"></script>
       <script src="_static/doctools.js?v=fd6eb6e6"></script>
       <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="_static/versions.js?v=58ec1786"></script>
@@ -77,12 +77,11 @@
              
   <section id="queryearth">
 <h1>queryearth<a class="headerlink" href="#queryearth" title="Link to this heading"></a></h1>
-<p>queryearth answers one question: given where (a point or a polygon), when (a time range) and anything else that matters (grid resolution, product, variable, model and so on), which registered rules apply, how much of the request does each one cover, and what does it say to watch out for or to do?</p>
-<p>Rules are short Python objects or GeoJSON records. A query returns <strong>findings</strong> of three kinds:</p>
+<p>queryearth answers one question: given where (a point or a polygon), when (a time range) and anything else that matters (grid resolution, product, variable, model and so on), which registered rules apply, how much of the query does each one cover, and what does it say to watch out for or to do?</p>
+<p>Rules are short Python objects or GeoJSON records. A query returns <strong>findings</strong> of two kinds:</p>
 <ul class="simple">
-<li><p><strong>caveats</strong>, such as “these values are climatology, not observations”;</p></li>
-<li><p><strong>coverage gaps</strong>, such as “this product does not reach part of your request”;</p></li>
-<li><p><strong>recommendations</strong> with structured suggestions, such as “set this model parameter”.</p></li>
+<li><p><strong>warnings</strong>, such as “these values are climatology, not observations” or “this product does not reach part of your area”;</p></li>
+<li><p><strong>suggestions</strong> of structured actions, such as “set this model parameter”.</p></li>
 </ul>
 <p>queryearth is an engine only: it ships no rules of its own. You bring yours.</p>
 <section id="install">
@@ -101,10 +100,9 @@
 <span class="n">registry</span><span class="o">.</span><span class="n">add</span><span class="p">(</span>
     <span class="n">qe</span><span class="o">.</span><span class="n">Rule</span><span class="p">(</span>
         <span class="n">code</span><span class="o">=</span><span class="s2">"DEMO001"</span><span class="p">,</span>
-        <span class="n">kind</span><span class="o">=</span><span class="s2">"caveat"</span><span class="p">,</span>
+        <span class="n">kind</span><span class="o">=</span><span class="s2">"warning"</span><span class="p">,</span>
         <span class="n">title</span><span class="o">=</span><span class="s2">"Sparse observations south of 50S before 2004"</span><span class="p">,</span>
         <span class="n">message</span><span class="o">=</span><span class="s2">"Few observations constrain this period, so values drift."</span><span class="p">,</span>
-        <span class="n">severity</span><span class="o">=</span><span class="n">qe</span><span class="o">.</span><span class="n">Severity</span><span class="o">.</span><span class="n">WARNING</span><span class="p">,</span>
         <span class="n">scope</span><span class="o">=</span><span class="n">qe</span><span class="o">.</span><span class="n">Scope</span><span class="p">(</span>
             <span class="n">space</span><span class="o">=</span><span class="n">sp</span><span class="o">.</span><span class="n">box</span><span class="p">(</span><span class="o">-</span><span class="mi">180</span><span class="p">,</span> <span class="o">-</span><span class="mi">90</span><span class="p">,</span> <span class="mi">180</span><span class="p">,</span> <span class="o">-</span><span class="mi">50</span><span class="p">),</span>
             <span class="n">time</span><span class="o">=</span><span class="n">qe</span><span class="o">.</span><span class="n">interval</span><span class="p">(</span><span class="s2">"1993-01-01"</span><span class="p">,</span> <span class="s2">"2003-12-31"</span><span class="p">),</span>
@@ -114,10 +112,9 @@
 <span class="n">registry</span><span class="o">.</span><span class="n">add</span><span class="p">(</span>
     <span class="n">qe</span><span class="o">.</span><span class="n">Rule</span><span class="p">(</span>
         <span class="n">code</span><span class="o">=</span><span class="s2">"DEMO101"</span><span class="p">,</span>
-        <span class="n">kind</span><span class="o">=</span><span class="s2">"recommendation"</span><span class="p">,</span>
+        <span class="n">kind</span><span class="o">=</span><span class="s2">"suggestion"</span><span class="p">,</span>
         <span class="n">title</span><span class="o">=</span><span class="s2">"Fine grid: turn off the coarse-grid scheme"</span><span class="p">,</span>
         <span class="n">message</span><span class="o">=</span><span class="s2">"Below 10 km the model resolves this process itself."</span><span class="p">,</span>
-        <span class="n">severity</span><span class="o">=</span><span class="n">qe</span><span class="o">.</span><span class="n">Severity</span><span class="o">.</span><span class="n">INFO</span><span class="p">,</span>
         <span class="n">scope</span><span class="o">=</span><span class="n">qe</span><span class="o">.</span><span class="n">Scope</span><span class="p">(</span><span class="n">axes</span><span class="o">=</span><span class="p">{</span><span class="s2">"resolution"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"lt"</span><span class="p">:</span> <span class="mi">10</span><span class="p">}}),</span>
         <span class="n">suggestions</span><span class="o">=</span><span class="p">[</span><span class="n">qe</span><span class="o">.</span><span class="n">Suggestion</span><span class="p">(</span><span class="s2">"settings"</span><span class="p">,</span> <span class="s2">"coarse_scheme"</span><span class="p">,</span> <span class="kc">False</span><span class="p">)],</span>
     <span class="p">)</span>
@@ -131,14 +128,14 @@
     <span class="nb">print</span><span class="p">(</span><span class="n">f</span><span class="o">.</span><span class="n">code</span><span class="p">,</span> <span class="n">f</span><span class="o">.</span><span class="n">kind</span><span class="p">,</span> <span class="sa">f</span><span class="s2">"area </span><span class="si">{</span><span class="n">f</span><span class="o">.</span><span class="n">area_fraction</span><span class="si">:</span><span class="s2">.0%</span><span class="si">}</span><span class="s2">"</span><span class="p">,</span> <span class="sa">f</span><span class="s2">"time </span><span class="si">{</span><span class="n">f</span><span class="o">.</span><span class="n">time_fraction</span><span class="si">:</span><span class="s2">.0%</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 </pre></div>
 </div>
-<p>This prints DEMO001 first, because it is more severe: it covers 58% of the box’s area and 67% of its period. Then it prints DEMO101, which applies to the whole request at 8 km.</p>
+<p>This prints DEMO001 first, because a warning’s level, WARNING, is above a suggestion’s, INFO. DEMO001 covers 58% of the box’s area and 67% of its period. Then it prints DEMO101, which applies to the whole query at 8 km.</p>
 <div class="toctree-wrapper compound">
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="concepts.html">Concepts</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="concepts.html#rules-and-their-scope">Rules and their scope</a></li>
 <li class="toctree-l2"><a class="reference internal" href="concepts.html#queries-and-findings">Queries and findings</a></li>
 <li class="toctree-l2"><a class="reference internal" href="concepts.html#conditional-findings">Conditional findings</a></li>
-<li class="toctree-l2"><a class="reference internal" href="concepts.html#several-products-in-one-query-requests">Several products in one query: requests</a></li>
+<li class="toctree-l2"><a class="reference internal" href="concepts.html#products">Products</a></li>
 <li class="toctree-l2"><a class="reference internal" href="concepts.html#query-with-what-you-use">Query with what you use</a></li>
 <li class="toctree-l2"><a class="reference internal" href="concepts.html#space">Space</a></li>
 <li class="toctree-l2"><a class="reference internal" href="concepts.html#time">Time</a></li>
@@ -151,8 +148,7 @@
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="results.html">Using findings</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="results.html#reporting-them-emit">Reporting them: emit()</a></li>
-<li class="toctree-l2"><a class="reference internal" href="results.html#choosing-a-product-suitable">Choosing a product: suitable()</a></li>
+<li class="toctree-l2"><a class="reference internal" href="results.html#reporting-findings">Reporting findings</a></li>
 <li class="toctree-l2"><a class="reference internal" href="results.html#many-points-at-once-query-points">Many points at once: query_points()</a></li>
 </ul>
 </li>
@@ -166,46 +162,32 @@
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="api.html">API reference</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="api.html#queryearth.AdvisoryError"><code class="docutils literal notranslate"><span class="pre">AdvisoryError</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="api.html#queryearth.AdvisoryWarning"><code class="docutils literal notranslate"><span class="pre">AdvisoryWarning</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="api.html#queryearth.Axis"><code class="docutils literal notranslate"><span class="pre">Axis</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="api.html#queryearth.AxisOverlap"><code class="docutils literal notranslate"><span class="pre">AxisOverlap</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="api.html#queryearth.ComputedRule"><code class="docutils literal notranslate"><span class="pre">ComputedRule</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="api.html#queryearth.Coverage"><code class="docutils literal notranslate"><span class="pre">Coverage</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="api.html#queryearth.DimMatch"><code class="docutils literal notranslate"><span class="pre">DimMatch</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="api.html#queryearth.Dimension"><code class="docutils literal notranslate"><span class="pre">Dimension</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="api.html#queryearth.DuplicateCodeError"><code class="docutils literal notranslate"><span class="pre">DuplicateCodeError</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="api.html#queryearth.Finding"><code class="docutils literal notranslate"><span class="pre">Finding</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="api.html#queryearth.Registry"><code class="docutils literal notranslate"><span class="pre">Registry</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="api.html#queryearth.InfoAdvisory"><code class="docutils literal notranslate"><span class="pre">InfoAdvisory</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="api.html#queryearth.Interval"><code class="docutils literal notranslate"><span class="pre">Interval</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="api.html#queryearth.Labels"><code class="docutils literal notranslate"><span class="pre">Labels</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="api.html#queryearth.LoadError"><code class="docutils literal notranslate"><span class="pre">LoadError</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="api.html#queryearth.Match"><code class="docutils literal notranslate"><span class="pre">Match</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="api.html#queryearth.Outcome"><code class="docutils literal notranslate"><span class="pre">Outcome</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="api.html#queryearth.PointResult"><code class="docutils literal notranslate"><span class="pre">PointResult</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="api.html#queryearth.Policy"><code class="docutils literal notranslate"><span class="pre">Policy</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="api.html#queryearth.Prefilter"><code class="docutils literal notranslate"><span class="pre">Prefilter</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="api.html#queryearth.Product"><code class="docutils literal notranslate"><span class="pre">Product</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="api.html#queryearth.Query"><code class="docutils literal notranslate"><span class="pre">Query</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="api.html#queryearth.Request"><code class="docutils literal notranslate"><span class="pre">Request</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="api.html#queryearth.Rule"><code class="docutils literal notranslate"><span class="pre">Rule</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="api.html#queryearth.RuleKind"><code class="docutils literal notranslate"><span class="pre">RuleKind</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="api.html#queryearth.Scope"><code class="docutils literal notranslate"><span class="pre">Scope</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="api.html#queryearth.SevereAdvisory"><code class="docutils literal notranslate"><span class="pre">SevereAdvisory</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="api.html#queryearth.Severity"><code class="docutils literal notranslate"><span class="pre">Severity</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="api.html#queryearth.Space"><code class="docutils literal notranslate"><span class="pre">Space</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="api.html#queryearth.Suggestion"><code class="docutils literal notranslate"><span class="pre">Suggestion</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="api.html#queryearth.Suitability"><code class="docutils literal notranslate"><span class="pre">Suitability</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="api.html#queryearth.TimeSpec"><code class="docutils literal notranslate"><span class="pre">TimeSpec</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="api.html#queryearth.UnknownNameError"><code class="docutils literal notranslate"><span class="pre">UnknownNameError</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="api.html#queryearth.Versions"><code class="docutils literal notranslate"><span class="pre">Versions</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="api.html#queryearth.WarningAdvisory"><code class="docutils literal notranslate"><span class="pre">WarningAdvisory</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="api.html#queryearth.default_score"><code class="docutils literal notranslate"><span class="pre">default_score()</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="api.html#queryearth.emit"><code class="docutils literal notranslate"><span class="pre">emit()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="api.html#queryearth.interval"><code class="docutils literal notranslate"><span class="pre">interval()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="api.html#queryearth.parse_time"><code class="docutils literal notranslate"><span class="pre">parse_time()</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="api.html#queryearth.policy"><code class="docutils literal notranslate"><span class="pre">policy()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="api.html#module-queryearth.space">queryearth.space</a></li>
 </ul>
 </li>

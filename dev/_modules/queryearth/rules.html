@@ -5,14 +5,14 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>queryearth.rules &mdash; queryearth 0.0.2.dev3</title>
+  <title>queryearth.rules &mdash; queryearth 0.0.2.dev5</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
 
   
       <script src="../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../_static/documentation_options.js?v=389fa3a0"></script>
+      <script src="../../_static/documentation_options.js?v=576eb774"></script>
       <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../_static/versions.js?v=58ec1786"></script>
@@ -78,9 +78,8 @@
 
 <span class="sd">Every rule kind implements RuleKind: a code, a scope and evaluate(query).</span>
 <span class="sd">Rule.evaluate and ComputedRule.evaluate are the reference semantics of</span>
-<span class="sd">design.md section 4.3, run on one part of a query (the base query or one</span>
-<span class="sd">request's sub-query, as Registry.expand() returns them). Registry.query calls</span>
-<span class="sd">evaluate() on every active rule, after any plugin prefilters.</span>
+<span class="sd">design.md section 4.3. Registry.query calls evaluate() on every active rule,</span>
+<span class="sd">after any plugin prefilters.</span>
 <span class="sd">"""</span>
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
@@ -97,7 +96,7 @@
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">queryearth</span><span class="w"> </span><span class="kn">import</span> <span class="n">space</span> <span class="k">as</span> <span class="n">sp</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">queryearth.dimensions</span><span class="w"> </span><span class="kn">import</span> <span class="n">DimMatch</span><span class="p">,</span> <span class="n">schema_problem</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">queryearth.objects</span><span class="w"> </span><span class="kn">import</span> <span class="n">Finding</span><span class="p">,</span> <span class="n">Match</span><span class="p">,</span> <span class="n">Outcome</span><span class="p">,</span> <span class="n">Query</span><span class="p">,</span> <span class="n">Scope</span><span class="p">,</span> <span class="n">Severity</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">queryearth.objects</span><span class="w"> </span><span class="kn">import</span> <span class="n">Finding</span><span class="p">,</span> <span class="n">Match</span><span class="p">,</span> <span class="n">Outcome</span><span class="p">,</span> <span class="n">Query</span><span class="p">,</span> <span class="n">Scope</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">queryearth.space</span><span class="w"> </span><span class="kn">import</span> <span class="n">Space</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">queryearth.time</span><span class="w"> </span><span class="kn">import</span> <span class="n">Interval</span><span class="p">,</span> <span class="n">TimeSpec</span><span class="p">,</span> <span class="n">overlap</span><span class="p">,</span> <span class="n">parse_time</span><span class="p">,</span> <span class="n">time_fraction</span>
 
@@ -110,7 +109,7 @@
 <span class="n">RuleFunc</span> <span class="o">=</span> <span class="n">Callable</span><span class="p">[[</span><span class="n">Query</span><span class="p">,</span> <span class="n">Match</span><span class="p">],</span> <span class="n">CheckResult</span><span class="p">]</span>
 
 <span class="c1"># A prefix plus three or four digits, with a hyphen after a prefix that ends in</span>
-<span class="c1"># a digit, so every code parses one way (Q8); QE is reserved.</span>
+<span class="c1"># a digit, so every code parses one way (Q8).</span>
 <span class="n">CODE</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="sa">r</span><span class="s2">"(?:[A-Z][A-Z0-9]{0,10}[A-Z]-?|[A-Z][A-Z0-9]{0,10}[0-9]-)[0-9]{3,4}"</span><span class="p">)</span>
 
 
@@ -122,8 +121,6 @@
             <span class="s2">"digits, such as CRU001, with a hyphen after a prefix that ends in a "</span>
             <span class="s2">"digit (ERA5-014)"</span>
         <span class="p">)</span>
-    <span class="k">if</span> <span class="n">re</span><span class="o">.</span><span class="n">fullmatch</span><span class="p">(</span><span class="sa">r</span><span class="s2">"QE-?[0-9]+"</span><span class="p">,</span> <span class="n">code</span><span class="p">):</span>
-        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">code</span><span class="si">!r}</span><span class="s2"> uses the prefix QE, which is reserved"</span><span class="p">)</span>
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">code_prefix</span><span class="p">(</span><span class="n">code</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
@@ -134,7 +131,7 @@
 <div class="viewcode-block" id="RuleKind">
 <a class="viewcode-back" href="../../api.html#queryearth.RuleKind">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">RuleKind</span><span class="p">(</span><span class="n">Protocol</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">"""Any rule: a code, a scope, and evaluate() on one query part.</span>
+<span class="w">    </span><span class="sd">"""Any rule: a code, a scope, and evaluate() on one query.</span>
 
 <span class="sd">    A third-party kind may also define outcomes(query, match) -&gt; CheckResult</span>
 <span class="sd">    and an outcome attribute (an Outcome) (Q5): the Registry then matches its scope</span>
@@ -154,9 +151,6 @@
 
     <span class="n">values</span><span class="p">:</span> <span class="n">Mapping</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span>  <span class="c1"># dimension name -&gt; parsed rule value, space and time too</span>
     <span class="n">requires</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span> <span class="o">=</span> <span class="p">()</span>
-
-    <span class="k">def</span><span class="w"> </span><span class="nf">constrains</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
-        <span class="k">return</span> <span class="n">name</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">values</span>
 
 
 <span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">eq</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
@@ -184,7 +178,7 @@
     <span class="n">query</span><span class="p">:</span> <span class="n">Query</span><span class="p">,</span>
     <span class="n">parsed</span><span class="p">:</span> <span class="n">Mapping</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Match</span><span class="p">,</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">"""Match one scope against one query part, dimension by dimension (section 4.3).</span>
+<span class="w">    </span><span class="sd">"""Match one scope against one query, dimension by dimension (section 4.3).</span>
 
 <span class="sd">    Returns None when some dimension fails; otherwise the Match, whose</span>
 <span class="sd">    conditional_on names the undecided dimensions in the Registry's order (space,</span>
@@ -237,17 +231,12 @@
         <span class="n">matched_facets</span><span class="o">=</span><span class="n">groups</span><span class="p">[</span><span class="s2">"facets"</span><span class="p">],</span>
         <span class="n">dims</span><span class="o">=</span><span class="n">groups</span><span class="p">[</span><span class="s2">"dims"</span><span class="p">],</span>
         <span class="n">conditional_on</span><span class="o">=</span><span class="nb">tuple</span><span class="p">(</span><span class="n">conditional</span><span class="p">),</span>
-        <span class="n">assumed</span><span class="o">=</span><span class="nb">tuple</span><span class="p">(</span><span class="n">d</span> <span class="k">for</span> <span class="n">d</span> <span class="ow">in</span> <span class="n">query</span><span class="o">.</span><span class="n">assumed</span> <span class="k">if</span> <span class="n">scope</span><span class="o">.</span><span class="n">constrains</span><span class="p">(</span><span class="n">d</span><span class="p">)),</span>
-        <span class="n">product</span><span class="o">=</span><span class="n">query</span><span class="o">.</span><span class="n">facets</span><span class="p">[</span><span class="s2">"product"</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="k">if</span> <span class="n">query</span><span class="o">.</span><span class="n">request</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
-        <span class="n">request</span><span class="o">=</span><span class="n">query</span><span class="o">.</span><span class="n">request</span><span class="p">,</span>
     <span class="p">)</span>
     <span class="k">return</span> <span class="n">match</span><span class="p">,</span> <span class="n">details</span>
 
 
 <span class="c1"># ---- findings ---------------------------------------------------------------------</span>
-<span class="n">_LOCKED</span> <span class="o">=</span> <span class="nb">frozenset</span><span class="p">(</span>
-    <span class="p">{</span><span class="s2">"code"</span><span class="p">,</span> <span class="s2">"product"</span><span class="p">,</span> <span class="s2">"request"</span><span class="p">,</span> <span class="s2">"query_label"</span><span class="p">,</span> <span class="s2">"source"</span><span class="p">,</span> <span class="s2">"conditional_on"</span><span class="p">,</span> <span class="s2">"assumed"</span><span class="p">}</span>
-<span class="p">)</span>
+<span class="n">_LOCKED</span> <span class="o">=</span> <span class="nb">frozenset</span><span class="p">({</span><span class="s2">"code"</span><span class="p">,</span> <span class="s2">"query_label"</span><span class="p">,</span> <span class="s2">"source"</span><span class="p">,</span> <span class="s2">"conditional_on"</span><span class="p">})</span>
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">_time_override</span><span class="p">(</span><span class="n">value</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">query</span><span class="p">:</span> <span class="n">TimeSpec</span> <span class="o">|</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">:</span>
@@ -362,10 +351,8 @@
 
     <span class="k">def</span><span class="w"> </span><span class="nf">__post_init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
         <span class="n">Outcome</span><span class="o">.</span><span class="n">__post_init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
-        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">kind</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"caveat"</span><span class="p">,</span> <span class="s2">"recommendation"</span><span class="p">):</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">code</span><span class="si">}</span><span class="s2">: coverage is declared on products"</span><span class="p">)</span>
-        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">kind</span> <span class="o">==</span> <span class="s2">"recommendation"</span> <span class="ow">and</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">suggestions</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">code</span><span class="si">}</span><span class="s2">: a recommendation needs suggestions"</span><span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">kind</span> <span class="o">==</span> <span class="s2">"suggestion"</span> <span class="ow">and</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">suggestions</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">code</span><span class="si">}</span><span class="s2">: a suggestion lists one or more suggestions"</span><span class="p">)</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">scope</span><span class="p">,</span> <span class="n">Scope</span><span class="p">):</span>
             <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">code</span><span class="si">}</span><span class="s2">: scope is a Scope"</span><span class="p">)</span>
         <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"region_ref"</span><span class="p">,</span> <span class="s2">"supersedes"</span><span class="p">,</span> <span class="s2">"aliases"</span><span class="p">):</span>
@@ -405,11 +392,7 @@
         <span class="n">unknown</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="n">feature</span><span class="p">)</span> <span class="o">-</span> <span class="n">_FEATURE_KEYS</span><span class="p">)</span> <span class="o">+</span> <span class="nb">sorted</span><span class="p">(</span>
             <span class="n">k</span> <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">props</span> <span class="k">if</span> <span class="n">k</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">_RECORD_KEYS</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">_EXTENSION</span><span class="o">.</span><span class="n">fullmatch</span><span class="p">(</span><span class="n">k</span><span class="p">)</span>
         <span class="p">)</span>
-        <span class="n">missing</span> <span class="o">=</span> <span class="p">[</span>
-            <span class="n">k</span>
-            <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"code"</span><span class="p">,</span> <span class="s2">"kind"</span><span class="p">,</span> <span class="s2">"title"</span><span class="p">,</span> <span class="s2">"message"</span><span class="p">,</span> <span class="s2">"severity"</span><span class="p">)</span>
-            <span class="k">if</span> <span class="n">k</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">props</span>
-        <span class="p">]</span>
+        <span class="n">missing</span> <span class="o">=</span> <span class="p">[</span><span class="n">k</span> <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"code"</span><span class="p">,</span> <span class="s2">"kind"</span><span class="p">,</span> <span class="s2">"title"</span><span class="p">,</span> <span class="s2">"message"</span><span class="p">)</span> <span class="k">if</span> <span class="n">k</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">props</span><span class="p">]</span>
         <span class="k">if</span> <span class="n">unknown</span> <span class="ow">or</span> <span class="n">missing</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
                 <span class="sa">f</span><span class="s2">"unknown members </span><span class="si">{</span><span class="n">unknown</span><span class="si">}</span><span class="s2">"</span> <span class="k">if</span> <span class="n">unknown</span> <span class="k">else</span> <span class="sa">f</span><span class="s2">"missing </span><span class="si">{</span><span class="n">missing</span><span class="si">}</span><span class="s2">"</span>
@@ -421,10 +404,8 @@
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"place must be null, and coordRefSys </span><span class="si">{</span><span class="n">_CRS84</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
         <span class="k">for</span> <span class="n">code</span> <span class="ow">in</span> <span class="p">(</span><span class="n">props</span><span class="p">[</span><span class="s2">"code"</span><span class="p">],</span> <span class="o">*</span><span class="n">props</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"supersedes"</span><span class="p">,</span> <span class="p">())):</span>
             <span class="n">check_code</span><span class="p">(</span><span class="n">code</span><span class="p">)</span>
-        <span class="k">if</span> <span class="n">props</span><span class="p">[</span><span class="s2">"severity"</span><span class="p">]</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"info"</span><span class="p">,</span> <span class="s2">"warning"</span><span class="p">,</span> <span class="s2">"severe"</span><span class="p">):</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                <span class="sa">f</span><span class="s2">"severity is info, warning or severe, not </span><span class="si">{</span><span class="n">props</span><span class="p">[</span><span class="s1">'severity'</span><span class="p">]</span><span class="si">!r}</span><span class="s2">"</span>
-            <span class="p">)</span>
+        <span class="k">if</span> <span class="n">props</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"level"</span><span class="p">,</span> <span class="s2">"info"</span><span class="p">)</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"info"</span><span class="p">,</span> <span class="s2">"warning"</span><span class="p">,</span> <span class="s2">"error"</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"level is info, warning or error, not </span><span class="si">{</span><span class="n">props</span><span class="p">[</span><span class="s1">'level'</span><span class="p">]</span><span class="si">!r}</span><span class="s2">"</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">props</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"status"</span><span class="p">)</span> <span class="o">==</span> <span class="s2">"reviewed"</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">props</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"references"</span><span class="p">):</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"a reviewed record cites at least one reference (Q54)"</span><span class="p">)</span>
         <span class="n">box</span><span class="p">,</span> <span class="n">geometry</span> <span class="o">=</span> <span class="n">props</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"box"</span><span class="p">),</span> <span class="n">feature</span><span class="p">[</span><span class="s2">"geometry"</span><span class="p">]</span>
@@ -459,7 +440,7 @@
 <div class="viewcode-block" id="Rule.evaluate">
 <a class="viewcode-back" href="../../api.html#queryearth.Rule.evaluate">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">evaluate</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">query</span><span class="p">:</span> <span class="n">Query</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">Finding</span><span class="p">]:</span>
-<span class="w">        </span><span class="sd">"""Findings for one query part (section 4.3)."""</span>
+<span class="w">        </span><span class="sd">"""Findings for one query (section 4.3)."""</span>
         <span class="n">bound</span> <span class="o">=</span> <span class="n">binding_of</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
         <span class="n">found</span> <span class="o">=</span> <span class="n">match_scope</span><span class="p">(</span><span class="n">bound</span><span class="o">.</span><span class="n">registry</span><span class="p">,</span> <span class="n">bound</span><span class="o">.</span><span class="n">scope</span><span class="p">,</span> <span class="n">query</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">found</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
@@ -488,14 +469,14 @@
 <div class="viewcode-block" id="ComputedRule">
 <a class="viewcode-back" href="../../api.html#queryearth.ComputedRule">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">ComputedRule</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">"""A rule computed from the request or from data the caller holds.</span>
+<span class="w">    </span><span class="sd">"""A rule computed from the query or from data the caller holds.</span>
 
 <span class="sd">    Class keywords give its identity and scope: code, registry (default</span>
-<span class="sd">    Registry.default()), abstract, the Outcome fields (kind defaults to caveat,</span>
-<span class="sd">    severity to WARNING or INFO for a recommendation, title and message to the</span>
-<span class="sd">    docstring), facets, axes, dims, space (a Space), time and requires (keys</span>
-<span class="sd">    of Query.context). Defining a subclass registers one instance; a subclass</span>
-<span class="sd">    inherits its bases' keywords, merged, with its own winning (Q9).</span>
+<span class="sd">    Registry.default()), abstract, the Outcome fields (kind defaults to warning,</span>
+<span class="sd">    level to the kind's default, title and message to the docstring), facets,</span>
+<span class="sd">    axes, dims, space (a Space), time and requires (keys of Query.context).</span>
+<span class="sd">    Defining a subclass registers one instance; a subclass inherits its bases'</span>
+<span class="sd">    keywords, merged, with its own winning (Q9).</span>
 
 <span class="sd">    check(query, match) runs only for a definite match and returns True (one</span>
 <span class="sd">    finding with the declared outcome), False or None (none), a mapping of</span>
@@ -540,13 +521,7 @@
     <span class="k">def</span><span class="w"> </span><span class="nf">outcome</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Outcome</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">"""The declared outcome, before check() overrides it."""</span>
         <span class="n">fields</span> <span class="o">=</span> <span class="p">{</span><span class="n">k</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="n">k</span><span class="p">]</span> <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">OUTCOME_KEYS</span> <span class="k">if</span> <span class="n">k</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">meta</span><span class="p">}</span>
-        <span class="n">kind</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">"kind"</span><span class="p">,</span> <span class="s2">"caveat"</span><span class="p">)</span>
-        <span class="k">if</span> <span class="n">kind</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"caveat"</span><span class="p">,</span> <span class="s2">"recommendation"</span><span class="p">):</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">code</span><span class="si">}</span><span class="s2">: a computed rule is a caveat or a recommendation"</span>
-            <span class="p">)</span>
-        <span class="n">default</span> <span class="o">=</span> <span class="n">Severity</span><span class="o">.</span><span class="n">INFO</span> <span class="k">if</span> <span class="n">kind</span> <span class="o">==</span> <span class="s2">"recommendation"</span> <span class="k">else</span> <span class="n">Severity</span><span class="o">.</span><span class="n">WARNING</span>
-        <span class="n">fields</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">"severity"</span><span class="p">,</span> <span class="n">default</span><span class="p">)</span>
+        <span class="n">fields</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">"kind"</span><span class="p">,</span> <span class="s2">"warning"</span><span class="p">)</span>
         <span class="n">lines</span> <span class="o">=</span> <span class="n">inspect</span><span class="o">.</span><span class="n">cleandoc</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_doc</span><span class="p">()</span> <span class="ow">or</span> <span class="s2">""</span><span class="p">)</span><span class="o">.</span><span class="n">splitlines</span><span class="p">()</span>
         <span class="n">fields</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">"title"</span><span class="p">,</span> <span class="n">lines</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">if</span> <span class="n">lines</span> <span class="k">else</span> <span class="s2">""</span><span class="p">)</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="n">fields</span><span class="p">[</span><span class="s2">"title"</span><span class="p">]:</span>
@@ -557,7 +532,7 @@
 <div class="viewcode-block" id="ComputedRule.evaluate">
 <a class="viewcode-back" href="../../api.html#queryearth.ComputedRule.evaluate">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">evaluate</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">query</span><span class="p">:</span> <span class="n">Query</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">Finding</span><span class="p">]:</span>
-<span class="w">        </span><span class="sd">"""Findings for one query part: the scope, then check() if definite."""</span>
+<span class="w">        </span><span class="sd">"""Findings for one query: the scope, then check() if definite."""</span>
         <span class="n">bound</span> <span class="o">=</span> <span class="n">binding_of</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
         <span class="n">found</span> <span class="o">=</span> <span class="n">match_scope</span><span class="p">(</span><span class="n">bound</span><span class="o">.</span><span class="n">registry</span><span class="p">,</span> <span class="n">bound</span><span class="o">.</span><span class="n">scope</span><span class="p">,</span> <span class="n">query</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">found</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>

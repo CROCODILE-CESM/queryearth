@@ -6,14 +6,14 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Concepts &mdash; queryearth 0.0.2.dev3</title>
+  <title>Concepts &mdash; queryearth 0.0.2.dev5</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
 
   
       <script src="_static/jquery.js?v=5d32c60e"></script>
       <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="_static/documentation_options.js?v=389fa3a0"></script>
+      <script src="_static/documentation_options.js?v=576eb774"></script>
       <script src="_static/doctools.js?v=fd6eb6e6"></script>
       <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="_static/versions.js?v=58ec1786"></script>
@@ -48,7 +48,7 @@
 <li class="toctree-l2"><a class="reference internal" href="#rules-and-their-scope">Rules and their scope</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#queries-and-findings">Queries and findings</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#conditional-findings">Conditional findings</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#several-products-in-one-query-requests">Several products in one query: requests</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#products">Products</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#query-with-what-you-use">Query with what you use</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#space">Space</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#time">Time</a></li>
@@ -121,19 +121,19 @@
 </tbody>
 </table>
 <p>Axes are declared on the <a class="reference internal" href="api.html#queryearth.Registry" title="queryearth.Registry"><code class="xref py py-class docutils literal notranslate"><span class="pre">Registry</span></code></a> with one unit each, for example <code class="docutils literal notranslate"><span class="pre">qe.Axis(&quot;resolution&quot;,</span> <span class="pre">&quot;km&quot;)</span></code>. The default facets can be replaced or extended with <code class="docutils literal notranslate"><span class="pre">Registry(facets=...)</span></code>.</p>
-<p>A <strong>code</strong> is a prefix plus three or four digits, such as <code class="docutils literal notranslate"><span class="pre">CRU001</span></code>, or <code class="docutils literal notranslate"><span class="pre">ERA5-014</span></code> (a prefix that ends in a digit needs the hyphen). The prefix <code class="docutils literal notranslate"><span class="pre">QE</span></code> is reserved for the built-in coverage findings.</p>
+<p>A <strong>code</strong> is a prefix plus three or four digits, such as <code class="docutils literal notranslate"><span class="pre">CRU001</span></code>, or <code class="docutils literal notranslate"><span class="pre">ERA5-014</span></code> (a prefix that ends in a digit needs the hyphen).</p>
 </section>
 <section id="queries-and-findings">
 <h2>Queries and findings<a class="headerlink" href="#queries-and-findings" title="Link to this heading"></a></h2>
-<p>A <a class="reference internal" href="api.html#queryearth.Query" title="queryearth.Query"><code class="xref py py-class docutils literal notranslate"><span class="pre">Query</span></code></a> gives any subset of the same dimensions. “Resolution 8 km” on its own is a complete query. <a class="reference internal" href="api.html#queryearth.Registry.query" title="queryearth.Registry.query"><code class="xref py py-meth docutils literal notranslate"><span class="pre">Registry.query()</span></code></a> takes a <code class="docutils literal notranslate"><span class="pre">Query</span></code> or its fields as keywords, and returns a sorted list of <a class="reference internal" href="api.html#queryearth.Finding" title="queryearth.Finding"><code class="xref py py-class docutils literal notranslate"><span class="pre">Finding</span></code></a> objects: most severe first, then by kind and code.</p>
+<p>A <a class="reference internal" href="api.html#queryearth.Query" title="queryearth.Query"><code class="xref py py-class docutils literal notranslate"><span class="pre">Query</span></code></a> gives any subset of the same dimensions. “Resolution 8 km” on its own is a complete query. <a class="reference internal" href="api.html#queryearth.Registry.query" title="queryearth.Registry.query"><code class="xref py py-meth docutils literal notranslate"><span class="pre">Registry.query()</span></code></a> takes a <code class="docutils literal notranslate"><span class="pre">Query</span></code> or its fields as keywords, and returns a sorted list of <a class="reference internal" href="api.html#queryearth.Finding" title="queryearth.Finding"><code class="xref py py-class docutils literal notranslate"><span class="pre">Finding</span></code></a> objects: highest level first, then by kind and code.</p>
 <p>A finding is the rule’s outcome plus how it matched:</p>
 <ul class="simple">
-<li><p><code class="docutils literal notranslate"><span class="pre">kind</span></code> is <code class="docutils literal notranslate"><span class="pre">caveat</span></code>, <code class="docutils literal notranslate"><span class="pre">coverage</span></code> or <code class="docutils literal notranslate"><span class="pre">recommendation</span></code>;</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">severity</span></code> is <code class="docutils literal notranslate"><span class="pre">INFO</span></code>, <code class="docutils literal notranslate"><span class="pre">WARNING</span></code> or <code class="docutils literal notranslate"><span class="pre">SEVERE</span></code>, with the values of the matching <code class="docutils literal notranslate"><span class="pre">logging</span></code> levels (20, 30, 40);</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">kind</span></code> is <code class="docutils literal notranslate"><span class="pre">warning</span></code> or <code class="docutils literal notranslate"><span class="pre">suggestion</span></code>;</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">level</span></code> is a <code class="docutils literal notranslate"><span class="pre">logging</span></code> level: by default <code class="docutils literal notranslate"><span class="pre">logging.WARNING</span></code> (30) for a warning and <code class="docutils literal notranslate"><span class="pre">logging.INFO</span></code> (20) for a suggestion;</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">area_fraction</span></code> and <code class="docutils literal notranslate"><span class="pre">overlap_km2</span></code> give how much of the query’s area the rule covers;</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">time_overlap</span></code> and <code class="docutils literal notranslate"><span class="pre">time_fraction</span></code> give the overlapping periods and their share of the query’s time;</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">axes</span></code>, <code class="docutils literal notranslate"><span class="pre">matched_facets</span></code> and <code class="docutils literal notranslate"><span class="pre">dims</span></code> hold the overlap on each other dimension;</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">suggestions</span></code> holds structured actions (<code class="docutils literal notranslate"><span class="pre">target</span></code>, <code class="docutils literal notranslate"><span class="pre">key</span></code>, <code class="docutils literal notranslate"><span class="pre">value</span></code>, <code class="docutils literal notranslate"><span class="pre">rationale</span></code>) for a recommendation. queryearth never interprets them; your code applies them.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">suggestions</span></code> holds structured actions (<code class="docutils literal notranslate"><span class="pre">target</span></code>, <code class="docutils literal notranslate"><span class="pre">key</span></code>, <code class="docutils literal notranslate"><span class="pre">value</span></code>, <code class="docutils literal notranslate"><span class="pre">rationale</span></code>) for a suggestion. queryearth never interprets them; your code applies them.</p></li>
 </ul>
 <p><code class="docutils literal notranslate"><span class="pre">Finding.to_dict()</span></code> gives a JSON-ready dictionary.</p>
 </section>
@@ -144,21 +144,13 @@
 </pre></div>
 </div>
 </section>
-<section id="several-products-in-one-query-requests">
-<h2>Several products in one query: requests<a class="headerlink" href="#several-products-in-one-query-requests" title="Link to this heading"></a></h2>
-<p>A query can name the products it uses, each with its own variables, version, time and support. With the products of the <a class="reference internal" href="example.html"><span class="std std-doc">toy pack</span></a>:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">registry</span><span class="o">.</span><span class="n">query</span><span class="p">(</span>
-    <span class="n">space</span><span class="o">=</span><span class="n">domain</span><span class="p">,</span>
-    <span class="n">time</span><span class="o">=</span><span class="n">qe</span><span class="o">.</span><span class="n">interval</span><span class="p">(</span><span class="s2">"2020-01-01"</span><span class="p">,</span> <span class="s2">"2020-12-31"</span><span class="p">),</span>
-    <span class="n">requests</span><span class="o">=</span><span class="p">[</span>
-        <span class="n">qe</span><span class="o">.</span><span class="n">Request</span><span class="p">(</span><span class="s2">"toy_ocean"</span><span class="p">,</span> <span class="n">variables</span><span class="o">=</span><span class="p">(</span><span class="s2">"thetao"</span><span class="p">,</span> <span class="s2">"so"</span><span class="p">)),</span>
-        <span class="n">qe</span><span class="o">.</span><span class="n">Request</span><span class="p">(</span><span class="s2">"toy_atmos"</span><span class="p">,</span> <span class="n">variables</span><span class="o">=</span><span class="p">(</span><span class="s2">"t2m"</span><span class="p">,)),</span>
-    <span class="p">],</span>
-<span class="p">)</span>
+<section id="products">
+<h2>Products<a class="headerlink" href="#products" title="Link to this heading"></a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">product</span></code> is an ordinary facet, matched like <code class="docutils literal notranslate"><span class="pre">variable</span></code>: exact, case-sensitive values or glob patterns. Coverage limits and other per-product facts are ordinary rules scoped by it, and you query once per product you use. In the <a class="reference internal" href="example.html"><span class="std std-doc">toy pack</span></a>, TOY004 is an ERROR for <code class="docutils literal notranslate"><span class="pre">toy_coastal</span></code> before 2010:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">registry</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="n">time</span><span class="o">=</span><span class="p">(</span><span class="s2">"2005-01-01"</span><span class="p">,</span> <span class="s2">"2005-12-31"</span><span class="p">),</span> <span class="n">facets</span><span class="o">=</span><span class="p">{</span><span class="s2">"product"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"toy_coastal"</span><span class="p">]})</span>
+<span class="c1"># [TOY004] toy_coastal starts in 2010 (2005-01-01..2005-12-31; draft)</span>
 </pre></div>
 </div>
-<p>Each request runs as its own sub-query, and every finding names its <code class="docutils literal notranslate"><span class="pre">product</span></code> and <code class="docutils literal notranslate"><span class="pre">request</span></code>. When the query gives no time, a request takes its product’s coverage time. When a request gives no version, it takes the product’s version. Either way, <code class="docutils literal notranslate"><span class="pre">Finding.assumed</span></code> lists what was filled in. <code class="docutils literal notranslate"><span class="pre">facets={&quot;product&quot;:</span> <span class="pre">[...],</span> <span class="pre">&quot;variable&quot;:</span> <span class="pre">[...]}</span></code> is shorthand for one request per product.</p>
-<p>Products are declared with <a class="reference internal" href="api.html#queryearth.Registry.add_product" title="queryearth.Registry.add_product"><code class="xref py py-meth docutils literal notranslate"><span class="pre">Registry.add_product()</span></code></a> or in a pack. A product’s <strong>coverage</strong> (a time range and optionally an area) produces two built-in findings: <strong>QE001</strong> when part of the request lies outside its area, and <strong>QE002</strong> when part lies outside its time.</p>
 </section>
 <section id="query-with-what-you-use">
 <h2>Query with what you use<a class="headerlink" href="#query-with-what-you-use" title="Link to this heading"></a></h2>

@@ -5,14 +5,14 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>queryearth.objects &mdash; queryearth 0.0.2.dev3</title>
+  <title>queryearth.objects &mdash; queryearth 0.0.2.dev5</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
 
   
       <script src="../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../_static/documentation_options.js?v=389fa3a0"></script>
+      <script src="../../_static/documentation_options.js?v=576eb774"></script>
       <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../_static/versions.js?v=58ec1786"></script>
@@ -74,22 +74,21 @@
            <div itemprop="articleBody">
              
   <h1>Source code for queryearth.objects</h1><div class="highlight"><pre>
-<span></span><span class="sd">"""Core objects: outcomes, matches, findings, scopes, products, requests, queries.</span>
+<span></span><span class="sd">"""Core objects: outcomes, matches, findings, scopes, queries, and the error classes.</span>
 
 <span class="sd">All are frozen dataclasses (design.md section 4.11). Constructors accept the</span>
 <span class="sd">Python shorthands the design allows (a bare string for a one-item tuple, a</span>
 <span class="sd">number for a one-point axis range, a pair of wire strings for a time) and store</span>
 <span class="sd">the normalised form. Objects that hold mappings compare by value but are not</span>
-<span class="sd">hashable; Request hashes, with its support by identity.</span>
+<span class="sd">hashable.</span>
 <span class="sd">"""</span>
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
 
 <span class="kn">import</span><span class="w"> </span><span class="nn">dataclasses</span>
-<span class="kn">import</span><span class="w"> </span><span class="nn">enum</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">math</span>
-<span class="kn">import</span><span class="w"> </span><span class="nn">re</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">collections.abc</span><span class="w"> </span><span class="kn">import</span> <span class="n">Callable</span><span class="p">,</span> <span class="n">Iterable</span><span class="p">,</span> <span class="n">Mapping</span><span class="p">,</span> <span class="n">Sequence</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">collections.abc</span><span class="w"> </span><span class="kn">import</span> <span class="n">Iterable</span><span class="p">,</span> <span class="n">Mapping</span><span class="p">,</span> <span class="n">Sequence</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">dataclasses</span><span class="w"> </span><span class="kn">import</span> <span class="n">dataclass</span><span class="p">,</span> <span class="n">field</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">TYPE_CHECKING</span><span class="p">,</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Literal</span>
 
@@ -105,69 +104,48 @@
     <span class="s2">"Action"</span><span class="p">,</span>
     <span class="s2">"AxisOverlap"</span><span class="p">,</span>
     <span class="s2">"Confidence"</span><span class="p">,</span>
-    <span class="s2">"Coverage"</span><span class="p">,</span>
+    <span class="s2">"DuplicateCodeError"</span><span class="p">,</span>
     <span class="s2">"Finding"</span><span class="p">,</span>
     <span class="s2">"Kind"</span><span class="p">,</span>
+    <span class="s2">"LoadError"</span><span class="p">,</span>
     <span class="s2">"Match"</span><span class="p">,</span>
     <span class="s2">"Outcome"</span><span class="p">,</span>
-    <span class="s2">"Product"</span><span class="p">,</span>
     <span class="s2">"Query"</span><span class="p">,</span>
-    <span class="s2">"Request"</span><span class="p">,</span>
     <span class="s2">"Scope"</span><span class="p">,</span>
-    <span class="s2">"Severity"</span><span class="p">,</span>
     <span class="s2">"Status"</span><span class="p">,</span>
     <span class="s2">"Suggestion"</span><span class="p">,</span>
+    <span class="s2">"UnknownNameError"</span><span class="p">,</span>
 <span class="p">]</span>
 
-<span class="n">Kind</span> <span class="o">=</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">"caveat"</span><span class="p">,</span> <span class="s2">"coverage"</span><span class="p">,</span> <span class="s2">"recommendation"</span><span class="p">]</span>
+<span class="n">Kind</span> <span class="o">=</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">"warning"</span><span class="p">,</span> <span class="s2">"suggestion"</span><span class="p">]</span>
 <span class="n">Confidence</span> <span class="o">=</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">"observed"</span><span class="p">,</span> <span class="s2">"likely"</span><span class="p">,</span> <span class="s2">"possible"</span><span class="p">,</span> <span class="s2">"unknown"</span><span class="p">]</span>  <span class="c1"># CAP certainty</span>
 <span class="n">Action</span> <span class="o">=</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">"can_be_used"</span><span class="p">,</span> <span class="s2">"use_with_caution"</span><span class="p">,</span> <span class="s2">"do_not_use"</span><span class="p">,</span> <span class="s2">"replaced"</span><span class="p">]</span>
 <span class="n">Status</span> <span class="o">=</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">"draft"</span><span class="p">,</span> <span class="s2">"reviewed"</span><span class="p">,</span> <span class="s2">"deprecated"</span><span class="p">]</span>
 
-<span class="n">KINDS</span> <span class="o">=</span> <span class="p">(</span><span class="s2">"caveat"</span><span class="p">,</span> <span class="s2">"coverage"</span><span class="p">,</span> <span class="s2">"recommendation"</span><span class="p">)</span>
+<span class="n">KINDS</span> <span class="o">=</span> <span class="p">(</span><span class="s2">"warning"</span><span class="p">,</span> <span class="s2">"suggestion"</span><span class="p">)</span>  <span class="c1"># in the order findings sort</span>
+<span class="n">LEVELS</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"warning"</span><span class="p">:</span> <span class="n">logging</span><span class="o">.</span><span class="n">WARNING</span><span class="p">,</span> <span class="s2">"suggestion"</span><span class="p">:</span> <span class="n">logging</span><span class="o">.</span><span class="n">INFO</span><span class="p">}</span>
 <span class="n">CONFIDENCES</span> <span class="o">=</span> <span class="p">(</span><span class="s2">"observed"</span><span class="p">,</span> <span class="s2">"likely"</span><span class="p">,</span> <span class="s2">"possible"</span><span class="p">,</span> <span class="s2">"unknown"</span><span class="p">)</span>
 <span class="n">ACTIONS</span> <span class="o">=</span> <span class="p">(</span><span class="s2">"can_be_used"</span><span class="p">,</span> <span class="s2">"use_with_caution"</span><span class="p">,</span> <span class="s2">"do_not_use"</span><span class="p">,</span> <span class="s2">"replaced"</span><span class="p">)</span>
 <span class="n">STATUSES</span> <span class="o">=</span> <span class="p">(</span><span class="s2">"draft"</span><span class="p">,</span> <span class="s2">"reviewed"</span><span class="p">,</span> <span class="s2">"deprecated"</span><span class="p">)</span>
-
-<span class="n">_SLUG</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="sa">r</span><span class="s2">"[a-z][a-z0-9_]*"</span><span class="p">)</span>
-
-
-<div class="viewcode-block" id="Severity">
-<a class="viewcode-back" href="../../api.html#queryearth.Severity">[docs]</a>
-<span class="k">class</span><span class="w"> </span><span class="nc">Severity</span><span class="p">(</span><span class="n">enum</span><span class="o">.</span><span class="n">IntEnum</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">"""How bad a finding is; the values equal the logging levels."""</span>
-
-    <span class="n">INFO</span> <span class="o">=</span> <span class="mi">20</span>
-    <span class="n">WARNING</span> <span class="o">=</span> <span class="mi">30</span>
-    <span class="n">SEVERE</span> <span class="o">=</span> <span class="mi">40</span>  <span class="c1"># the number of logging.ERROR</span></div>
-
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">_set</span><span class="p">(</span><span class="n">obj</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
     <span class="nb">object</span><span class="o">.</span><span class="fm">__setattr__</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span>
 
 
-<span class="k">def</span><span class="w"> </span><span class="nf">severity_of</span><span class="p">(</span><span class="n">value</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Severity</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">"""A Severity from itself, its value (20, 30, 40) or its name, any case."""</span>
-    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">Severity</span><span class="p">):</span>
-        <span class="k">return</span> <span class="n">value</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">level_of</span><span class="p">(</span><span class="n">value</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""A logging level from an int, such as logging.INFO, or a level name, any case."""</span>
     <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
-        <span class="k">try</span><span class="p">:</span>
-            <span class="k">return</span> <span class="n">Severity</span><span class="p">[</span><span class="n">value</span><span class="o">.</span><span class="n">upper</span><span class="p">()]</span>
-        <span class="k">except</span> <span class="ne">KeyError</span><span class="p">:</span>
-            <span class="k">pass</span>
-    <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="p">(</span><span class="nb">int</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">integer</span><span class="p">))</span> <span class="ow">and</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">bool</span><span class="p">):</span>
-        <span class="k">try</span><span class="p">:</span>
-            <span class="k">return</span> <span class="n">Severity</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">value</span><span class="p">))</span>
-        <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
-            <span class="k">pass</span>
+        <span class="n">value</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLevelNamesMapping</span><span class="p">()</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">value</span><span class="o">.</span><span class="n">upper</span><span class="p">(),</span> <span class="n">value</span><span class="p">)</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="p">(</span><span class="nb">int</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">integer</span><span class="p">))</span> <span class="ow">and</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">bool</span><span class="p">):</span>
+        <span class="k">return</span> <span class="nb">int</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
     <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-        <span class="sa">f</span><span class="s2">"severity must be info, warning or severe (20, 30 or 40), not </span><span class="si">{</span><span class="n">value</span><span class="si">!r}</span><span class="s2">"</span>
+        <span class="sa">f</span><span class="s2">"a level is a logging level such as logging.INFO or 'info', not </span><span class="si">{</span><span class="n">value</span><span class="si">!r}</span><span class="s2">"</span>
     <span class="p">)</span>
 
 
-<span class="k">def</span><span class="w"> </span><span class="nf">_strings</span><span class="p">(</span><span class="n">value</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">what</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">empty</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="o">...</span><span class="p">]:</span>
-<span class="w">    </span><span class="sd">"""A tuple of strings from one string or an iterable of them."""</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">_strings</span><span class="p">(</span><span class="n">value</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">what</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="o">...</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">"""A non-empty tuple of strings from one string or an iterable of them."""</span>
     <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
         <span class="n">value</span> <span class="o">=</span> <span class="p">(</span><span class="n">value</span><span class="p">,)</span>
     <span class="k">elif</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">Iterable</span><span class="p">)</span> <span class="ow">or</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">Mapping</span><span class="p">):</span>
@@ -175,7 +153,7 @@
     <span class="n">items</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
     <span class="k">if</span> <span class="ow">not</span> <span class="nb">all</span><span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">and</span> <span class="n">v</span> <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">items</span><span class="p">):</span>
         <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">what</span><span class="si">}</span><span class="s2"> must be non-empty strings, got </span><span class="si">{</span><span class="n">items</span><span class="si">!r}</span><span class="s2">"</span><span class="p">)</span>
-    <span class="k">if</span> <span class="ow">not</span> <span class="n">empty</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">items</span><span class="p">:</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">items</span><span class="p">:</span>
         <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">what</span><span class="si">}</span><span class="s2"> needs at least one value"</span><span class="p">)</span>
     <span class="k">return</span> <span class="n">items</span>
 
@@ -228,8 +206,6 @@
 <span class="w">    </span><span class="sd">"""A JSON-ready copy: tuples become lists, infinities None, numpy plain."""</span>
     <span class="k">if</span> <span class="n">value</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="p">(</span><span class="nb">bool</span><span class="p">,</span> <span class="nb">str</span><span class="p">)):</span>
         <span class="k">return</span> <span class="n">value</span>
-    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">Severity</span><span class="p">):</span>
-        <span class="k">return</span> <span class="n">value</span><span class="o">.</span><span class="n">name</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
     <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="p">(</span><span class="nb">int</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">integer</span><span class="p">)):</span>
         <span class="k">return</span> <span class="nb">int</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
     <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="p">(</span><span class="nb">float</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">floating</span><span class="p">)):</span>
@@ -318,9 +294,7 @@
     <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"title"</span><span class="p">,</span> <span class="s2">"message"</span><span class="p">,</span> <span class="s2">"instruction"</span><span class="p">):</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="nb">getattr</span><span class="p">(</span><span class="n">o</span><span class="p">,</span> <span class="n">name</span><span class="p">),</span> <span class="nb">str</span><span class="p">):</span>
             <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2"> must be a string"</span><span class="p">)</span>
-    <span class="n">_set</span><span class="p">(</span><span class="n">o</span><span class="p">,</span> <span class="s2">"severity"</span><span class="p">,</span> <span class="n">severity_of</span><span class="p">(</span><span class="n">o</span><span class="o">.</span><span class="n">severity</span><span class="p">))</span>
-    <span class="k">if</span> <span class="n">o</span><span class="o">.</span><span class="n">source_severity</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">o</span><span class="o">.</span><span class="n">source_severity</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
-        <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">"source_severity must be a string or None"</span><span class="p">)</span>
+    <span class="n">_set</span><span class="p">(</span><span class="n">o</span><span class="p">,</span> <span class="s2">"level"</span><span class="p">,</span> <span class="n">LEVELS</span><span class="p">[</span><span class="n">o</span><span class="o">.</span><span class="n">kind</span><span class="p">]</span> <span class="k">if</span> <span class="n">o</span><span class="o">.</span><span class="n">level</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">level_of</span><span class="p">(</span><span class="n">o</span><span class="o">.</span><span class="n">level</span><span class="p">))</span>
     <span class="n">_choice</span><span class="p">(</span><span class="n">o</span><span class="o">.</span><span class="n">confidence</span><span class="p">,</span> <span class="n">CONFIDENCES</span><span class="p">,</span> <span class="s2">"confidence"</span><span class="p">)</span>
     <span class="k">if</span> <span class="n">o</span><span class="o">.</span><span class="n">action</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
         <span class="n">_choice</span><span class="p">(</span><span class="n">o</span><span class="o">.</span><span class="n">action</span><span class="p">,</span> <span class="n">ACTIONS</span><span class="p">,</span> <span class="s2">"action"</span><span class="p">)</span>
@@ -349,13 +323,12 @@
     <span class="n">kind</span><span class="p">:</span> <span class="n">Kind</span>
     <span class="n">title</span><span class="p">:</span> <span class="nb">str</span>
     <span class="n">message</span><span class="p">:</span> <span class="nb">str</span>
-    <span class="n">severity</span><span class="p">:</span> <span class="n">Severity</span> <span class="o">=</span> <span class="n">Severity</span><span class="o">.</span><span class="n">WARNING</span>
-    <span class="n">source_severity</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>  <span class="c1"># the source's own wording, verbatim</span>
+    <span class="n">level</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>  <span class="c1"># a logging level; None takes the kind's default</span>
     <span class="n">confidence</span><span class="p">:</span> <span class="n">Confidence</span> <span class="o">=</span> <span class="s2">"unknown"</span>
     <span class="n">action</span><span class="p">:</span> <span class="n">Action</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
     <span class="n">instruction</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">""</span>
     <span class="n">suggestions</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Suggestion</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span> <span class="o">=</span> <span class="p">()</span>
-    <span class="n">min_overlap</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.0</span>  <span class="c1"># emit() threshold on area_fraction</span>
+    <span class="n">min_overlap</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.0</span>  <span class="c1"># a smaller area_fraction is too small to count</span>
     <span class="n">status</span><span class="p">:</span> <span class="n">Status</span> <span class="o">=</span> <span class="s2">"draft"</span>
     <span class="n">references</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Mapping</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">],</span> <span class="o">...</span><span class="p">]</span> <span class="o">=</span> <span class="p">()</span>
     <span class="n">evidence</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Mapping</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span> <span class="o">...</span><span class="p">]</span> <span class="o">=</span> <span class="p">()</span>
@@ -374,7 +347,6 @@
     <span class="n">_set</span><span class="p">(</span><span class="n">m</span><span class="p">,</span> <span class="s2">"matched_facets"</span><span class="p">,</span> <span class="p">{</span><span class="n">k</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">v</span><span class="p">)</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">m</span><span class="o">.</span><span class="n">matched_facets</span><span class="o">.</span><span class="n">items</span><span class="p">()})</span>
     <span class="n">_set</span><span class="p">(</span><span class="n">m</span><span class="p">,</span> <span class="s2">"dims"</span><span class="p">,</span> <span class="nb">dict</span><span class="p">(</span><span class="n">m</span><span class="o">.</span><span class="n">dims</span><span class="p">))</span>
     <span class="n">_set</span><span class="p">(</span><span class="n">m</span><span class="p">,</span> <span class="s2">"conditional_on"</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">m</span><span class="o">.</span><span class="n">conditional_on</span><span class="p">))</span>
-    <span class="n">_set</span><span class="p">(</span><span class="n">m</span><span class="p">,</span> <span class="s2">"assumed"</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">m</span><span class="o">.</span><span class="n">assumed</span><span class="p">))</span>
 
 
 <div class="viewcode-block" id="Match">
@@ -395,9 +367,6 @@
     <span class="n">matched_facets</span><span class="p">:</span> <span class="n">Mapping</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="o">...</span><span class="p">]]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">dict</span><span class="p">)</span>
     <span class="n">dims</span><span class="p">:</span> <span class="n">Mapping</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">DimMatch</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">dict</span><span class="p">)</span>  <span class="c1"># plugin dimensions</span>
     <span class="n">conditional_on</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span> <span class="o">=</span> <span class="p">()</span>  <span class="c1"># e.g. ("space", "product")</span>
-    <span class="n">assumed</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span> <span class="o">=</span> <span class="p">()</span>  <span class="c1"># product-filled dimensions the rule constrains</span>
-    <span class="n">product</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>  <span class="c1"># the request's product; None on the base query</span>
-    <span class="n">request</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>  <span class="c1"># position of the request; None on the base query</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">__post_init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
         <span class="n">_match_post_init</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span></div>
@@ -426,14 +395,27 @@
 <div class="viewcode-block" id="Finding.to_dict">
 <a class="viewcode-back" href="../../api.html#queryearth.Finding.to_dict">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">to_dict</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
-<span class="w">        </span><span class="sd">"""A JSON-ready dict: severity as its lowercase name, intervals as lists."""</span>
+<span class="w">        </span><span class="sd">"""A JSON-ready dict: the level as its number, intervals as lists."""</span>
         <span class="n">names</span> <span class="o">=</span> <span class="n">_OUTCOME_FIELDS</span> <span class="o">+</span> <span class="n">_MATCH_FIELDS</span> <span class="o">+</span> <span class="p">(</span><span class="s2">"details"</span><span class="p">,</span> <span class="s2">"source"</span><span class="p">,</span> <span class="s2">"query_label"</span><span class="p">)</span>
         <span class="k">return</span> <span class="p">{</span><span class="n">name</span><span class="p">:</span> <span class="n">_jsonable</span><span class="p">(</span><span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">))</span> <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">names</span><span class="p">}</span></div>
-</div>
+
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""The text to log: "[CODE] title (label; area 40%; periods; draft)"."""</span>
+        <span class="n">notes</span> <span class="o">=</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">query_label</span><span class="p">]</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">query_label</span> <span class="k">else</span> <span class="p">[]</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">area_fraction</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">notes</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">"area </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">area_fraction</span><span class="si">:</span><span class="s2">.0%</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">time_overlap</span><span class="p">:</span>
+            <span class="n">notes</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">", "</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">a</span><span class="si">}</span><span class="s2">..</span><span class="si">{</span><span class="n">b</span><span class="si">}</span><span class="s2">"</span> <span class="k">for</span> <span class="n">a</span><span class="p">,</span> <span class="n">b</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">time_overlap</span><span class="p">))</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">status</span> <span class="o">==</span> <span class="s2">"draft"</span><span class="p">:</span>
+            <span class="n">notes</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">"draft"</span><span class="p">)</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">"[</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">code</span><span class="si">}</span><span class="s2">] </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">title</span><span class="si">}</span><span class="s2">"</span> <span class="o">+</span> <span class="p">(</span>
+            <span class="sa">f</span><span class="s2">" (</span><span class="si">{</span><span class="s1">'; '</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">notes</span><span class="p">)</span><span class="si">}</span><span class="s2">)"</span> <span class="k">if</span> <span class="n">notes</span> <span class="k">else</span> <span class="s2">""</span>
+        <span class="p">)</span></div>
 
 
 
-<span class="c1"># ---- scopes, products, requests, queries -----------------------------------------</span>
+<span class="c1"># ---- scopes and queries -----------------------------------------------------------</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">_mapping</span><span class="p">(</span><span class="n">value</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">what</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
     <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">Mapping</span><span class="p">):</span>
         <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">what</span><span class="si">}</span><span class="s2"> is a mapping of names to values, not </span><span class="si">{</span><span class="n">value</span><span class="si">!r}</span><span class="s2">"</span><span class="p">)</span>
@@ -467,105 +449,6 @@
 
 
 
-<div class="viewcode-block" id="Coverage">
-<a class="viewcode-back" href="../../api.html#queryearth.Coverage">[docs]</a>
-<span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-<span class="k">class</span><span class="w"> </span><span class="nc">Coverage</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">"""Where and when a product has data; None means global or all time.</span>
-
-<span class="sd">    A callable coverage gives space=sp.nowhere(), an empty polygon, for a</span>
-<span class="sd">    request its product does not serve.</span>
-<span class="sd">    """</span>
-
-    <span class="n">space</span><span class="p">:</span> <span class="n">Space</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
-    <span class="n">time</span><span class="p">:</span> <span class="n">TimeSpec</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
-
-    <span class="k">def</span><span class="w"> </span><span class="nf">__post_init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-        <span class="n">_space_of</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">space</span><span class="p">,</span> <span class="s2">"a coverage space"</span><span class="p">)</span>
-        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">space</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">space</span><span class="o">.</span><span class="n">kind</span> <span class="o">!=</span> <span class="s2">"polygon"</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                <span class="sa">f</span><span class="s2">"a coverage space is a polygon or nowhere(), not a </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">space</span><span class="o">.</span><span class="n">kind</span><span class="si">!r}</span><span class="s2">"</span>
-            <span class="p">)</span>
-        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">time</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">time</span><span class="p">,</span> <span class="n">TimeSpec</span><span class="p">):</span>
-                <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">"a coverage time is a TimeSpec or None"</span><span class="p">)</span>
-            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">time</span><span class="o">.</span><span class="n">months</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"a coverage time cannot carry a month recurrence"</span><span class="p">)</span></div>
-
-
-
-<div class="viewcode-block" id="Product">
-<a class="viewcode-back" href="../../api.html#queryearth.Product">[docs]</a>
-<span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-<span class="k">class</span><span class="w"> </span><span class="nc">Product</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">"""A dataset that queries can name, with its coverage and version."""</span>
-
-    <span class="n">name</span><span class="p">:</span> <span class="nb">str</span>  <span class="c1"># canonical lowercase slug, e.g. "cru_ts"</span>
-    <span class="n">aliases</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span> <span class="o">=</span> <span class="p">()</span>  <span class="c1"># e.g. ("CRUTS", "CRU TS")</span>
-    <span class="n">variables</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span> <span class="o">=</span> <span class="p">()</span>
-    <span class="n">coverage</span><span class="p">:</span> <span class="n">Coverage</span> <span class="o">|</span> <span class="n">Callable</span><span class="p">[[</span><span class="n">Query</span><span class="p">],</span> <span class="n">Coverage</span><span class="p">]</span> <span class="o">=</span> <span class="n">Coverage</span><span class="p">()</span>
-    <span class="n">resolution</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">"deg"</span><span class="p">,</span> <span class="s2">"km"</span><span class="p">]]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
-    <span class="n">version</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>  <span class="c1"># version in use; fills an omitted version facet</span>
-
-    <span class="k">def</span><span class="w"> </span><span class="nf">__post_init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">_SLUG</span><span class="o">.</span><span class="n">fullmatch</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">):</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                <span class="sa">f</span><span class="s2">"a product name is a lowercase slug such as 'cru_ts', not </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="si">!r}</span><span class="s2">"</span>
-            <span class="p">)</span>
-        <span class="n">_set</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">"aliases"</span><span class="p">,</span> <span class="n">_strings</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">aliases</span><span class="p">,</span> <span class="s2">"aliases"</span><span class="p">))</span>
-        <span class="n">_set</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">"variables"</span><span class="p">,</span> <span class="n">_strings</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">variables</span><span class="p">,</span> <span class="s2">"variables"</span><span class="p">))</span>
-        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">coverage</span><span class="p">,</span> <span class="n">Coverage</span><span class="p">)</span> <span class="ow">and</span> <span class="ow">not</span> <span class="nb">callable</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">coverage</span><span class="p">):</span>
-            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">"a product coverage is a Coverage or a callable"</span><span class="p">)</span>
-        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">resolution</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">resolution</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">or</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">resolution</span><span class="p">)</span> <span class="o">!=</span> <span class="mi">2</span><span class="p">:</span>
-                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"a resolution is (size, 'deg' or 'km')"</span><span class="p">)</span>
-            <span class="n">size</span><span class="p">,</span> <span class="n">unit</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">resolution</span>
-            <span class="n">_choice</span><span class="p">(</span><span class="n">unit</span><span class="p">,</span> <span class="p">(</span><span class="s2">"deg"</span><span class="p">,</span> <span class="s2">"km"</span><span class="p">),</span> <span class="s2">"resolution unit"</span><span class="p">)</span>
-            <span class="n">size</span> <span class="o">=</span> <span class="n">_number</span><span class="p">(</span><span class="n">size</span><span class="p">,</span> <span class="s2">"resolution"</span><span class="p">)</span>
-            <span class="k">if</span> <span class="n">size</span> <span class="o">&lt;=</span> <span class="mf">0.0</span><span class="p">:</span>
-                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"a resolution must be positive"</span><span class="p">)</span>
-            <span class="n">_set</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">"resolution"</span><span class="p">,</span> <span class="p">(</span><span class="n">size</span><span class="p">,</span> <span class="n">unit</span><span class="p">))</span>
-        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">version</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="p">(</span>
-            <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">version</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">or</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">version</span>
-        <span class="p">):</span>
-            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">"a product version is a non-empty string or None"</span><span class="p">)</span></div>
-
-
-
-<div class="viewcode-block" id="Request">
-<a class="viewcode-back" href="../../api.html#queryearth.Request">[docs]</a>
-<span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-<span class="k">class</span><span class="w"> </span><span class="nc">Request</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">"""One product as the caller uses it (section 4.12)."""</span>
-
-    <span class="n">product</span><span class="p">:</span> <span class="nb">str</span>  <span class="c1"># canonical name or alias</span>
-    <span class="n">variables</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span> <span class="o">=</span> <span class="p">()</span>  <span class="c1"># a plain string means one variable</span>
-    <span class="n">version</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>  <span class="c1"># default: Product.version, listed in assumed</span>
-    <span class="n">time</span><span class="p">:</span> <span class="n">TimeSpec</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>  <span class="c1"># default: the query's time, else the coverage</span>
-    <span class="n">support</span><span class="p">:</span> <span class="n">Space</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>  <span class="c1"># a point or polygon; default: query.space</span>
-
-    <span class="k">def</span><span class="w"> </span><span class="nf">__post_init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">product</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">or</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">product</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">"a request names its product with a non-empty string"</span><span class="p">)</span>
-        <span class="n">_set</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">"variables"</span><span class="p">,</span> <span class="n">_strings</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">variables</span><span class="p">,</span> <span class="s2">"variables"</span><span class="p">))</span>
-        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">version</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="p">(</span>
-            <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">version</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">or</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">version</span>
-        <span class="p">):</span>
-            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">"a request version is a non-empty string or None"</span><span class="p">)</span>
-        <span class="n">_set</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">"time"</span><span class="p">,</span> <span class="n">time_of</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">time</span><span class="p">))</span>
-        <span class="n">_space_of</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">support</span><span class="p">,</span> <span class="s2">"a request's support"</span><span class="p">)</span></div>
-
-
-
-<span class="k">def</span><span class="w"> </span><span class="nf">request_of</span><span class="p">(</span><span class="n">value</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Request</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">"""A Request from itself or a product name."""</span>
-    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">Request</span><span class="p">):</span>
-        <span class="k">return</span> <span class="n">value</span>
-    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
-        <span class="k">return</span> <span class="n">Request</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
-    <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"a request is a Request or a product name, not </span><span class="si">{</span><span class="n">value</span><span class="si">!r}</span><span class="s2">"</span><span class="p">)</span>
-
-
 <span class="k">def</span><span class="w"> </span><span class="nf">_axis_range</span><span class="p">(</span><span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">]:</span>
     <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="p">(</span><span class="nb">str</span><span class="p">,</span> <span class="nb">bytes</span><span class="p">))</span> <span class="ow">or</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">Sequence</span><span class="p">):</span>
         <span class="n">v</span> <span class="o">=</span> <span class="n">_number</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="sa">f</span><span class="s2">"axis </span><span class="si">{</span><span class="n">name</span><span class="si">!r}</span><span class="s2">"</span><span class="p">)</span>
@@ -585,10 +468,7 @@
 <span class="w">    </span><span class="sd">"""What the caller is about to use; every part is optional.</span>
 
 <span class="sd">    Pass the support (the cells and time steps a product contributes), never a</span>
-<span class="sd">    buffered shape. A product facet, with variable and version, is shorthand</span>
-<span class="sd">    for requests. request and assumed are set only on the sub-queries that</span>
-<span class="sd">    Registry.expand() returns: the request's position, and the dimensions filled</span>
-<span class="sd">    from its product.</span>
+<span class="sd">    buffered shape.</span>
 <span class="sd">    """</span>
 
     <span class="n">space</span><span class="p">:</span> <span class="n">Space</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
@@ -596,11 +476,8 @@
     <span class="n">axes</span><span class="p">:</span> <span class="n">Mapping</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">]]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">dict</span><span class="p">)</span>
     <span class="n">facets</span><span class="p">:</span> <span class="n">Mapping</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="o">...</span><span class="p">]]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">dict</span><span class="p">)</span>
     <span class="n">dims</span><span class="p">:</span> <span class="n">Mapping</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">dict</span><span class="p">)</span>  <span class="c1"># other plugin dimensions</span>
-    <span class="n">requests</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Request</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span> <span class="o">=</span> <span class="p">()</span>  <span class="c1"># one sub-query per request</span>
     <span class="n">context</span><span class="p">:</span> <span class="n">Mapping</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">dict</span><span class="p">,</span> <span class="n">compare</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
     <span class="n">label</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">""</span>  <span class="c1"># the caller's name for the query, used in messages</span>
-    <span class="n">request</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>  <span class="c1"># set by Registry.expand() on a request's sub-query</span>
-    <span class="n">assumed</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span> <span class="o">=</span> <span class="p">()</span>  <span class="c1"># set by Registry.expand(): filled from the product</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">__post_init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
         <span class="n">_space_of</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">space</span><span class="p">,</span> <span class="s2">"a query's space"</span><span class="p">)</span>
@@ -611,20 +488,54 @@
         <span class="n">_set</span><span class="p">(</span>
             <span class="bp">self</span><span class="p">,</span>
             <span class="s2">"facets"</span><span class="p">,</span>
-            <span class="p">{</span><span class="n">k</span><span class="p">:</span> <span class="n">_strings</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="sa">f</span><span class="s2">"facet </span><span class="si">{</span><span class="n">k</span><span class="si">!r}</span><span class="s2">"</span><span class="p">,</span> <span class="n">empty</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">facets</span><span class="o">.</span><span class="n">items</span><span class="p">()},</span>
+            <span class="p">{</span><span class="n">k</span><span class="p">:</span> <span class="n">_strings</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="sa">f</span><span class="s2">"facet </span><span class="si">{</span><span class="n">k</span><span class="si">!r}</span><span class="s2">"</span><span class="p">)</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">facets</span><span class="o">.</span><span class="n">items</span><span class="p">()},</span>
         <span class="p">)</span>
         <span class="n">_set</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">"dims"</span><span class="p">,</span> <span class="n">_mapping</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">dims</span><span class="p">,</span> <span class="s2">"query dims"</span><span class="p">))</span>
-        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">requests</span><span class="p">,</span> <span class="p">(</span><span class="nb">str</span><span class="p">,</span> <span class="n">Request</span><span class="p">)):</span>
-            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">"requests is a sequence of Request objects"</span><span class="p">)</span>
-        <span class="n">_set</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">"requests"</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">request_of</span><span class="p">(</span><span class="n">r</span><span class="p">)</span> <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">requests</span><span class="p">))</span>
         <span class="n">_set</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">"context"</span><span class="p">,</span> <span class="n">_mapping</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="p">,</span> <span class="s2">"query context"</span><span class="p">))</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">label</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
-            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">"a query label is a string"</span><span class="p">)</span>
-        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">request</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="p">(</span>
-            <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">request</span><span class="p">,</span> <span class="nb">bool</span><span class="p">)</span> <span class="ow">or</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">request</span><span class="p">,</span> <span class="nb">int</span><span class="p">)</span>
-        <span class="p">):</span>
-            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">"request is the position of a request, an int"</span><span class="p">)</span>
-        <span class="n">_set</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">"assumed"</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">assumed</span><span class="p">))</span></div>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">"a query label is a string"</span><span class="p">)</span></div>
+
+
+
+<span class="c1"># ---- errors ---------------------------------------------------------------------</span>
+<span class="c1"># The error classes the design names (reference/decisions.md, "Error classes").</span>
+<span class="c1"># Where the design only says that something "is an error", the engine raises a</span>
+<span class="c1"># plain ValueError or TypeError with a message that names the problem.</span>
+<div class="viewcode-block" id="DuplicateCodeError">
+<a class="viewcode-back" href="../../api.html#queryearth.DuplicateCodeError">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">DuplicateCodeError</span><span class="p">(</span><span class="ne">ValueError</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""A code the Registry already holds was registered again (section 12.3)."""</span></div>
+
+
+
+<div class="viewcode-block" id="UnknownNameError">
+<a class="viewcode-back" href="../../api.html#queryearth.UnknownNameError">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">UnknownNameError</span><span class="p">(</span><span class="ne">KeyError</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""An undeclared axis, facet, dimension or region name.</span>
+
+<span class="sd">    A misspelt name would otherwise look like "no known issues", so the engine</span>
+<span class="sd">    refuses it in rules and queries alike (sections 4.6 and 4.7).</span>
+<span class="sd">    """</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="c1"># KeyError quotes its argument, which would wrap the message in quotes</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">args</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="k">return</span> <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+        <span class="k">return</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__str__</span><span class="p">()</span></div>
+
+
+
+<div class="viewcode-block" id="LoadError">
+<a class="viewcode-back" href="../../api.html#queryearth.LoadError">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">LoadError</span><span class="p">(</span><span class="ne">ValueError</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""A pack or FeatureCollection failed the loader checks (section 5.3).</span>
+
+<span class="sd">    .problems lists each, naming its file, the feature's position and its code.</span>
+<span class="sd">    """</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">problems</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">problems</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">problems</span><span class="p">)</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="s2">"</span><span class="se">\n</span><span class="s2">"</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">problems</span><span class="p">))</span></div>
 
 </pre></div>
 

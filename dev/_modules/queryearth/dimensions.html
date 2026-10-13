@@ -5,14 +5,14 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>queryearth.dimensions &mdash; queryearth 0.0.2.dev3</title>
+  <title>queryearth.dimensions &mdash; queryearth 0.0.2.dev5</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
 
   
       <script src="../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../_static/documentation_options.js?v=389fa3a0"></script>
+      <script src="../../_static/documentation_options.js?v=576eb774"></script>
       <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../_static/versions.js?v=58ec1786"></script>
@@ -77,8 +77,7 @@
 <span></span><span class="sd">"""Dimensions: every kind of scope, through one interface (section 4.13).</span>
 
 <span class="sd">A dimension decides only whether one rule value meets one query value; the</span>
-<span class="sd">Registry does everything else (conditional findings, unknown names, requests,</span>
-<span class="sd">sorting). Space and time are built in on every Registry and cannot be replaced.</span>
+<span class="sd">Registry does everything else (conditional findings, unknown names, sorting). Space and time are built in on every Registry and cannot be replaced.</span>
 <span class="sd">Axis (numeric ranges), Labels (facets matched by glob patterns) and Versions</span>
 <span class="sd">(OSV-style version ranges) are the built-in plugins, and a user plugin</span>
 <span class="sd">implements the same four members.</span>
@@ -430,12 +429,6 @@
         <span class="p">},</span>
     <span class="p">]</span>
 <span class="p">}</span>
-<span class="n">_GLOB</span> <span class="o">=</span> <span class="nb">frozenset</span><span class="p">(</span><span class="s2">"*?["</span><span class="p">)</span>
-
-
-<span class="k">def</span><span class="w"> </span><span class="nf">is_glob</span><span class="p">(</span><span class="n">pattern</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">"""Whether a facet pattern uses fnmatch syntax rather than a literal value."""</span>
-    <span class="k">return</span> <span class="ow">not</span> <span class="n">_GLOB</span><span class="o">.</span><span class="n">isdisjoint</span><span class="p">(</span><span class="n">pattern</span><span class="p">)</span>
 
 
 <span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>

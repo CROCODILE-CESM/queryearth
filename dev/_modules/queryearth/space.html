@@ -5,14 +5,14 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>queryearth.space &mdash; queryearth 0.0.2.dev3</title>
+  <title>queryearth.space &mdash; queryearth 0.0.2.dev5</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
 
   
       <script src="../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../_static/documentation_options.js?v=389fa3a0"></script>
+      <script src="../../_static/documentation_options.js?v=576eb774"></script>
       <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../_static/versions.js?v=58ec1786"></script>
@@ -102,7 +102,6 @@
     <span class="s2">"box"</span><span class="p">,</span>
     <span class="s2">"measure"</span><span class="p">,</span>
     <span class="s2">"meets"</span><span class="p">,</span>
-    <span class="s2">"nowhere"</span><span class="p">,</span>
     <span class="s2">"point"</span><span class="p">,</span>
     <span class="s2">"points_mask"</span><span class="p">,</span>
     <span class="s2">"polygon"</span><span class="p">,</span>
@@ -279,14 +278,6 @@
 
 
 
-<div class="viewcode-block" id="nowhere">
-<a class="viewcode-back" href="../../api.html#queryearth.nowhere">[docs]</a>
-<span class="k">def</span><span class="w"> </span><span class="nf">nowhere</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">Space</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">"""An empty polygon, for a callable coverage that does not serve a query."""</span>
-    <span class="k">return</span> <span class="n">Space</span><span class="p">(</span><span class="s2">"polygon"</span><span class="p">,</span> <span class="n">shapely</span><span class="o">.</span><span class="n">Polygon</span><span class="p">(),</span> <span class="mf">0.0</span><span class="p">)</span></div>
-
-
-
 <span class="c1"># ---- areas (design.md section 6.3) ---------------------------------------------</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">_ring_area</span><span class="p">(</span><span class="n">coords</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""Signed area of a closed ring with straight lon/lat edges; CCW is positive.</span>
@@ -350,7 +341,7 @@
     <span class="k">if</span> <span class="n">rule</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
         <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">isfinite</span><span class="p">(</span><span class="n">lon</span><span class="p">)</span> <span class="o">&amp;</span> <span class="n">np</span><span class="o">.</span><span class="n">isfinite</span><span class="p">(</span><span class="n">lat</span><span class="p">)</span>
     <span class="n">shape</span> <span class="o">=</span> <span class="n">_shape</span><span class="p">(</span><span class="n">rule</span><span class="p">)</span>
-    <span class="n">x0</span><span class="p">,</span> <span class="n">y0</span><span class="p">,</span> <span class="n">x1</span><span class="p">,</span> <span class="n">y1</span> <span class="o">=</span> <span class="n">shape</span><span class="o">.</span><span class="n">bounds</span>  <span class="c1"># NaN for an empty shape, so nothing is near</span>
+    <span class="n">x0</span><span class="p">,</span> <span class="n">y0</span><span class="p">,</span> <span class="n">x1</span><span class="p">,</span> <span class="n">y1</span> <span class="o">=</span> <span class="n">shape</span><span class="o">.</span><span class="n">bounds</span>
     <span class="n">seam</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">lon</span><span class="p">)</span> <span class="o">==</span> <span class="mf">180.0</span>
     <span class="n">near</span> <span class="o">=</span> <span class="p">(</span><span class="n">lat</span> <span class="o">&gt;=</span> <span class="n">y0</span><span class="p">)</span> <span class="o">&amp;</span> <span class="p">(</span><span class="n">lat</span> <span class="o">&lt;=</span> <span class="n">y1</span><span class="p">)</span> <span class="o">&amp;</span> <span class="p">((</span><span class="n">lon</span> <span class="o">&gt;=</span> <span class="n">x0</span><span class="p">)</span> <span class="o">&amp;</span> <span class="p">(</span><span class="n">lon</span> <span class="o">&lt;=</span> <span class="n">x1</span><span class="p">)</span> <span class="o">|</span> <span class="n">seam</span><span class="p">)</span>
     <span class="n">mask</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">lon</span><span class="o">.</span><span class="n">shape</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">bool</span><span class="p">)</span>
@@ -367,11 +358,9 @@
 <span class="w">    </span><span class="sd">"""Whether a query space meets a normalised rule shape, as closed sets.</span>
 
 <span class="sd">    rule is a polygon Space or shapely geometry, or None for a global rule. A</span>
-<span class="sd">    point on an edge meets the shape, shapes that touch across +-180 meet</span>
-<span class="sd">    there, and an empty query meets nothing.</span>
+<span class="sd">    point on an edge meets the shape, and shapes that touch across +-180 meet</span>
+<span class="sd">    there.</span>
 <span class="sd">    """</span>
-    <span class="k">if</span> <span class="n">query</span><span class="o">.</span><span class="n">geometry</span><span class="o">.</span><span class="n">is_empty</span><span class="p">:</span>
-        <span class="k">return</span> <span class="kc">False</span>
     <span class="k">if</span> <span class="n">rule</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
         <span class="k">return</span> <span class="kc">True</span>
     <span class="n">shape</span><span class="p">,</span> <span class="n">other</span> <span class="o">=</span> <span class="n">_shape</span><span class="p">(</span><span class="n">rule</span><span class="p">),</span> <span class="n">query</span><span class="o">.</span><span class="n">geometry</span>
@@ -393,10 +382,8 @@
 
 <span class="sd">    area_fraction is 1.0 or 0.0 for a point, and for a polygon the spherical</span>
 <span class="sd">    area of the intersection over the query's area. overlap_km2 is None for a</span>
-<span class="sd">    point. A global rule (None) covers all; an empty query has no measures.</span>
+<span class="sd">    point. A global rule (None) covers all.</span>
 <span class="sd">    """</span>
-    <span class="k">if</span> <span class="n">query</span><span class="o">.</span><span class="n">geometry</span><span class="o">.</span><span class="n">is_empty</span><span class="p">:</span>
-        <span class="k">return</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span>
     <span class="k">if</span> <span class="n">query</span><span class="o">.</span><span class="n">kind</span> <span class="o">==</span> <span class="s2">"point"</span><span class="p">:</span>
         <span class="k">return</span> <span class="p">(</span><span class="mf">1.0</span> <span class="k">if</span> <span class="n">meets</span><span class="p">(</span><span class="n">rule</span><span class="p">,</span> <span class="n">query</span><span class="p">)</span> <span class="k">else</span> <span class="mf">0.0</span><span class="p">),</span> <span class="kc">None</span>
     <span class="k">if</span> <span class="n">rule</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
