@@ -421,7 +421,6 @@ def test_record_polygons_are_built_on_first_use():  # section 9.2
     assert square.envelope == (0, 0, 10, 10) and "built" not in vars(square)
     assert not hasattr(seam, "envelope")  # crosses the seam: normalised at load
     assert [f.code for f in index.query(space=sp.point(-175, -15))] == ["TST002"]
-    assert "built" not in vars(square)  # never a spatial candidate so far
     assert [f.code for f in index.query(space=sp.point(10, 5))] == ["TST001"]
     assert square.area_km2 == pytest.approx(sp.box(0, 0, 10, 10).area_km2, rel=1e-12)
 

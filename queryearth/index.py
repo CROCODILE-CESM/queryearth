@@ -521,15 +521,18 @@ class Index:
         query = part.query
         found: list[Finding] = []
         for entry in self._candidates(part):
-            if entry.form != "hooked":
+            if entry.form in ("record", "computed"):
                 found += entry.rule.evaluate(query)
                 continue
-            matched = match_scope(self, entry.scope, query)
-            if matched is not None:
+            matched = match_scope(self, entry.scope, query)  # third-party kinds
+            if matched is None:  # a definite scope failure drops the rule
+                continue
+            if entry.form == "foreign":  # its own evaluate() decides the rest
+                found += entry.rule.evaluate(query)
+            else:
                 match, details = matched
-                rule = entry.rule
                 found += computed_findings(
-                    rule.outcome, match, query, details, rule.outcomes
+                    entry.rule.outcome, match, query, details, entry.rule.outcomes
                 )
         found += self._coverage(part)
         return [f for f in found if conditional or not f.conditional_on]
