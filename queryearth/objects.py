@@ -159,6 +159,8 @@ def _jsonable(value: Any) -> Any:
         return bool(value)
     if isinstance(value, np.ndarray):
         return _jsonable(value.tolist())
+    if callable(getattr(value, "to_dict", None)) and not isinstance(value, type):
+        return _jsonable(value.to_dict())  # such as a DimMatch with a plugin's to_json
     if dataclasses.is_dataclass(value) and not isinstance(value, type):
         return {
             f.name: _jsonable(getattr(value, f.name)) for f in dataclasses.fields(value)

@@ -399,6 +399,26 @@ def test_fixture_27_plugin_dimension(plugin):
     assert nested.to_dict()["dims"] == {"basin": {"overlap": ["14"], "fraction": 1.0}}
 
 
+class DescribedPfafstetter(Pfafstetter):
+    """The same dimension with the optional to_json and extent hooks."""
+
+    def to_json(self, overlap):
+        return "+".join(overlap)
+
+    def extent(self, rule):
+        return rule
+
+
+def test_plugin_to_json_and_extent():
+    index = qe.Index("glhe", dimensions=[DescribedPfafstetter()])
+    index.add(caveat("BAS001", dims={"basin": ["14", "62"]}))
+    (nested,) = index.query(dims={"basin": "1423"})
+    assert nested.dims == {"basin": qe.DimMatch(("14",), 1.0)}
+    assert nested.to_dict()["dims"] == {"basin": {"overlap": "14", "fraction": 1.0}}
+    (undecided,) = index.query(include_conditional=True)
+    assert undecided.dims == {"basin": qe.DimMatch(("14", "62"))}
+
+
 def test_dimensions_are_declared_before_rules_with_unique_names():
     index = qe.Index("x")
     index.add(caveat("TST050"))

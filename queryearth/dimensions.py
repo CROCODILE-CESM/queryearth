@@ -12,8 +12,8 @@ from __future__ import annotations
 
 import math
 import re
-from collections.abc import Iterable, Mapping, Sequence
-from dataclasses import dataclass
+from collections.abc import Callable, Iterable, Mapping, Sequence
+from dataclasses import dataclass, field
 from fnmatch import fnmatchcase
 from typing import Any, ClassVar, Protocol, runtime_checkable
 
@@ -43,6 +43,14 @@ class DimMatch:
 
     overlap: Any = None  # dimension-specific; serialised with the plugin's to_json
     fraction: float | None = None  # share of the query's value covered, if measurable
+    to_json: Callable[[Any], Any] | None = field(
+        default=None, compare=False, repr=False
+    )
+
+    def to_dict(self) -> dict[str, Any]:
+        """For Finding.to_dict(): the overlap through the plugin's to_json, if any."""
+        overlap = self.overlap if self.to_json is None else self.to_json(self.overlap)
+        return {"overlap": overlap, "fraction": self.fraction}
 
 
 @runtime_checkable

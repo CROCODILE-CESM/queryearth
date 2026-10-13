@@ -3,8 +3,8 @@
 Every rule kind implements RuleKind: a code, a scope and evaluate(query).
 Rule.evaluate and ComputedRule.evaluate are the reference semantics of
 design.md section 4.3, run on one part of a query (the base query or one
-request's sub-query, as Index.expand() returns them). Index.query prunes rules
-with vectorised prefilters and then calls evaluate() on the survivors.
+request's sub-query, as Index.expand() returns them). Index.query calls
+evaluate() on every active rule, after any plugin prefilters.
 """
 
 from __future__ import annotations
@@ -134,10 +134,12 @@ def match_scope(
     for name, dimension, group in index._groups:
         if name in found:
             hit = found[name]
+            if group == "dims" and hasattr(dimension, "to_json"):
+                hit = dataclasses.replace(hit, to_json=dimension.to_json)
             groups[group][name] = hit if group == "dims" else hit.overlap
-        elif name in undecided and group in ("time", "axes"):  # the rule's own extent
-            if hasattr(dimension, "extent"):
-                groups[group][name] = dimension.extent(scope.values[name])
+        elif name in undecided and hasattr(dimension, "extent"):  # the rule's own
+            extent = dimension.extent(scope.values[name])
+            groups[group][name] = DimMatch(extent) if group == "dims" else extent
     details: dict[str, Any] = {}
     if "time" in undecided and scope.values["time"].months is not None:
         details["recurrence_months"] = sorted(scope.values["time"].months)
