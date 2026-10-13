@@ -1,6 +1,6 @@
 # Writing rules
 
-There are three ways to write a rule: a {class}`~queryearth.Rule` built in Python, a computed rule whose outcome depends on the request, or a record in a GeoJSON **pack**. All three end up on an {class}`~queryearth.Index`.
+There are three ways to write a rule: a {class}`~queryearth.Rule` built in Python, a computed rule whose outcome depends on the request, or a record in a GeoJSON **pack**. All three end up on an {class}`~queryearth.Registry`.
 
 ## Rules in Python
 
@@ -8,8 +8,8 @@ There are three ways to write a rule: a {class}`~queryearth.Rule` built in Pytho
 import queryearth as qe
 from queryearth import space as sp
 
-index = qe.Index("mine", axes=[qe.Axis("resolution", "km")])
-index.add(
+registry = qe.Registry("mine", axes=[qe.Axis("resolution", "km")])
+registry.add(
     qe.Rule(
         code="MINE001",
         kind="caveat",
@@ -25,25 +25,25 @@ index.add(
 )
 ```
 
-`kind` is `"caveat"` or `"recommendation"`; a recommendation needs at least one {class}`~queryearth.Suggestion`. Adding a code that is already on the Index raises `DuplicateCodeError`.
+`kind` is `"caveat"` or `"recommendation"`; a recommendation needs at least one {class}`~queryearth.Suggestion`. Adding a code that is already on the Registry raises `DuplicateCodeError`.
 
 ## Computed rules
 
-A computed rule decides its outcome from the request, or from data the caller passes in `Query.context`. Register a function with `@index.rule`; its docstring is the title:
+A computed rule decides its outcome from the request, or from data the caller passes in `Query.context`. Register a function with `@registry.rule`; its docstring is the title:
 
 ```python
-@index.rule("MINE102", kind="recommendation", axes={"resolution": {"gt": 0}})
+@registry.rule("MINE102", kind="recommendation", axes={"resolution": {"gt": 0}})
 def time_step(query, match):
     """Set the time step from the finest cells"""
     finest_km = match.axes["resolution"].lo
     return {"suggestions": [qe.Suggestion("settings", "dt", 30.0 * finest_km)]}
 ```
 
-The function runs only when the scope matches definitely. It returns `True` (one finding with the declared outcome), `False` or `None` (no finding), a mapping of `Finding` fields to override, or several such mappings. For a class-based rule, subclass {class}`~queryearth.ComputedRule` with the same keywords and define `check(self, query, match)`. `requires=["key"]` names `Query.context` keys the rule needs: without them, the finding is conditional. A `mask(lon, lat, query)` method lets the rule take part in {meth}`~queryearth.Index.query_points`.
+The function runs only when the scope matches definitely. It returns `True` (one finding with the declared outcome), `False` or `None` (no finding), a mapping of `Finding` fields to override, or several such mappings. For a class-based rule, subclass {class}`~queryearth.ComputedRule` with the same keywords and define `check(self, query, match)`. `requires=["key"]` names `Query.context` keys the rule needs: without them, the finding is conditional. A `mask(lon, lat, query)` method lets the rule take part in {meth}`~queryearth.Registry.query_points`.
 
 ## Packs
 
-A pack is a directory with a `pack.toml` and one or more GeoJSON FeatureCollections, loaded with {meth}`Index.load_pack() <queryearth.Index.load_pack>`. Loading never runs code. Every problem is reported at once in a `LoadError` that names the file, the feature's position and its code, and the Index is left unchanged.
+A pack is a directory with a `pack.toml` and one or more GeoJSON FeatureCollections, loaded with {meth}`Registry.load_pack() <queryearth.Registry.load_pack>`. Loading never runs code. Every problem is reported at once in a `LoadError` that names the file, the feature's position and its code, and the Registry is left unchanged.
 
 `pack.toml` declares the pack's name, version, the code prefixes it owns and its files. It also declares the axes, facets and products its records use, and any named regions:
 
@@ -51,7 +51,7 @@ A pack is a directory with a `pack.toml` and one or more GeoJSON FeatureCollecti
 :language: toml
 ```
 
-The axes and facets a pack declares must exist on the Index it is loaded into. A product under `[products.<name>]` has `aliases`, `variables`, `resolution`, `version` and a `coverage` with a `time` range and, optionally, a `box`. Named regions go under `[regions.<namespace>]`, with a GeoJSON `file` and the `id_property` that names each region. Records then refer to them as `region_ref = "namespace:id"`.
+The axes and facets a pack declares must exist on the Registry it is loaded into. A product under `[products.<name>]` has `aliases`, `variables`, `resolution`, `version` and a `coverage` with a `time` range and, optionally, a `box`. Named regions go under `[regions.<namespace>]`, with a GeoJSON `file` and the `id_property` that names each region. Records then refer to them as `region_ref = "namespace:id"`.
 
 ### Records
 
@@ -93,4 +93,4 @@ A record from the toy pack:
 
 Its ring crosses the antimeridian the way most tools write it, from 165 to -160, and queryearth splits it at ±180.
 
-A single Feature or FeatureCollection can also be added directly with `Index.add(mapping)`.
+A single Feature or FeatureCollection can also be added directly with `Registry.add(mapping)`.

@@ -6,14 +6,14 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>queryearth &mdash; queryearth 0.0.2.dev1</title>
+  <title>queryearth &mdash; queryearth 0.0.2.dev2</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
 
   
       <script src="_static/jquery.js?v=5d32c60e"></script>
       <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="_static/documentation_options.js?v=ab1fadd3"></script>
+      <script src="_static/documentation_options.js?v=9ce727b9"></script>
       <script src="_static/doctools.js?v=fd6eb6e6"></script>
       <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script src="_static/js/theme.js"></script>
@@ -96,8 +96,8 @@
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">queryearth</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">qe</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">queryearth</span><span class="w"> </span><span class="kn">import</span> <span class="n">space</span> <span class="k">as</span> <span class="n">sp</span>
 
-<span class="n">index</span> <span class="o">=</span> <span class="n">qe</span><span class="o">.</span><span class="n">Index</span><span class="p">(</span><span class="s2">"demo"</span><span class="p">,</span> <span class="n">axes</span><span class="o">=</span><span class="p">[</span><span class="n">qe</span><span class="o">.</span><span class="n">Axis</span><span class="p">(</span><span class="s2">"resolution"</span><span class="p">,</span> <span class="s2">"km"</span><span class="p">)])</span>
-<span class="n">index</span><span class="o">.</span><span class="n">add</span><span class="p">(</span>
+<span class="n">registry</span> <span class="o">=</span> <span class="n">qe</span><span class="o">.</span><span class="n">Registry</span><span class="p">(</span><span class="s2">"demo"</span><span class="p">,</span> <span class="n">axes</span><span class="o">=</span><span class="p">[</span><span class="n">qe</span><span class="o">.</span><span class="n">Axis</span><span class="p">(</span><span class="s2">"resolution"</span><span class="p">,</span> <span class="s2">"km"</span><span class="p">)])</span>
+<span class="n">registry</span><span class="o">.</span><span class="n">add</span><span class="p">(</span>
     <span class="n">qe</span><span class="o">.</span><span class="n">Rule</span><span class="p">(</span>
         <span class="n">code</span><span class="o">=</span><span class="s2">"DEMO001"</span><span class="p">,</span>
         <span class="n">kind</span><span class="o">=</span><span class="s2">"caveat"</span><span class="p">,</span>
@@ -110,7 +110,7 @@
         <span class="p">),</span>
     <span class="p">)</span>
 <span class="p">)</span>
-<span class="n">index</span><span class="o">.</span><span class="n">add</span><span class="p">(</span>
+<span class="n">registry</span><span class="o">.</span><span class="n">add</span><span class="p">(</span>
     <span class="n">qe</span><span class="o">.</span><span class="n">Rule</span><span class="p">(</span>
         <span class="n">code</span><span class="o">=</span><span class="s2">"DEMO101"</span><span class="p">,</span>
         <span class="n">kind</span><span class="o">=</span><span class="s2">"recommendation"</span><span class="p">,</span>
@@ -122,7 +122,7 @@
     <span class="p">)</span>
 <span class="p">)</span>
 
-<span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">index</span><span class="o">.</span><span class="n">query</span><span class="p">(</span>
+<span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">registry</span><span class="o">.</span><span class="n">query</span><span class="p">(</span>
     <span class="n">space</span><span class="o">=</span><span class="n">sp</span><span class="o">.</span><span class="n">box</span><span class="p">(</span><span class="o">-</span><span class="mi">60</span><span class="p">,</span> <span class="o">-</span><span class="mi">70</span><span class="p">,</span> <span class="o">-</span><span class="mi">20</span><span class="p">,</span> <span class="o">-</span><span class="mi">40</span><span class="p">),</span>  <span class="c1"># west, south, east, north</span>
     <span class="n">time</span><span class="o">=</span><span class="n">qe</span><span class="o">.</span><span class="n">interval</span><span class="p">(</span><span class="s2">"2000-01-01"</span><span class="p">,</span> <span class="s2">"2005-12-31"</span><span class="p">),</span>
     <span class="n">axes</span><span class="o">=</span><span class="p">{</span><span class="s2">"resolution"</span><span class="p">:</span> <span class="mi">8</span><span class="p">},</span>
@@ -175,7 +175,7 @@
 <li class="toctree-l2"><a class="reference internal" href="api.html#queryearth.Dimension"><code class="docutils literal notranslate"><span class="pre">Dimension</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="api.html#queryearth.DuplicateCodeError"><code class="docutils literal notranslate"><span class="pre">DuplicateCodeError</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="api.html#queryearth.Finding"><code class="docutils literal notranslate"><span class="pre">Finding</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="api.html#queryearth.Index"><code class="docutils literal notranslate"><span class="pre">Index</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#queryearth.Registry"><code class="docutils literal notranslate"><span class="pre">Registry</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="api.html#queryearth.InfoAdvisory"><code class="docutils literal notranslate"><span class="pre">InfoAdvisory</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="api.html#queryearth.Interval"><code class="docutils literal notranslate"><span class="pre">Interval</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="api.html#queryearth.Labels"><code class="docutils literal notranslate"><span class="pre">Labels</span></code></a></li>

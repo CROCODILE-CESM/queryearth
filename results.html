@@ -6,14 +6,14 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Using findings &mdash; queryearth 0.0.2.dev1</title>
+  <title>Using findings &mdash; queryearth 0.0.2.dev2</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
 
   
       <script src="_static/jquery.js?v=5d32c60e"></script>
       <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="_static/documentation_options.js?v=ab1fadd3"></script>
+      <script src="_static/documentation_options.js?v=9ce727b9"></script>
       <script src="_static/doctools.js?v=fd6eb6e6"></script>
       <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script src="_static/js/theme.js"></script>
@@ -109,18 +109,18 @@
 </section>
 <section id="choosing-a-product-suitable">
 <h2>Choosing a product: suitable()<a class="headerlink" href="#choosing-a-product-suitable" title="Link to this heading"></a></h2>
-<p><a class="reference internal" href="api.html#queryearth.Index.suitable" title="queryearth.Index.suitable"><code class="xref py py-meth docutils literal notranslate"><span class="pre">Index.suitable()</span></code></a> takes a query and a variable, and ranks the products that offer that variable:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">index</span><span class="o">.</span><span class="n">suitable</span><span class="p">(</span><span class="n">qe</span><span class="o">.</span><span class="n">Query</span><span class="p">(</span><span class="n">space</span><span class="o">=</span><span class="n">gulf</span><span class="p">,</span> <span class="n">time</span><span class="o">=</span><span class="n">year_2000</span><span class="p">),</span> <span class="s2">"so"</span><span class="p">):</span>
+<p><a class="reference internal" href="api.html#queryearth.Registry.suitable" title="queryearth.Registry.suitable"><code class="xref py py-meth docutils literal notranslate"><span class="pre">Registry.suitable()</span></code></a> takes a query and a variable, and ranks the products that offer that variable:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">registry</span><span class="o">.</span><span class="n">suitable</span><span class="p">(</span><span class="n">qe</span><span class="o">.</span><span class="n">Query</span><span class="p">(</span><span class="n">space</span><span class="o">=</span><span class="n">gulf</span><span class="p">,</span> <span class="n">time</span><span class="o">=</span><span class="n">year_2000</span><span class="p">),</span> <span class="s2">"so"</span><span class="p">):</span>
     <span class="nb">print</span><span class="p">(</span><span class="n">s</span><span class="o">.</span><span class="n">product</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">s</span><span class="o">.</span><span class="n">score</span><span class="p">,</span> <span class="p">[</span><span class="n">f</span><span class="o">.</span><span class="n">code</span> <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">s</span><span class="o">.</span><span class="n">findings</span><span class="p">])</span>
 </pre></div>
 </div>
 <p>Products entirely outside their coverage are dropped, or listed last with <code class="docutils literal notranslate"><span class="pre">include_dropped=True</span></code>. The rest are ordered by their worst severity, then by severity weighted by area and time fractions, then by how well the product’s resolution fits the query.</p>
-<p>The score is not a quality ranking. A product with no findings only has no rule written about it; <code class="docutils literal notranslate"><span class="pre">index.rule_counts()</span></code> shows how many rules concern each product. Pass <code class="docutils literal notranslate"><span class="pre">score=</span></code> to rank by your own function.</p>
+<p>The score is not a quality ranking. A product with no findings only has no rule written about it; <code class="docutils literal notranslate"><span class="pre">registry.rule_counts()</span></code> shows how many rules concern each product. Pass <code class="docutils literal notranslate"><span class="pre">score=</span></code> to rank by your own function.</p>
 </section>
 <section id="many-points-at-once-query-points">
 <h2>Many points at once: query_points()<a class="headerlink" href="#many-points-at-once-query-points" title="Link to this heading"></a></h2>
-<p><a class="reference internal" href="api.html#queryearth.Index.query_points" title="queryearth.Index.query_points"><code class="xref py py-meth docutils literal notranslate"><span class="pre">Index.query_points()</span></code></a> evaluates every rule over many points, such as every cell centre of a grid:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">result</span> <span class="o">=</span> <span class="n">index</span><span class="o">.</span><span class="n">query_points</span><span class="p">(</span>
+<p><a class="reference internal" href="api.html#queryearth.Registry.query_points" title="queryearth.Registry.query_points"><code class="xref py py-meth docutils literal notranslate"><span class="pre">Registry.query_points()</span></code></a> evaluates every rule over many points, such as every cell centre of a grid:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">result</span> <span class="o">=</span> <span class="n">registry</span><span class="o">.</span><span class="n">query_points</span><span class="p">(</span>
     <span class="n">lon</span><span class="p">,</span> <span class="n">lat</span><span class="p">,</span> <span class="n">weights</span><span class="o">=</span><span class="n">cell_area</span><span class="p">,</span> <span class="n">time</span><span class="o">=</span><span class="n">january</span><span class="p">,</span> <span class="n">requests</span><span class="o">=</span><span class="p">[</span><span class="n">qe</span><span class="o">.</span><span class="n">Request</span><span class="p">(</span><span class="s2">"toy_ocean"</span><span class="p">,</span> <span class="s2">"thetao"</span><span class="p">)]</span>
 <span class="p">)</span>
 <span class="n">mask</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">masks</span><span class="p">[(</span><span class="s2">"toy_ocean"</span><span class="p">,</span> <span class="s2">"TOY002"</span><span class="p">)]</span>  <span class="c1"># shaped like lon</span>

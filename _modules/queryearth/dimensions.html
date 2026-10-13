@@ -5,14 +5,14 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>queryearth.dimensions &mdash; queryearth 0.0.2.dev1</title>
+  <title>queryearth.dimensions &mdash; queryearth 0.0.2.dev2</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
 
   
       <script src="../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../_static/documentation_options.js?v=ab1fadd3"></script>
+      <script src="../../_static/documentation_options.js?v=9ce727b9"></script>
       <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script src="../../_static/js/theme.js"></script>
@@ -76,8 +76,8 @@
 <span></span><span class="sd">"""Dimensions: every kind of scope, through one interface (section 4.13).</span>
 
 <span class="sd">A dimension decides only whether one rule value meets one query value; the</span>
-<span class="sd">Index does everything else (conditional findings, unknown names, requests,</span>
-<span class="sd">sorting). Space and time are built in on every Index and cannot be replaced.</span>
+<span class="sd">Registry does everything else (conditional findings, unknown names, requests,</span>
+<span class="sd">sorting). Space and time are built in on every Registry and cannot be replaced.</span>
 <span class="sd">Axis (numeric ranges), Labels (facets matched by glob patterns) and Versions</span>
 <span class="sd">(OSV-style version ranges) are the built-in plugins, and a user plugin</span>
 <span class="sd">implements the same four members.</span>
@@ -138,7 +138,7 @@
 <a class="viewcode-back" href="../../api.html#queryearth.Dimension">[docs]</a>
 <span class="nd">@runtime_checkable</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">Dimension</span><span class="p">(</span><span class="n">Protocol</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">"""One kind of scope, declared on an Index under a unique name.</span>
+<span class="w">    </span><span class="sd">"""One kind of scope, declared on a Registry under a unique name.</span>
 
 <span class="sd">    Optional members, looked up with getattr: comparable(rule, query) -&gt; bool</span>
 <span class="sd">    (False makes the finding conditional on the dimension); build(pairs) -&gt;</span>
@@ -168,7 +168,7 @@
 
 
 
-<span class="c1"># ---- space and time: built in on every Index --------------------------------------</span>
+<span class="c1"># ---- space and time: built in on every Registry --------------------------------------</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">SpaceDimension</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""Space: closed-set meeting, then the area fraction and overlap in km².</span>
 

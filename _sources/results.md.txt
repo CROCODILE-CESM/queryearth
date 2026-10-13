@@ -32,23 +32,23 @@ with qe.policy(mode="log", raise_at=qe.Severity.SEVERE, ignore={"TOY002"}):
 
 ## Choosing a product: suitable()
 
-{meth}`Index.suitable() <queryearth.Index.suitable>` takes a query and a variable, and ranks the products that offer that variable:
+{meth}`Registry.suitable() <queryearth.Registry.suitable>` takes a query and a variable, and ranks the products that offer that variable:
 
 ```python
-for s in index.suitable(qe.Query(space=gulf, time=year_2000), "so"):
+for s in registry.suitable(qe.Query(space=gulf, time=year_2000), "so"):
     print(s.product.name, s.score, [f.code for f in s.findings])
 ```
 
 Products entirely outside their coverage are dropped, or listed last with `include_dropped=True`. The rest are ordered by their worst severity, then by severity weighted by area and time fractions, then by how well the product's resolution fits the query.
 
-The score is not a quality ranking. A product with no findings only has no rule written about it; `index.rule_counts()` shows how many rules concern each product. Pass `score=` to rank by your own function.
+The score is not a quality ranking. A product with no findings only has no rule written about it; `registry.rule_counts()` shows how many rules concern each product. Pass `score=` to rank by your own function.
 
 ## Many points at once: query_points()
 
-{meth}`Index.query_points() <queryearth.Index.query_points>` evaluates every rule over many points, such as every cell centre of a grid:
+{meth}`Registry.query_points() <queryearth.Registry.query_points>` evaluates every rule over many points, such as every cell centre of a grid:
 
 ```python
-result = index.query_points(
+result = registry.query_points(
     lon, lat, weights=cell_area, time=january, requests=[qe.Request("toy_ocean", "thetao")]
 )
 mask = result.masks[("toy_ocean", "TOY002")]  # shaped like lon

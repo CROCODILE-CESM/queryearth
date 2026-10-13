@@ -6,14 +6,14 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>The toy example &mdash; queryearth 0.0.2.dev1</title>
+  <title>The toy example &mdash; queryearth 0.0.2.dev2</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
 
   
       <script src="_static/jquery.js?v=5d32c60e"></script>
       <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="_static/documentation_options.js?v=ab1fadd3"></script>
+      <script src="_static/documentation_options.js?v=9ce727b9"></script>
       <script src="_static/doctools.js?v=fd6eb6e6"></script>
       <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script src="_static/js/theme.js"></script>
@@ -101,7 +101,7 @@
 <span class="sd">rules.geojson or this file and rerun to see what changes.</span>
 <span class="sd">"""</span>
 
-<span class="c1"># %% Set up: an Index with a resolution axis, then load the toy pack.</span>
+<span class="c1"># %% Set up: a Registry with a resolution axis, then load the toy pack.</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
 
@@ -112,9 +112,9 @@
 
 <span class="n">HERE</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="nb">globals</span><span class="p">()</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"__file__"</span><span class="p">,</span> <span class="s2">"play.py"</span><span class="p">))</span><span class="o">.</span><span class="n">resolve</span><span class="p">()</span><span class="o">.</span><span class="n">parent</span>
 
-<span class="n">index</span> <span class="o">=</span> <span class="n">qe</span><span class="o">.</span><span class="n">Index</span><span class="p">(</span><span class="s2">"toy"</span><span class="p">,</span> <span class="n">axes</span><span class="o">=</span><span class="p">[</span><span class="n">qe</span><span class="o">.</span><span class="n">Axis</span><span class="p">(</span><span class="s2">"resolution"</span><span class="p">,</span> <span class="s2">"km"</span><span class="p">)])</span>
-<span class="nb">print</span><span class="p">(</span><span class="s2">"loaded:"</span><span class="p">,</span> <span class="n">index</span><span class="o">.</span><span class="n">load_pack</span><span class="p">(</span><span class="n">HERE</span><span class="p">))</span>
-<span class="nb">print</span><span class="p">(</span><span class="s2">"products:"</span><span class="p">,</span> <span class="nb">list</span><span class="p">(</span><span class="n">index</span><span class="o">.</span><span class="n">products</span><span class="p">))</span>
+<span class="n">registry</span> <span class="o">=</span> <span class="n">qe</span><span class="o">.</span><span class="n">Registry</span><span class="p">(</span><span class="s2">"toy"</span><span class="p">,</span> <span class="n">axes</span><span class="o">=</span><span class="p">[</span><span class="n">qe</span><span class="o">.</span><span class="n">Axis</span><span class="p">(</span><span class="s2">"resolution"</span><span class="p">,</span> <span class="s2">"km"</span><span class="p">)])</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">"loaded:"</span><span class="p">,</span> <span class="n">registry</span><span class="o">.</span><span class="n">load_pack</span><span class="p">(</span><span class="n">HERE</span><span class="p">))</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">"products:"</span><span class="p">,</span> <span class="nb">list</span><span class="p">(</span><span class="n">registry</span><span class="o">.</span><span class="n">products</span><span class="p">))</span>
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">show</span><span class="p">(</span><span class="n">findings</span><span class="p">):</span>
@@ -142,7 +142,7 @@
 <span class="n">bering</span> <span class="o">=</span> <span class="n">sp</span><span class="o">.</span><span class="n">box</span><span class="p">(</span><span class="mi">165</span><span class="p">,</span> <span class="mi">52</span><span class="p">,</span> <span class="o">-</span><span class="mi">160</span><span class="p">,</span> <span class="mi">70</span><span class="p">)</span>  <span class="c1"># west, south, east, north</span>
 <span class="n">winter</span> <span class="o">=</span> <span class="n">qe</span><span class="o">.</span><span class="n">interval</span><span class="p">(</span><span class="s2">"2000-11-01"</span><span class="p">,</span> <span class="s2">"2001-03-31"</span><span class="p">)</span>
 <span class="n">show</span><span class="p">(</span>
-    <span class="n">index</span><span class="o">.</span><span class="n">query</span><span class="p">(</span>
+    <span class="n">registry</span><span class="o">.</span><span class="n">query</span><span class="p">(</span>
         <span class="n">space</span><span class="o">=</span><span class="n">bering</span><span class="p">,</span>
         <span class="n">time</span><span class="o">=</span><span class="n">winter</span><span class="p">,</span>
         <span class="n">axes</span><span class="o">=</span><span class="p">{</span><span class="s2">"resolution"</span><span class="p">:</span> <span class="p">(</span><span class="mi">8</span><span class="p">,</span> <span class="mi">8</span><span class="p">)},</span>
@@ -154,7 +154,7 @@
 <span class="c1"># %% 2. The same domain with no time: each product's coverage is used instead,</span>
 <span class="c1"># and the findings say so in "filled from the product".</span>
 <span class="n">show</span><span class="p">(</span>
-    <span class="n">index</span><span class="o">.</span><span class="n">query</span><span class="p">(</span>
+    <span class="n">registry</span><span class="o">.</span><span class="n">query</span><span class="p">(</span>
         <span class="n">space</span><span class="o">=</span><span class="n">bering</span><span class="p">,</span>
         <span class="n">axes</span><span class="o">=</span><span class="p">{</span><span class="s2">"resolution"</span><span class="p">:</span> <span class="p">(</span><span class="mi">8</span><span class="p">,</span> <span class="mi">8</span><span class="p">)},</span>
         <span class="n">requests</span><span class="o">=</span><span class="p">[</span><span class="n">qe</span><span class="o">.</span><span class="n">Request</span><span class="p">(</span><span class="s2">"toy_ocean"</span><span class="p">,</span> <span class="n">variables</span><span class="o">=</span><span class="s2">"so"</span><span class="p">)],</span>
@@ -163,14 +163,14 @@
 
 <span class="c1"># %% 3. Resolution only. TOY102 applies outright; with include_conditional=True</span>
 <span class="c1"># the other rules come back too, each naming what the query left out.</span>
-<span class="n">show</span><span class="p">(</span><span class="n">index</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="n">axes</span><span class="o">=</span><span class="p">{</span><span class="s2">"resolution"</span><span class="p">:</span> <span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">)},</span> <span class="n">include_conditional</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span>
+<span class="n">show</span><span class="p">(</span><span class="n">registry</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="n">axes</span><span class="o">=</span><span class="p">{</span><span class="s2">"resolution"</span><span class="p">:</span> <span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">)},</span> <span class="n">include_conditional</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span>
 
 <span class="c1"># %% 4. Coverage gaps. toy_coastal covers one box from 2010 to 2023 only, so</span>
 <span class="c1"># asking for it in the Bering Sea gives QE001 (space) and in 2005 QE002 (time).</span>
-<span class="n">show</span><span class="p">(</span><span class="n">index</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="n">space</span><span class="o">=</span><span class="n">bering</span><span class="p">,</span> <span class="n">time</span><span class="o">=</span><span class="n">winter</span><span class="p">,</span> <span class="n">requests</span><span class="o">=</span><span class="p">[</span><span class="s2">"toy_coastal"</span><span class="p">]))</span>
+<span class="n">show</span><span class="p">(</span><span class="n">registry</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="n">space</span><span class="o">=</span><span class="n">bering</span><span class="p">,</span> <span class="n">time</span><span class="o">=</span><span class="n">winter</span><span class="p">,</span> <span class="n">requests</span><span class="o">=</span><span class="p">[</span><span class="s2">"toy_coastal"</span><span class="p">]))</span>
 <span class="n">gulf</span> <span class="o">=</span> <span class="n">sp</span><span class="o">.</span><span class="n">box</span><span class="p">(</span><span class="o">-</span><span class="mi">95</span><span class="p">,</span> <span class="mi">22</span><span class="p">,</span> <span class="o">-</span><span class="mi">85</span><span class="p">,</span> <span class="mi">29</span><span class="p">)</span>
 <span class="n">show</span><span class="p">(</span>
-    <span class="n">index</span><span class="o">.</span><span class="n">query</span><span class="p">(</span>
+    <span class="n">registry</span><span class="o">.</span><span class="n">query</span><span class="p">(</span>
         <span class="n">space</span><span class="o">=</span><span class="n">gulf</span><span class="p">,</span>
         <span class="n">time</span><span class="o">=</span><span class="n">qe</span><span class="o">.</span><span class="n">interval</span><span class="p">(</span><span class="s2">"2005-01-01"</span><span class="p">,</span> <span class="s2">"2005-12-31"</span><span class="p">),</span>
         <span class="n">requests</span><span class="o">=</span><span class="p">[</span><span class="s2">"toy_coastal"</span><span class="p">],</span>
@@ -179,7 +179,7 @@
 
 <span class="c1"># %% 5. Rules written in Python. A static rule, and a computed rule whose</span>
 <span class="c1"># suggestion depends on the query (a made-up time step from the finest cells).</span>
-<span class="n">index</span><span class="o">.</span><span class="n">add</span><span class="p">(</span>
+<span class="n">registry</span><span class="o">.</span><span class="n">add</span><span class="p">(</span>
     <span class="n">qe</span><span class="o">.</span><span class="n">Rule</span><span class="p">(</span>
         <span class="n">code</span><span class="o">=</span><span class="s2">"TOY201"</span><span class="p">,</span>
         <span class="n">kind</span><span class="o">=</span><span class="s2">"caveat"</span><span class="p">,</span>
@@ -193,7 +193,7 @@
 <span class="p">)</span>
 
 
-<span class="nd">@index</span><span class="o">.</span><span class="n">rule</span><span class="p">(</span>
+<span class="nd">@registry</span><span class="o">.</span><span class="n">rule</span><span class="p">(</span>
     <span class="s2">"TOY202"</span><span class="p">,</span>
     <span class="n">kind</span><span class="o">=</span><span class="s2">"recommendation"</span><span class="p">,</span>
     <span class="n">axes</span><span class="o">=</span><span class="p">{</span><span class="s2">"resolution"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"gt"</span><span class="p">:</span> <span class="mi">0</span><span class="p">}},</span>  <span class="c1"># needs a resolution, so conditional without one</span>
@@ -206,7 +206,7 @@
 
 
 <span class="n">show</span><span class="p">(</span>
-    <span class="n">index</span><span class="o">.</span><span class="n">query</span><span class="p">(</span>
+    <span class="n">registry</span><span class="o">.</span><span class="n">query</span><span class="p">(</span>
         <span class="n">space</span><span class="o">=</span><span class="n">bering</span><span class="p">,</span>
         <span class="n">time</span><span class="o">=</span><span class="n">winter</span><span class="p">,</span>
         <span class="n">axes</span><span class="o">=</span><span class="p">{</span><span class="s2">"resolution"</span><span class="p">:</span> <span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="mi">12</span><span class="p">)},</span>
@@ -215,7 +215,7 @@
 <span class="p">)</span>
 
 <span class="c1"># %% 6. Findings are data; emit() reports them. Try each mode.</span>
-<span class="n">findings</span> <span class="o">=</span> <span class="n">index</span><span class="o">.</span><span class="n">query</span><span class="p">(</span>
+<span class="n">findings</span> <span class="o">=</span> <span class="n">registry</span><span class="o">.</span><span class="n">query</span><span class="p">(</span>
     <span class="n">space</span><span class="o">=</span><span class="n">bering</span><span class="p">,</span>
     <span class="n">time</span><span class="o">=</span><span class="n">winter</span><span class="p">,</span>
     <span class="n">axes</span><span class="o">=</span><span class="p">{</span><span class="s2">"resolution"</span><span class="p">:</span> <span class="p">(</span><span class="mi">8</span><span class="p">,</span> <span class="mi">8</span><span class="p">)},</span>
@@ -243,7 +243,7 @@
 <span class="c1"># %% 7. Which product suits salinity in the Gulf in 2000? toy_coastal starts in</span>
 <span class="c1"># 2010 so it drops out; toy_ocean stays, with TOY001 against it. A low score</span>
 <span class="c1"># means fewer known concerns, not better data.</span>
-<span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">index</span><span class="o">.</span><span class="n">suitable</span><span class="p">(</span>
+<span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">registry</span><span class="o">.</span><span class="n">suitable</span><span class="p">(</span>
     <span class="n">qe</span><span class="o">.</span><span class="n">Query</span><span class="p">(</span><span class="n">space</span><span class="o">=</span><span class="n">gulf</span><span class="p">,</span> <span class="n">time</span><span class="o">=</span><span class="n">qe</span><span class="o">.</span><span class="n">interval</span><span class="p">(</span><span class="s2">"2000-01-01"</span><span class="p">,</span> <span class="s2">"2000-12-31"</span><span class="p">)),</span>
     <span class="s2">"so"</span><span class="p">,</span>
     <span class="n">include_dropped</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
@@ -252,7 +252,7 @@
 
 <span class="c1"># %% 8. Many points at once: every 1-degree cell centre, January 2001, toy_ocean.</span>
 <span class="n">lon</span><span class="p">,</span> <span class="n">lat</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">meshgrid</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="o">-</span><span class="mf">179.5</span><span class="p">,</span> <span class="mi">180</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">),</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="o">-</span><span class="mf">89.5</span><span class="p">,</span> <span class="mi">90</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">))</span>
-<span class="n">result</span> <span class="o">=</span> <span class="n">index</span><span class="o">.</span><span class="n">query_points</span><span class="p">(</span>
+<span class="n">result</span> <span class="o">=</span> <span class="n">registry</span><span class="o">.</span><span class="n">query_points</span><span class="p">(</span>
     <span class="n">lon</span><span class="p">,</span>
     <span class="n">lat</span><span class="p">,</span>
     <span class="n">time</span><span class="o">=</span><span class="n">qe</span><span class="o">.</span><span class="n">interval</span><span class="p">(</span><span class="s2">"2001-01-01"</span><span class="p">,</span> <span class="s2">"2001-01-31"</span><span class="p">),</span>

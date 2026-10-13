@@ -5,14 +5,14 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>queryearth.rules &mdash; queryearth 0.0.2.dev1</title>
+  <title>queryearth.rules &mdash; queryearth 0.0.2.dev2</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
 
   
       <script src="../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../_static/documentation_options.js?v=ab1fadd3"></script>
+      <script src="../../_static/documentation_options.js?v=9ce727b9"></script>
       <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script src="../../_static/js/theme.js"></script>
@@ -78,7 +78,7 @@
 <span class="sd">Every rule kind implements RuleKind: a code, a scope and evaluate(query).</span>
 <span class="sd">Rule.evaluate and ComputedRule.evaluate are the reference semantics of</span>
 <span class="sd">design.md section 4.3, run on one part of a query (the base query or one</span>
-<span class="sd">request's sub-query, as Index.expand() returns them). Index.query calls</span>
+<span class="sd">request's sub-query, as Registry.expand() returns them). Registry.query calls</span>
 <span class="sd">evaluate() on every active rule, after any plugin prefilters.</span>
 <span class="sd">"""</span>
 
@@ -101,7 +101,7 @@
 <span class="kn">from</span><span class="w"> </span><span class="nn">queryearth.time</span><span class="w"> </span><span class="kn">import</span> <span class="n">Interval</span><span class="p">,</span> <span class="n">TimeSpec</span><span class="p">,</span> <span class="n">overlap</span><span class="p">,</span> <span class="n">parse_time</span><span class="p">,</span> <span class="n">time_fraction</span>
 
 <span class="k">if</span> <span class="n">TYPE_CHECKING</span><span class="p">:</span>
-    <span class="kn">from</span><span class="w"> </span><span class="nn">queryearth.index</span><span class="w"> </span><span class="kn">import</span> <span class="n">Index</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">queryearth.registry</span><span class="w"> </span><span class="kn">import</span> <span class="n">Registry</span>
 
 <span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span><span class="s2">"CheckResult"</span><span class="p">,</span> <span class="s2">"ComputedRule"</span><span class="p">,</span> <span class="s2">"Rule"</span><span class="p">,</span> <span class="s2">"RuleFunc"</span><span class="p">,</span> <span class="s2">"RuleKind"</span><span class="p">]</span>
 
@@ -136,7 +136,7 @@
 <span class="w">    </span><span class="sd">"""Any rule: a code, a scope, and evaluate() on one query part.</span>
 
 <span class="sd">    A third-party kind may also define outcomes(query, match) -&gt; CheckResult</span>
-<span class="sd">    and an outcome attribute (an Outcome) (Q5): the Index then matches its scope</span>
+<span class="sd">    and an outcome attribute (an Outcome) (Q5): the Registry then matches its scope</span>
 <span class="sd">    itself and calls outcomes() only for definite matches.</span>
 <span class="sd">    """</span>
 
@@ -160,9 +160,9 @@
 
 <span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">eq</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">Binding</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">"""What a rule needs from the Index it was added to."""</span>
+<span class="w">    </span><span class="sd">"""What a rule needs from the Registry it was added to."""</span>
 
-    <span class="n">index</span><span class="p">:</span> <span class="n">Index</span>
+    <span class="n">registry</span><span class="p">:</span> <span class="n">Registry</span>
     <span class="n">scope</span><span class="p">:</span> <span class="n">CompiledScope</span>
     <span class="n">source</span><span class="p">:</span> <span class="nb">str</span>
 
@@ -170,7 +170,7 @@
 <span class="k">def</span><span class="w"> </span><span class="nf">binding_of</span><span class="p">(</span><span class="n">rule</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Binding</span><span class="p">:</span>
     <span class="n">found</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">rule</span><span class="p">,</span> <span class="s2">"_qe_binding"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
     <span class="k">if</span> <span class="n">found</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-        <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"rule </span><span class="si">{</span><span class="nb">getattr</span><span class="p">(</span><span class="n">rule</span><span class="p">,</span><span class="w"> </span><span class="s1">'code'</span><span class="p">,</span><span class="w"> </span><span class="n">rule</span><span class="p">)</span><span class="si">!r}</span><span class="s2"> is not on an Index"</span><span class="p">)</span>
+        <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"rule </span><span class="si">{</span><span class="nb">getattr</span><span class="p">(</span><span class="n">rule</span><span class="p">,</span><span class="w"> </span><span class="s1">'code'</span><span class="p">,</span><span class="w"> </span><span class="n">rule</span><span class="p">)</span><span class="si">!r}</span><span class="s2"> is not on a Registry"</span><span class="p">)</span>
     <span class="k">return</span> <span class="n">found</span>
 
 
@@ -178,22 +178,25 @@
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">match_scope</span><span class="p">(</span>
-    <span class="n">index</span><span class="p">:</span> <span class="n">Index</span><span class="p">,</span> <span class="n">scope</span><span class="p">:</span> <span class="n">CompiledScope</span><span class="p">,</span> <span class="n">query</span><span class="p">:</span> <span class="n">Query</span><span class="p">,</span> <span class="n">parsed</span><span class="p">:</span> <span class="n">Mapping</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">registry</span><span class="p">:</span> <span class="n">Registry</span><span class="p">,</span>
+    <span class="n">scope</span><span class="p">:</span> <span class="n">CompiledScope</span><span class="p">,</span>
+    <span class="n">query</span><span class="p">:</span> <span class="n">Query</span><span class="p">,</span>
+    <span class="n">parsed</span><span class="p">:</span> <span class="n">Mapping</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Match</span><span class="p">,</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""Match one scope against one query part, dimension by dimension (section 4.3).</span>
 
 <span class="sd">    Returns None when some dimension fails; otherwise the Match, whose</span>
-<span class="sd">    conditional_on names the undecided dimensions in the Index's order (space,</span>
+<span class="sd">    conditional_on names the undecided dimensions in the Registry's order (space,</span>
 <span class="sd">    time, axes, facets, other plugins, then context keys), and details that</span>
 <span class="sd">    hold recurrence_months when time is undecided. Dimensions marked late run</span>
 <span class="sd">    after the others, so the costly spatial test runs last.</span>
 <span class="sd">    """</span>
     <span class="k">if</span> <span class="n">parsed</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-        <span class="n">parsed</span> <span class="o">=</span> <span class="n">index</span><span class="o">.</span><span class="n">_parse_query</span><span class="p">(</span><span class="n">query</span><span class="p">)</span>
+        <span class="n">parsed</span> <span class="o">=</span> <span class="n">registry</span><span class="o">.</span><span class="n">_parse_query</span><span class="p">(</span><span class="n">query</span><span class="p">)</span>
     <span class="n">undecided</span><span class="p">:</span> <span class="nb">set</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
     <span class="n">found</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">DimMatch</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
     <span class="k">for</span> <span class="n">late</span> <span class="ow">in</span> <span class="p">(</span><span class="kc">False</span><span class="p">,</span> <span class="kc">True</span><span class="p">):</span>
-        <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">dimension</span><span class="p">,</span> <span class="n">_</span> <span class="ow">in</span> <span class="n">index</span><span class="o">.</span><span class="n">_groups</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">dimension</span><span class="p">,</span> <span class="n">_</span> <span class="ow">in</span> <span class="n">registry</span><span class="o">.</span><span class="n">_groups</span><span class="p">:</span>
             <span class="k">if</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">dimension</span><span class="p">,</span> <span class="s2">"late"</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span> <span class="o">!=</span> <span class="n">late</span><span class="p">:</span>
                 <span class="k">continue</span>
             <span class="n">rule</span><span class="p">,</span> <span class="n">value</span> <span class="o">=</span> <span class="n">scope</span><span class="o">.</span><span class="n">values</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">name</span><span class="p">),</span> <span class="n">parsed</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">name</span><span class="p">)</span>
@@ -209,7 +212,7 @@
             <span class="k">if</span> <span class="n">found</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
                 <span class="k">return</span> <span class="kc">None</span>
     <span class="n">groups</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="p">{</span><span class="n">g</span><span class="p">:</span> <span class="p">{}</span> <span class="k">for</span> <span class="n">g</span> <span class="ow">in</span> <span class="n">_GROUP_NAMES</span><span class="p">}</span>
-    <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">dimension</span><span class="p">,</span> <span class="n">group</span> <span class="ow">in</span> <span class="n">index</span><span class="o">.</span><span class="n">_groups</span><span class="p">:</span>
+    <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">dimension</span><span class="p">,</span> <span class="n">group</span> <span class="ow">in</span> <span class="n">registry</span><span class="o">.</span><span class="n">_groups</span><span class="p">:</span>
         <span class="k">if</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">found</span><span class="p">:</span>
             <span class="n">hit</span> <span class="o">=</span> <span class="n">found</span><span class="p">[</span><span class="n">name</span><span class="p">]</span>
             <span class="k">if</span> <span class="n">group</span> <span class="o">==</span> <span class="s2">"dims"</span> <span class="ow">and</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">dimension</span><span class="p">,</span> <span class="s2">"to_json"</span><span class="p">):</span>
@@ -222,7 +225,7 @@
     <span class="k">if</span> <span class="s2">"time"</span> <span class="ow">in</span> <span class="n">undecided</span> <span class="ow">and</span> <span class="n">scope</span><span class="o">.</span><span class="n">values</span><span class="p">[</span><span class="s2">"time"</span><span class="p">]</span><span class="o">.</span><span class="n">months</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
         <span class="n">details</span><span class="p">[</span><span class="s2">"recurrence_months"</span><span class="p">]</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">scope</span><span class="o">.</span><span class="n">values</span><span class="p">[</span><span class="s2">"time"</span><span class="p">]</span><span class="o">.</span><span class="n">months</span><span class="p">)</span>
     <span class="n">space</span><span class="p">,</span> <span class="n">time</span> <span class="o">=</span> <span class="n">found</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"space"</span><span class="p">),</span> <span class="n">found</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"time"</span><span class="p">)</span>
-    <span class="n">conditional</span> <span class="o">=</span> <span class="p">[</span><span class="n">name</span> <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">_</span> <span class="ow">in</span> <span class="n">index</span><span class="o">.</span><span class="n">_groups</span> <span class="k">if</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">undecided</span><span class="p">]</span>
+    <span class="n">conditional</span> <span class="o">=</span> <span class="p">[</span><span class="n">name</span> <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">_</span> <span class="ow">in</span> <span class="n">registry</span><span class="o">.</span><span class="n">_groups</span> <span class="k">if</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">undecided</span><span class="p">]</span>
     <span class="n">conditional</span> <span class="o">+=</span> <span class="p">[</span><span class="sa">f</span><span class="s2">"context:</span><span class="si">{</span><span class="n">k</span><span class="si">}</span><span class="s2">"</span> <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">scope</span><span class="o">.</span><span class="n">requires</span> <span class="k">if</span> <span class="n">k</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">query</span><span class="o">.</span><span class="n">context</span><span class="p">]</span>
     <span class="n">match</span> <span class="o">=</span> <span class="n">Match</span><span class="p">(</span>
         <span class="n">area_fraction</span><span class="o">=</span><span class="kc">None</span> <span class="k">if</span> <span class="n">space</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">space</span><span class="o">.</span><span class="n">fraction</span><span class="p">,</span>
@@ -343,12 +346,12 @@
 <span class="k">class</span><span class="w"> </span><span class="nc">Rule</span><span class="p">(</span><span class="n">Outcome</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""A static record: one GeoJSON Feature (Rule.from_feature) or built in Python.</span>
 
-<span class="sd">    Index.add checks its names and resolves region_ref; evaluate() then runs</span>
-<span class="sd">    against that Index (a rule added to a second Index is added as a copy).</span>
+<span class="sd">    Registry.add checks its names and resolves region_ref; evaluate() then runs</span>
+<span class="sd">    against that Registry (a rule added to a second Registry is added as a copy).</span>
 <span class="sd">    """</span>
 
     <span class="n">scope</span><span class="p">:</span> <span class="n">Scope</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="n">Scope</span><span class="p">)</span>
-    <span class="n">region_ref</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span> <span class="o">=</span> <span class="p">()</span>  <span class="c1"># resolved into a space by Index.add</span>
+    <span class="n">region_ref</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span> <span class="o">=</span> <span class="p">()</span>  <span class="c1"># resolved into a space by Registry.add</span>
     <span class="n">created</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>  <span class="c1"># record lifecycle time, not data time</span>
     <span class="n">updated</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
     <span class="n">withdrawn</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>  <span class="c1"># kept for history, never matched</span>
@@ -376,8 +379,8 @@
 <div class="viewcode-block" id="Rule.from_feature">
 <a class="viewcode-back" href="../../api.html#queryearth.Rule.from_feature">[docs]</a>
     <span class="nd">@classmethod</span>
-    <span class="k">def</span><span class="w"> </span><span class="nf">from_feature</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">feature</span><span class="p">:</span> <span class="n">Mapping</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span> <span class="n">index</span><span class="p">:</span> <span class="n">Index</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Rule</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">"""Read one GeoJSON record (section 5); Index.add then checks its names.</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">from_feature</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">feature</span><span class="p">:</span> <span class="n">Mapping</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span> <span class="n">registry</span><span class="p">:</span> <span class="n">Registry</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Rule</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Read one GeoJSON record (section 5); Registry.add then checks its names.</span>
 
 <span class="sd">        Checks by hand what reference/schema.json states, and plugin dimension</span>
 <span class="sd">        values against their schemas; errors name the record's code.</span>
@@ -385,7 +388,7 @@
         <span class="n">props</span> <span class="o">=</span> <span class="n">feature</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"properties"</span><span class="p">)</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">feature</span><span class="p">,</span> <span class="n">Mapping</span><span class="p">)</span> <span class="k">else</span> <span class="kc">None</span>
         <span class="n">code</span> <span class="o">=</span> <span class="n">props</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"code"</span><span class="p">)</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">props</span><span class="p">,</span> <span class="n">Mapping</span><span class="p">)</span> <span class="k">else</span> <span class="kc">None</span>
         <span class="k">try</span><span class="p">:</span>
-            <span class="k">return</span> <span class="bp">cls</span><span class="o">.</span><span class="n">_read</span><span class="p">(</span><span class="n">feature</span><span class="p">,</span> <span class="n">props</span><span class="p">,</span> <span class="n">index</span><span class="p">)</span>
+            <span class="k">return</span> <span class="bp">cls</span><span class="o">.</span><span class="n">_read</span><span class="p">(</span><span class="n">feature</span><span class="p">,</span> <span class="n">props</span><span class="p">,</span> <span class="n">registry</span><span class="p">)</span>
         <span class="k">except</span> <span class="p">(</span><span class="ne">ValueError</span><span class="p">,</span> <span class="ne">TypeError</span><span class="p">,</span> <span class="ne">KeyError</span><span class="p">)</span> <span class="k">as</span> <span class="n">err</span><span class="p">:</span>
             <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">code</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">or</span> <span class="nb">str</span><span class="p">(</span><span class="n">err</span><span class="p">)</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">code</span><span class="si">}</span><span class="s2">:"</span><span class="p">):</span>
                 <span class="k">raise</span>
@@ -393,7 +396,7 @@
 
 
     <span class="nd">@classmethod</span>
-    <span class="k">def</span><span class="w"> </span><span class="nf">_read</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">feature</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">props</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">index</span><span class="p">:</span> <span class="n">Index</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Rule</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_read</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">feature</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">props</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">registry</span><span class="p">:</span> <span class="n">Registry</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Rule</span><span class="p">:</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">feature</span><span class="p">,</span> <span class="n">Mapping</span><span class="p">)</span> <span class="ow">or</span> <span class="n">feature</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"type"</span><span class="p">)</span> <span class="o">!=</span> <span class="s2">"Feature"</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"a record is a GeoJSON Feature"</span><span class="p">)</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">props</span><span class="p">,</span> <span class="n">Mapping</span><span class="p">)</span> <span class="ow">or</span> <span class="s2">"geometry"</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">feature</span><span class="p">:</span>
@@ -438,7 +441,7 @@
             <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="p">(</span><span class="nb">list</span><span class="p">,</span> <span class="n">Mapping</span><span class="p">)):</span>  <span class="c1"># no bare strings in records</span>
                 <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"facet </span><span class="si">{</span><span class="n">name</span><span class="si">!r}</span><span class="s2"> is a list of patterns or an object"</span><span class="p">)</span>
         <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">props</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"dimensions"</span><span class="p">,</span> <span class="p">{})</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
-            <span class="n">problem</span> <span class="o">=</span> <span class="n">schema_problem</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">index</span><span class="o">.</span><span class="n">_dimension</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="s2">"dims"</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">schema</span><span class="p">)</span>
+            <span class="n">problem</span> <span class="o">=</span> <span class="n">schema_problem</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">registry</span><span class="o">.</span><span class="n">_dimension</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="s2">"dims"</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">schema</span><span class="p">)</span>
             <span class="k">if</span> <span class="n">problem</span><span class="p">:</span>
                 <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"dimension </span><span class="si">{</span><span class="n">name</span><span class="si">!r}</span><span class="s2">: </span><span class="si">{</span><span class="n">problem</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
         <span class="n">scope</span> <span class="o">=</span> <span class="n">Scope</span><span class="p">(</span>
@@ -457,7 +460,7 @@
     <span class="k">def</span><span class="w"> </span><span class="nf">evaluate</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">query</span><span class="p">:</span> <span class="n">Query</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">Finding</span><span class="p">]:</span>
 <span class="w">        </span><span class="sd">"""Findings for one query part (section 4.3)."""</span>
         <span class="n">bound</span> <span class="o">=</span> <span class="n">binding_of</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
-        <span class="n">found</span> <span class="o">=</span> <span class="n">match_scope</span><span class="p">(</span><span class="n">bound</span><span class="o">.</span><span class="n">index</span><span class="p">,</span> <span class="n">bound</span><span class="o">.</span><span class="n">scope</span><span class="p">,</span> <span class="n">query</span><span class="p">)</span>
+        <span class="n">found</span> <span class="o">=</span> <span class="n">match_scope</span><span class="p">(</span><span class="n">bound</span><span class="o">.</span><span class="n">registry</span><span class="p">,</span> <span class="n">bound</span><span class="o">.</span><span class="n">scope</span><span class="p">,</span> <span class="n">query</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">found</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
             <span class="k">return</span> <span class="p">[]</span>
         <span class="n">match</span><span class="p">,</span> <span class="n">details</span> <span class="o">=</span> <span class="n">found</span>
@@ -486,8 +489,8 @@
 <span class="k">class</span><span class="w"> </span><span class="nc">ComputedRule</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""A rule computed from the request or from data the caller holds.</span>
 
-<span class="sd">    Class keywords give its identity and scope: code, index (default</span>
-<span class="sd">    Index.default()), abstract, the Outcome fields (kind defaults to caveat,</span>
+<span class="sd">    Class keywords give its identity and scope: code, registry (default</span>
+<span class="sd">    Registry.default()), abstract, the Outcome fields (kind defaults to caveat,</span>
 <span class="sd">    severity to WARNING or INFO for a recommendation, title and message to the</span>
 <span class="sd">    docstring), facets, axes, dims, space (a Space), time and requires (keys</span>
 <span class="sd">    of Query.context). Defining a subclass registers one instance; a subclass</span>
@@ -500,14 +503,16 @@
 
     <span class="n">code</span><span class="p">:</span> <span class="n">ClassVar</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span>
     <span class="n">meta</span><span class="p">:</span> <span class="n">ClassVar</span><span class="p">[</span><span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span>
-    <span class="n">scope</span><span class="p">:</span> <span class="n">Scope</span>  <span class="c1"># set by Index.add from meta, after checking the declared names</span>
+    <span class="n">scope</span><span class="p">:</span> <span class="n">Scope</span>  <span class="c1"># set by Registry.add from meta, after checking the declared names</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">__init_subclass__</span><span class="p">(</span>
-        <span class="bp">cls</span><span class="p">,</span> <span class="n">code</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">""</span><span class="p">,</span> <span class="n">index</span><span class="p">:</span> <span class="n">Index</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="o">**</span><span class="n">meta</span><span class="p">:</span> <span class="n">Any</span>
+        <span class="bp">cls</span><span class="p">,</span> <span class="n">code</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">""</span><span class="p">,</span> <span class="n">registry</span><span class="p">:</span> <span class="n">Registry</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="o">**</span><span class="n">meta</span><span class="p">:</span> <span class="n">Any</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">__init_subclass__</span><span class="p">()</span>
         <span class="n">abstract</span> <span class="o">=</span> <span class="n">meta</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">"abstract"</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span>
-        <span class="bp">cls</span><span class="o">.</span><span class="n">_qe_meta</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">meta</span><span class="p">,</span> <span class="o">**</span><span class="p">({}</span> <span class="k">if</span> <span class="n">index</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="p">{</span><span class="s2">"index"</span><span class="p">:</span> <span class="n">index</span><span class="p">}))</span>
+        <span class="bp">cls</span><span class="o">.</span><span class="n">_qe_meta</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span>
+            <span class="n">meta</span><span class="p">,</span> <span class="o">**</span><span class="p">({}</span> <span class="k">if</span> <span class="n">registry</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="p">{</span><span class="s2">"registry"</span><span class="p">:</span> <span class="n">registry</span><span class="p">})</span>
+        <span class="p">)</span>
         <span class="k">if</span> <span class="n">abstract</span><span class="p">:</span>
             <span class="k">return</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="n">code</span><span class="p">:</span>
@@ -515,13 +520,13 @@
         <span class="n">merged</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
         <span class="k">for</span> <span class="n">base</span> <span class="ow">in</span> <span class="nb">reversed</span><span class="p">(</span><span class="bp">cls</span><span class="o">.</span><span class="vm">__mro__</span><span class="p">):</span>
             <span class="n">merged</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">base</span><span class="o">.</span><span class="vm">__dict__</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"_qe_meta"</span><span class="p">,</span> <span class="p">{}))</span>
-        <span class="n">target</span> <span class="o">=</span> <span class="n">merged</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">"index"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+        <span class="n">target</span> <span class="o">=</span> <span class="n">merged</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">"registry"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
         <span class="n">check_meta</span><span class="p">(</span><span class="n">merged</span><span class="p">,</span> <span class="bp">cls</span><span class="o">.</span><span class="vm">__name__</span><span class="p">)</span>
         <span class="bp">cls</span><span class="o">.</span><span class="n">code</span><span class="p">,</span> <span class="bp">cls</span><span class="o">.</span><span class="n">meta</span> <span class="o">=</span> <span class="n">code</span><span class="p">,</span> <span class="n">merged</span>
         <span class="k">if</span> <span class="n">target</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="kn">from</span><span class="w"> </span><span class="nn">queryearth.index</span><span class="w"> </span><span class="kn">import</span> <span class="n">Index</span>
+            <span class="kn">from</span><span class="w"> </span><span class="nn">queryearth.registry</span><span class="w"> </span><span class="kn">import</span> <span class="n">Registry</span>
 
-            <span class="n">target</span> <span class="o">=</span> <span class="n">Index</span><span class="o">.</span><span class="n">default</span><span class="p">()</span>
+            <span class="n">target</span> <span class="o">=</span> <span class="n">Registry</span><span class="o">.</span><span class="n">default</span><span class="p">()</span>
         <span class="n">target</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="bp">cls</span><span class="p">())</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">_doc</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
@@ -553,7 +558,7 @@
     <span class="k">def</span><span class="w"> </span><span class="nf">evaluate</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">query</span><span class="p">:</span> <span class="n">Query</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">Finding</span><span class="p">]:</span>
 <span class="w">        </span><span class="sd">"""Findings for one query part: the scope, then check() if definite."""</span>
         <span class="n">bound</span> <span class="o">=</span> <span class="n">binding_of</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
-        <span class="n">found</span> <span class="o">=</span> <span class="n">match_scope</span><span class="p">(</span><span class="n">bound</span><span class="o">.</span><span class="n">index</span><span class="p">,</span> <span class="n">bound</span><span class="o">.</span><span class="n">scope</span><span class="p">,</span> <span class="n">query</span><span class="p">)</span>
+        <span class="n">found</span> <span class="o">=</span> <span class="n">match_scope</span><span class="p">(</span><span class="n">bound</span><span class="o">.</span><span class="n">registry</span><span class="p">,</span> <span class="n">bound</span><span class="o">.</span><span class="n">scope</span><span class="p">,</span> <span class="n">query</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">found</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
             <span class="k">return</span> <span class="p">[]</span>
         <span class="n">match</span><span class="p">,</span> <span class="n">details</span> <span class="o">=</span> <span class="n">found</span>
@@ -580,7 +585,7 @@
 
 
 <span class="k">class</span><span class="w"> </span><span class="nc">FunctionRule</span><span class="p">(</span><span class="n">ComputedRule</span><span class="p">,</span> <span class="n">abstract</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">"""A plain function (query, match) -&gt; CheckResult, wrapped by Index.rule()."""</span>
+<span class="w">    </span><span class="sd">"""A plain function (query, match) -&gt; CheckResult, wrapped by Registry.rule()."""</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">func</span><span class="p">:</span> <span class="n">RuleFunc</span><span class="p">,</span> <span class="n">code</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">meta</span><span class="p">:</span> <span class="n">Mapping</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
         <span class="n">check_meta</span><span class="p">(</span><span class="n">meta</span><span class="p">,</span> <span class="n">code</span><span class="p">)</span>

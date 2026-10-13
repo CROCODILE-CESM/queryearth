@@ -5,14 +5,14 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>queryearth.index &mdash; queryearth 0.0.2.dev1</title>
+  <title>queryearth.registry &mdash; queryearth 0.0.2.dev2</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
 
   
       <script src="../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../_static/documentation_options.js?v=ab1fadd3"></script>
+      <script src="../../_static/documentation_options.js?v=9ce727b9"></script>
       <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script src="../../_static/js/theme.js"></script>
@@ -63,7 +63,7 @@
   <ul class="wy-breadcrumbs">
       <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
           <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
-      <li class="breadcrumb-item active">queryearth.index</li>
+      <li class="breadcrumb-item active">queryearth.registry</li>
       <li class="wy-breadcrumbs-aside">
       </li>
   </ul>
@@ -72,10 +72,10 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
              
-  <h1>Source code for queryearth.index</h1><div class="highlight"><pre>
-<span></span><span class="sd">"""The Index: declared dimensions, products, regions and rules, and the query.</span>
+  <h1>Source code for queryearth.registry</h1><div class="highlight"><pre>
+<span></span><span class="sd">"""The Registry: declared dimensions, products, regions and rules, and the query.</span>
 
-<span class="sd">Index.query follows design.md section 9.1: it splits the query into its base</span>
+<span class="sd">Registry.query follows design.md section 9.1: it splits the query into its base</span>
 <span class="sd">query and one sub-query per request (section 4.12), calls evaluate() on every</span>
 <span class="sd">active rule of each part (after any plugin prefilters), adds the built-in</span>
 <span class="sd">coverage findings QE001 and QE002, and sorts.</span>
@@ -138,7 +138,7 @@
 <span class="kn">from</span><span class="w"> </span><span class="nn">queryearth.space</span><span class="w"> </span><span class="kn">import</span> <span class="n">Space</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">queryearth.time</span><span class="w"> </span><span class="kn">import</span> <span class="n">DAY</span><span class="p">,</span> <span class="n">Interval</span><span class="p">,</span> <span class="n">TimeSpec</span><span class="p">,</span> <span class="n">overlap</span><span class="p">,</span> <span class="n">time_fraction</span>
 
-<span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span><span class="s2">"Index"</span><span class="p">,</span> <span class="s2">"PointResult"</span><span class="p">,</span> <span class="s2">"ScoreFn"</span><span class="p">,</span> <span class="s2">"Suitability"</span><span class="p">,</span> <span class="s2">"default_score"</span><span class="p">]</span>
+<span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span><span class="s2">"Registry"</span><span class="p">,</span> <span class="s2">"PointResult"</span><span class="p">,</span> <span class="s2">"ScoreFn"</span><span class="p">,</span> <span class="s2">"Suitability"</span><span class="p">,</span> <span class="s2">"default_score"</span><span class="p">]</span>
 
 <span class="n">_SLUG</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="sa">r</span><span class="s2">"[a-z][a-z0-9_]*"</span><span class="p">)</span>
 <span class="n">_REGION</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="sa">r</span><span class="s2">"[a-z][a-z0-9_.-]*:[A-Za-z0-9_.+-]+"</span><span class="p">)</span>
@@ -146,7 +146,7 @@
 <span class="n">_KINDS</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"coverage"</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span> <span class="s2">"caveat"</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span> <span class="s2">"recommendation"</span><span class="p">:</span> <span class="mi">2</span><span class="p">}</span>
 <span class="n">_PER_REQUEST</span> <span class="o">=</span> <span class="p">(</span><span class="s2">"product"</span><span class="p">,</span> <span class="s2">"variable"</span><span class="p">,</span> <span class="s2">"version"</span><span class="p">)</span>
 
-<span class="n">_default</span><span class="p">:</span> <span class="n">Index</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+<span class="n">_default</span><span class="p">:</span> <span class="n">Registry</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
 <span class="n">_default_lock</span> <span class="o">=</span> <span class="n">threading</span><span class="o">.</span><span class="n">Lock</span><span class="p">()</span>
 
 
@@ -173,13 +173,13 @@
     <span class="k">return</span> <span class="p">(</span><span class="n">value</span><span class="p">,)</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="k">else</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">value</span> <span class="ow">or</span> <span class="p">())</span>
 
 
-<div class="viewcode-block" id="Index">
-<a class="viewcode-back" href="../../api.html#queryearth.Index">[docs]</a>
-<span class="k">class</span><span class="w"> </span><span class="nc">Index</span><span class="p">:</span>
+<div class="viewcode-block" id="Registry">
+<a class="viewcode-back" href="../../api.html#queryearth.Registry">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">Registry</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""Declared dimensions, products, regions and rules; answers queries.</span>
 
-<span class="sd">    There is no hidden global registry: a library keeps its own Index, and</span>
-<span class="sd">    Index.default() is the application default for scripts and notebooks.</span>
+<span class="sd">    There is no hidden global registry: a library keeps its own Registry, and</span>
+<span class="sd">    Registry.default() is the application default for scripts and notebooks.</span>
 <span class="sd">    """</span>
 
     <span class="n">FACETS</span> <span class="o">=</span> <span class="p">(</span><span class="s2">"product"</span><span class="p">,</span> <span class="s2">"variable"</span><span class="p">,</span> <span class="s2">"version"</span><span class="p">,</span> <span class="s2">"model"</span><span class="p">,</span> <span class="s2">"component"</span><span class="p">)</span>
@@ -217,23 +217,23 @@
             <span class="bp">self</span><span class="o">.</span><span class="n">add_dimension</span><span class="p">(</span><span class="n">dimension</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-        <span class="k">return</span> <span class="sa">f</span><span class="s2">"Index(</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="si">!r}</span><span class="s2">, rules=</span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_entries</span><span class="p">)</span><span class="si">}</span><span class="s2">)"</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">"Registry(</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="si">!r}</span><span class="s2">, rules=</span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_entries</span><span class="p">)</span><span class="si">}</span><span class="s2">)"</span>
 
-<div class="viewcode-block" id="Index.default">
-<a class="viewcode-back" href="../../api.html#queryearth.Index.default">[docs]</a>
+<div class="viewcode-block" id="Registry.default">
+<a class="viewcode-back" href="../../api.html#queryearth.Registry.default">[docs]</a>
     <span class="nd">@classmethod</span>
-    <span class="k">def</span><span class="w"> </span><span class="nf">default</span><span class="p">(</span><span class="bp">cls</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Index</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">"""The application default Index, made on first use."""</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">default</span><span class="p">(</span><span class="bp">cls</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Registry</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""The application default Registry, made on first use."""</span>
         <span class="k">global</span> <span class="n">_default</span>
         <span class="k">with</span> <span class="n">_default_lock</span><span class="p">:</span>
             <span class="k">if</span> <span class="n">_default</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-                <span class="n">_default</span> <span class="o">=</span> <span class="n">Index</span><span class="p">(</span><span class="s2">"default"</span><span class="p">)</span>
+                <span class="n">_default</span> <span class="o">=</span> <span class="n">Registry</span><span class="p">(</span><span class="s2">"default"</span><span class="p">)</span>
             <span class="k">return</span> <span class="n">_default</span></div>
 
 
     <span class="c1"># ---- declarations -------------------------------------------------------------</span>
-<div class="viewcode-block" id="Index.add_dimension">
-<a class="viewcode-back" href="../../api.html#queryearth.Index.add_dimension">[docs]</a>
+<div class="viewcode-block" id="Registry.add_dimension">
+<a class="viewcode-back" href="../../api.html#queryearth.Registry.add_dimension">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">add_dimension</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dimension</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">"""Declare a plugin dimension (section 4.13), before any rule is added."""</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_entries</span><span class="p">:</span>
@@ -257,8 +257,8 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">_groups</span><span class="o">.</span><span class="n">sort</span><span class="p">(</span><span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">g</span><span class="p">:</span> <span class="n">_GROUPS</span><span class="p">[</span><span class="n">g</span><span class="p">[</span><span class="mi">2</span><span class="p">]])</span>  <span class="c1"># stable sort</span></div>
 
 
-<div class="viewcode-block" id="Index.add_product">
-<a class="viewcode-back" href="../../api.html#queryearth.Index.add_product">[docs]</a>
+<div class="viewcode-block" id="Registry.add_product">
+<a class="viewcode-back" href="../../api.html#queryearth.Registry.add_product">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">add_product</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">product</span><span class="p">:</span> <span class="n">Product</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">"""Declare a product; its name and aliases resolve exactly, ignoring case."""</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">product</span><span class="p">,</span> <span class="n">Product</span><span class="p">):</span>
@@ -276,8 +276,8 @@
 <span class="w">        </span><span class="sd">"""The declared products by canonical name, read-only (Q4)."""</span>
         <span class="k">return</span> <span class="n">types</span><span class="o">.</span><span class="n">MappingProxyType</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_products</span><span class="p">)</span>
 
-<div class="viewcode-block" id="Index.add_regions">
-<a class="viewcode-back" href="../../api.html#queryearth.Index.add_regions">[docs]</a>
+<div class="viewcode-block" id="Registry.add_regions">
+<a class="viewcode-back" href="../../api.html#queryearth.Registry.add_regions">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">add_regions</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">namespace</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">regions</span><span class="p">:</span> <span class="n">Mapping</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">"""Declare named regions, referred to as "namespace:id" in region_ref."""</span>
         <span class="k">for</span> <span class="n">rid</span><span class="p">,</span> <span class="n">shape</span> <span class="ow">in</span> <span class="n">regions</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
@@ -291,8 +291,8 @@
                 <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"region </span><span class="si">{</span><span class="n">ref</span><span class="si">}</span><span class="s2"> is already declared"</span><span class="p">)</span></div>
 
 
-<div class="viewcode-block" id="Index.add">
-<a class="viewcode-back" href="../../api.html#queryearth.Index.add">[docs]</a>
+<div class="viewcode-block" id="Registry.add">
+<a class="viewcode-back" href="../../api.html#queryearth.Registry.add">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">add</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">rule</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">"""Add a Rule, a ComputedRule instance, any RuleKind or a record mapping.</span>
 
@@ -306,19 +306,19 @@
             <span class="bp">self</span><span class="o">.</span><span class="n">_add</span><span class="p">(</span><span class="n">rule</span><span class="p">,</span> <span class="s2">"python"</span><span class="p">)</span></div>
 
 
-<div class="viewcode-block" id="Index.load_pack">
-<a class="viewcode-back" href="../../api.html#queryearth.Index.load_pack">[docs]</a>
+<div class="viewcode-block" id="Registry.load_pack">
+<a class="viewcode-back" href="../../api.html#queryearth.Registry.load_pack">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">load_pack</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">os</span><span class="o">.</span><span class="n">PathLike</span><span class="p">[</span><span class="nb">str</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
 <span class="w">        </span><span class="sd">"""Load a data-only pack directory (section 5.4); returns the codes loaded.</span>
 
 <span class="sd">        Raises LoadError listing every problem with its file, the feature's</span>
-<span class="sd">        position and its code, and then leaves the Index as it was.</span>
+<span class="sd">        position and its code, and then leaves the Registry as it was.</span>
 <span class="sd">        """</span>
         <span class="k">return</span> <span class="n">packs</span><span class="o">.</span><span class="n">load_pack</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">)</span></div>
 
 
     <span class="k">def</span><span class="w"> </span><span class="nf">_add</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">rule</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">source</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">"""Index.add; source names a record's pack ("python" from Python)."""</span>
+<span class="w">        </span><span class="sd">"""Registry.add; source names a record's pack ("python" from Python)."""</span>
         <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">rule</span><span class="p">,</span> <span class="n">ComputedRule</span><span class="p">):</span>
             <span class="n">form</span><span class="p">,</span> <span class="n">get</span> <span class="o">=</span> <span class="s2">"computed"</span><span class="p">,</span> <span class="n">rule</span><span class="o">.</span><span class="n">meta</span><span class="o">.</span><span class="n">get</span>
             <span class="n">scope</span> <span class="o">=</span> <span class="n">Scope</span><span class="p">(</span>
@@ -345,12 +345,14 @@
         <span class="k">if</span> <span class="n">at</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="p">(</span>
             <span class="n">qualname</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">_entries</span><span class="p">[</span><span class="n">at</span><span class="p">]</span><span class="o">.</span><span class="n">qualname</span> <span class="o">!=</span> <span class="n">qualname</span>
         <span class="p">):</span>
-            <span class="k">raise</span> <span class="n">DuplicateCodeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"code </span><span class="si">{</span><span class="n">code</span><span class="si">!r}</span><span class="s2"> is already on index </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="si">!r}</span><span class="s2">"</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="n">DuplicateCodeError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">"code </span><span class="si">{</span><span class="n">code</span><span class="si">!r}</span><span class="s2"> is already on registry </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="si">!r}</span><span class="s2">"</span>
+            <span class="p">)</span>
         <span class="n">bound</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">rule</span><span class="p">,</span> <span class="s2">"_qe_binding"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
-        <span class="k">if</span> <span class="n">bound</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">bound</span><span class="o">.</span><span class="n">index</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">self</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">bound</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">bound</span><span class="o">.</span><span class="n">registry</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">self</span><span class="p">:</span>
             <span class="k">if</span> <span class="n">form</span> <span class="o">!=</span> <span class="s2">"record"</span><span class="p">:</span>
                 <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                    <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">code</span><span class="si">}</span><span class="s2">: this rule object is already on another Index"</span>
+                    <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">code</span><span class="si">}</span><span class="s2">: this rule object is already on another Registry"</span>
                 <span class="p">)</span>
             <span class="n">rule</span> <span class="o">=</span> <span class="n">copy</span><span class="o">.</span><span class="n">copy</span><span class="p">(</span><span class="n">rule</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">form</span> <span class="o">==</span> <span class="s2">"computed"</span><span class="p">:</span>
@@ -368,8 +370,8 @@
             <span class="bp">self</span><span class="o">.</span><span class="n">_entries</span><span class="p">[</span><span class="n">at</span><span class="p">]</span> <span class="o">=</span> <span class="n">entry</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_prefilters_cache</span> <span class="o">=</span> <span class="kc">None</span>
 
-<div class="viewcode-block" id="Index.rule">
-<a class="viewcode-back" href="../../api.html#queryearth.Index.rule">[docs]</a>
+<div class="viewcode-block" id="Registry.rule">
+<a class="viewcode-back" href="../../api.html#queryearth.Registry.rule">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">rule</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">code</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="o">**</span><span class="n">meta</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Callable</span><span class="p">[[</span><span class="n">RuleFunc</span><span class="p">],</span> <span class="n">RuleFunc</span><span class="p">]:</span>
 <span class="w">        </span><span class="sd">"""Register a function (query, match) -&gt; CheckResult as a computed rule.</span>
 
@@ -383,8 +385,8 @@
         <span class="k">return</span> <span class="n">register</span></div>
 
 
-<div class="viewcode-block" id="Index.rule_counts">
-<a class="viewcode-back" href="../../api.html#queryearth.Index.rule_counts">[docs]</a>
+<div class="viewcode-block" id="Registry.rule_counts">
+<a class="viewcode-back" href="../../api.html#queryearth.Registry.rule_counts">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">rule_counts</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span> <span class="nb">int</span><span class="p">]:</span>
 <span class="w">        </span><span class="sd">"""How many active rules concern each product; None counts the others (Q35)."""</span>
         <span class="n">counts</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span> <span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="nb">dict</span><span class="o">.</span><span class="n">fromkeys</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_products</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
@@ -486,8 +488,8 @@
         <span class="k">return</span> <span class="n">parsed</span>
 
     <span class="c1"># ---- requests (section 4.12) ----------------------------------------------------</span>
-<div class="viewcode-block" id="Index.expand">
-<a class="viewcode-back" href="../../api.html#queryearth.Index.expand">[docs]</a>
+<div class="viewcode-block" id="Registry.expand">
+<a class="viewcode-back" href="../../api.html#queryearth.Registry.expand">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">expand</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">query</span><span class="p">:</span> <span class="n">Query</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Query</span><span class="p">,</span> <span class="o">...</span><span class="p">]:</span>
 <span class="w">        </span><span class="sd">"""The base query and one sub-query per request, as the engine runs them."""</span>
         <span class="k">return</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">part</span><span class="o">.</span><span class="n">query</span> <span class="k">for</span> <span class="n">part</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_expand</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_make_query</span><span class="p">(</span><span class="n">query</span><span class="p">,</span> <span class="p">{})))</span></div>
@@ -499,7 +501,7 @@
         <span class="p">)</span>
         <span class="k">if</span> <span class="n">query</span><span class="o">.</span><span class="n">request</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">query</span><span class="o">.</span><span class="n">assumed</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                <span class="s2">"request and assumed are set by Index.expand(), not callers"</span>
+                <span class="s2">"request and assumed are set by Registry.expand(), not callers"</span>
             <span class="p">)</span>
         <span class="k">return</span> <span class="n">query</span>
 
@@ -566,8 +568,8 @@
         <span class="k">return</span> <span class="n">_Part</span><span class="p">(</span><span class="n">sub</span><span class="p">,</span> <span class="s2">"request"</span><span class="p">,</span> <span class="n">product</span><span class="p">,</span> <span class="n">coverage</span><span class="p">)</span>
 
     <span class="c1"># ---- queries ------------------------------------------------------------------</span>
-<div class="viewcode-block" id="Index.query">
-<a class="viewcode-back" href="../../api.html#queryearth.Index.query">[docs]</a>
+<div class="viewcode-block" id="Registry.query">
+<a class="viewcode-back" href="../../api.html#queryearth.Registry.query">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">query</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">query</span><span class="p">:</span> <span class="n">Query</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="o">/</span><span class="p">,</span> <span class="o">**</span><span class="n">fields</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">Finding</span><span class="p">]:</span>
 <span class="w">        </span><span class="sd">"""Findings for one query with any number of requests, sorted.</span>
 
@@ -733,8 +735,8 @@
         <span class="k">return</span> <span class="n">found</span>
 
     <span class="c1"># ---- the inverse query (section 10) ---------------------------------------------</span>
-<div class="viewcode-block" id="Index.suitable">
-<a class="viewcode-back" href="../../api.html#queryearth.Index.suitable">[docs]</a>
+<div class="viewcode-block" id="Registry.suitable">
+<a class="viewcode-back" href="../../api.html#queryearth.Registry.suitable">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">suitable</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">query</span><span class="p">:</span> <span class="n">Query</span><span class="p">,</span>
@@ -786,8 +788,8 @@
 
 
     <span class="c1"># ---- the bulk path (section 9.3) ------------------------------------------------</span>
-<div class="viewcode-block" id="Index.query_points">
-<a class="viewcode-back" href="../../api.html#queryearth.Index.query_points">[docs]</a>
+<div class="viewcode-block" id="Registry.query_points">
+<a class="viewcode-back" href="../../api.html#queryearth.Registry.query_points">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">query_points</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span> <span class="n">lon</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">lat</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">weights</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="o">**</span><span class="n">fields</span><span class="p">:</span> <span class="n">Any</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">PointResult</span><span class="p">:</span>
@@ -893,7 +895,7 @@
 <a class="viewcode-back" href="../../api.html#queryearth.PointResult">[docs]</a>
 <span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">eq</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">PointResult</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">"""What Index.query_points found, keyed by (product, code), product None</span>
+<span class="w">    </span><span class="sd">"""What Registry.query_points found, keyed by (product, code), product None</span>
 <span class="sd">    on the base query. Masks are shaped like lon; conditional findings have none.</span>
 <span class="sd">    """</span>
 
@@ -921,7 +923,7 @@
 <div class="viewcode-block" id="Suitability">
 <a class="viewcode-back" href="../../api.html#queryearth.Suitability">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">Suitability</span><span class="p">(</span><span class="n">NamedTuple</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">"""A product ranked by Index.suitable; a low score is not "good data"."""</span>
+<span class="w">    </span><span class="sd">"""A product ranked by Registry.suitable; a low score is not "good data"."""</span>
 
     <span class="n">product</span><span class="p">:</span> <span class="n">Product</span>
     <span class="n">score</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span>  <span class="c1"># for ordering only; () for a dropped product</span>

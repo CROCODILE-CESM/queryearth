@@ -5,14 +5,14 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Index &mdash; queryearth 0.0.2.dev1</title>
+  <title>Index &mdash; queryearth 0.0.2.dev2</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
 
   
       <script src="_static/jquery.js?v=5d32c60e"></script>
       <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="_static/documentation_options.js?v=ab1fadd3"></script>
+      <script src="_static/documentation_options.js?v=9ce727b9"></script>
       <script src="_static/doctools.js?v=fd6eb6e6"></script>
       <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script src="_static/js/theme.js"></script>
@@ -99,13 +99,13 @@
 <h2 id="A">A</h2>
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="api.html#queryearth.Index.add">add() (queryearth.Index method)</a>
+      <li><a href="api.html#queryearth.Registry.add">add() (queryearth.Registry method)</a>
 </li>
-      <li><a href="api.html#queryearth.Index.add_dimension">add_dimension() (queryearth.Index method)</a>
+      <li><a href="api.html#queryearth.Registry.add_dimension">add_dimension() (queryearth.Registry method)</a>
 </li>
-      <li><a href="api.html#queryearth.Index.add_product">add_product() (queryearth.Index method)</a>
+      <li><a href="api.html#queryearth.Registry.add_product">add_product() (queryearth.Registry method)</a>
 </li>
-      <li><a href="api.html#queryearth.Index.add_regions">add_regions() (queryearth.Index method)</a>
+      <li><a href="api.html#queryearth.Registry.add_regions">add_regions() (queryearth.Registry method)</a>
 </li>
       <li><a href="api.html#queryearth.AdvisoryError">AdvisoryError</a>
 </li>
@@ -149,7 +149,7 @@
 <h2 id="D">D</h2>
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="api.html#queryearth.Index.default">default() (queryearth.Index class method)</a>
+      <li><a href="api.html#queryearth.Registry.default">default() (queryearth.Registry class method)</a>
 </li>
       <li><a href="api.html#queryearth.default_score">default_score() (in module queryearth)</a>
 </li>
@@ -177,7 +177,7 @@
       </ul></li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="api.html#queryearth.Index.expand">expand() (queryearth.Index method)</a>
+      <li><a href="api.html#queryearth.Registry.expand">expand() (queryearth.Registry method)</a>
 </li>
       <li><a href="api.html#queryearth.TimeSpec.extent">extent (queryearth.TimeSpec property)</a>
 </li>
@@ -203,8 +203,6 @@
 <h2 id="I">I</h2>
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="api.html#queryearth.Index">Index (class in queryearth)</a>
-</li>
       <li><a href="api.html#queryearth.InfoAdvisory">InfoAdvisory</a>
 </li>
   </ul></td>
@@ -223,7 +221,7 @@
 </li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="api.html#queryearth.Index.load_pack">load_pack() (queryearth.Index method)</a>
+      <li><a href="api.html#queryearth.Registry.load_pack">load_pack() (queryearth.Registry method)</a>
 </li>
       <li><a href="api.html#queryearth.LoadError">LoadError</a>
 </li>
@@ -300,7 +298,7 @@
 </li>
       <li><a href="api.html#queryearth.Suitability.product">product (queryearth.Suitability attribute)</a>
 </li>
-      <li><a href="api.html#queryearth.Index.products">products (queryearth.Index property)</a>
+      <li><a href="api.html#queryearth.Registry.products">products (queryearth.Registry property)</a>
 </li>
   </ul></td>
 </tr></table>
@@ -310,9 +308,9 @@
   <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="api.html#queryearth.Query">Query (class in queryearth)</a>
 </li>
-      <li><a href="api.html#queryearth.Index.query">query() (queryearth.Index method)</a>
+      <li><a href="api.html#queryearth.Registry.query">query() (queryearth.Registry method)</a>
 </li>
-      <li><a href="api.html#queryearth.Index.query_points">query_points() (queryearth.Index method)</a>
+      <li><a href="api.html#queryearth.Registry.query_points">query_points() (queryearth.Registry method)</a>
 </li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
@@ -336,15 +334,17 @@
 <h2 id="R">R</h2>
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="api.html#queryearth.Registry">Registry (class in queryearth)</a>
+</li>
       <li><a href="api.html#queryearth.Request">Request (class in queryearth)</a>
 </li>
       <li><a href="api.html#queryearth.Rule">Rule (class in queryearth)</a>
 </li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="api.html#queryearth.Index.rule">rule() (queryearth.Index method)</a>
+      <li><a href="api.html#queryearth.Registry.rule">rule() (queryearth.Registry method)</a>
 </li>
-      <li><a href="api.html#queryearth.Index.rule_counts">rule_counts() (queryearth.Index method)</a>
+      <li><a href="api.html#queryearth.Registry.rule_counts">rule_counts() (queryearth.Registry method)</a>
 </li>
       <li><a href="api.html#queryearth.RuleKind">RuleKind (class in queryearth)</a>
 </li>
@@ -374,7 +374,7 @@
 </li>
       <li><a href="api.html#queryearth.Suitability">Suitability (class in queryearth)</a>
 </li>
-      <li><a href="api.html#queryearth.Index.suitable">suitable() (queryearth.Index method)</a>
+      <li><a href="api.html#queryearth.Registry.suitable">suitable() (queryearth.Registry method)</a>
 </li>
   </ul></td>
 </tr></table>
