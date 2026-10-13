@@ -42,7 +42,7 @@ It is an engine only: the package ships no curated rules. Rule packs belong to t
 | `queryearth/emit.py` | `emit()`, `Policy`, `policy()`, the warning classes and `AdvisoryError` |
 | `tests/` | One file per module, plus `test_queries.py` (bulk path, `suitable`) and `test_packs.py` |
 | `examples/toy/` | A made-up pack and `play.py`, a walkthrough to run cell by cell |
-| `docs/source/` | The public user docs (Sphinx with MyST Markdown), built and deployed to GitHub Pages by `.github/workflows/docs.yml`. Nothing derived from the private interviews goes here |
+| `docs/source/` | The public user docs (Sphinx with MyST Markdown), built and deployed to GitHub Pages by `.github/workflows/docs.yml`: one folder per release (`vX.Y.Z/`) plus `dev/` for `main`, with a version menu; `.github/docs_versions.py` keeps the version list and the root redirect. Nothing derived from the private interviews goes here |
 | `docs/design.md` | The design and the spec. "As built" notes mark where the code differs from it |
 | `docs/reference/` | `fixtures.md` (correctness fixtures, each with a test unless marked dropped), `schema.json` (record schema), `decisions.md` (the Q-numbered decisions and detailed contracts), the example pack, `usage.py` (a usage example), and background, consumer and glossary notes |
 

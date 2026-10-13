@@ -1,19 +1,35 @@
 name: Docs
 
+# Each version of the docs has its own folder on the gh-pages branch: dev/ for
+# main and vX.Y.Z/ for each release, and the site root redirects to the newest
+# release. Pull requests only build the docs, as a check.
 on:
   push:
     branches: [main]
   pull_request:
+  release:
+    types: [published]
   workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to rebuild, such as v0.1.0 (leave empty for main)"
+        required: false
+
+concurrency:  # one deploy at a time, so two versions never race to push
+  group: ${{ github.event_name == 'pull_request' && github.ref || 'docs-deploy' }}
+  cancel-in-progress: false
 
 jobs:
   docs:
     runs-on: ubuntu-latest
     permissions:
       contents: write  # push the built site to the gh-pages branch
+    env:
+      TAG: ${{ github.event_name == 'release' && github.event.release.tag_name || inputs.tag }}
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: ${{ env.TAG }}  # empty: the commit that triggered the run
           fetch-depth: 0  # setuptools-scm reads the version from git tags
       - uses: actions/setup-python@v5
         with:
@@ -24,10 +40,22 @@ jobs:
       # stay private: parts of them paraphrase private interviews.
       - name: Build
         run: sphinx-build -W --keep-going -b html docs/source docs/_build
-      - name: Deploy to GitHub Pages
-        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
-        uses: peaceiris/actions-gh-pages@v4
+      - name: Check out the published site
+        if: github.event_name != 'pull_request' && (env.TAG != '' || github.ref == 'refs/heads/main')
+        uses: actions/checkout@v4
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_branch: gh-pages
-          publish_dir: docs/_build
+          ref: gh-pages
+          path: site
+      - name: Publish this version and update the version list
+        if: github.event_name != 'pull_request' && (env.TAG != '' || github.ref == 'refs/heads/main')
+        run: |
+          folder="${TAG:-dev}"
+          rm -rf "site/$folder"
+          cp -r docs/_build "site/$folder"
+          python .github/docs_versions.py site
+          cd site
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -q -m "Publish the $folder docs" || exit 0
+          git push
