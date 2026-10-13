@@ -1,6 +1,6 @@
 """queryearth.time: fixtures 12 to 14 of docs/reference/fixtures.md, and edge cases.
 
-The fixtures need no Index, so each is tested on the operations its expected
+The fixtures need no Registry, so each is tested on the operations its expected
 findings rely on: overlap(), time_fraction() and the wire form.
 """
 

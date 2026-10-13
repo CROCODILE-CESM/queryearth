@@ -17,7 +17,7 @@ It is an engine only: the package ships no curated rules. Rule packs belong to t
 - **Keep the extension hooks.** Everything that varies between users plugs in through a small interface (design.md section 12.5), and these hooks stay even where nothing uses them yet:
   - plugin `Dimension`s, with their optional `build`, `comparable`, `late`, `to_json` and `extent`;
   - third-party rule kinds (`RuleKind`, `outcomes()`);
-  - `ComputedRule` and `@index.rule`, with `mask()` for the bulk path;
+  - `ComputedRule` and `@registry.rule`, with `mask()` for the bulk path;
   - a callable `Product.coverage`;
   - a `ScoreFn` for `suitable()`;
   - `emit()` sinks;
@@ -35,9 +35,9 @@ It is an engine only: the package ships no curated rules. Rule packs belong to t
 | `queryearth/space.py` | `Space` (point or polygon) and its helpers `point`, `box`, `polygon`. Antimeridian splitting, closed-set `meets`, `measure` (area fraction and km²), spherical `area_km2`, the points mask for the bulk path |
 | `queryearth/time.py` | `Interval`, `TimeSpec`, `interval()`, `parse_time()` for records, `overlap`, `time_fraction`, month recurrence. One calendar: proleptic Gregorian |
 | `queryearth/objects.py` | Frozen dataclasses: `Severity`, `Suggestion`, `Outcome`, `Match`, `Finding`, `Scope`, `Coverage`, `Product`, `Request`, `Query` |
-| `queryearth/dimensions.py` | The `Dimension` protocol; `SpaceDimension` and `TimeDimension`, built into every Index and not replaceable; the built-in plugins `Axis`, `Labels` and `Versions` |
+| `queryearth/dimensions.py` | The `Dimension` protocol; `SpaceDimension` and `TimeDimension`, built into every Registry and not replaceable; the built-in plugins `Axis`, `Labels` and `Versions` |
 | `queryearth/rules.py` | `Rule` (a static record), `ComputedRule`, `match_scope` (one scope against one query part) and building findings |
-| `queryearth/index.py` | `Index`: declarations, `query`, requests, coverage findings, `suitable`, `query_points`, `PointResult` |
+| `queryearth/registry.py` | `Registry`: declarations, `query`, requests, coverage findings, `suitable`, `query_points`, `PointResult` |
 | `queryearth/packs.py` | Loading a pack (`pack.toml` plus GeoJSON FeatureCollections), with the loader checks done by hand |
 | `queryearth/emit.py` | `emit()`, `Policy`, `policy()`, the warning classes and `AdvisoryError` |
 | `tests/` | One file per module, plus `test_queries.py` (bulk path, `suitable`) and `test_packs.py` |
@@ -48,10 +48,11 @@ It is an engine only: the package ships no curated rules. Rule packs belong to t
 
 ## Concepts worth knowing before changing the engine
 
-- A rule's scope is a conjunction: a dimension the rule leaves out matches anything. Space and time are dimensions too. `match_scope` runs one loop over every dimension of the Index, and the `late` ones (space) run last.
+- A **pack** is a file format: a directory with `pack.toml` (identity, owned code prefixes, products, axes, facets, regions) and GeoJSON rule records. A **Registry** is the in-memory object that packs and Python rules are loaded into, and the thing you query. One Registry can hold several packs.
+- A rule's scope is a conjunction: a dimension the rule leaves out matches anything. Space and time are dimensions too. `match_scope` runs one loop over every dimension of the Registry, and the `late` ones (space) run last.
 - When a query omits a dimension that a rule constrains, the finding is **conditional** (`conditional_on` names what is missing). Conditional findings are hidden unless `include_conditional=True`.
 - A query can hold several **requests** (one per product). Each runs as its own sub-query. It takes its product's coverage time and version when the query gives none, and lists them in `Finding.assumed`.
-- `Index.query` calls `evaluate()` on every active rule of each part, after any plugin prefilters. There are no vectorised tables (design.md section 9.1).
+- `Registry.query` calls `evaluate()` on every active rule of each part, after any plugin prefilters. There are no vectorised tables (design.md section 9.1).
 - Rings are normalised once, at load: longitudes wrapped, rings split at ±180, `make_valid`, oriented. Matching uses closed sets, so a point on an edge is inside.
 - On the wire, time intervals are closed, and an end date covers its whole day.
 - Callers query with the support they actually use (the cells and time steps), never a buffered shape.

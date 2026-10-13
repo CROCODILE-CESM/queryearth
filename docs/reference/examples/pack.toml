@@ -8,7 +8,7 @@ license = "CC-BY-4.0"
 files = ["rules.geojson"]
 
 # The axes, facets and plugin dimensions the records use; they must agree with the
-# Index the pack is loaded into (section 5.4).
+# Registry the pack is loaded into (section 5.4).
 [axes.resolution]
 unit = "km"
 description = "horizontal grid spacing"

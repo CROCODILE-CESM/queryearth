@@ -12,13 +12,13 @@ A **rule** has a code, an outcome (what it says) and a scope (where, when and fo
 | facets: `product`, `variable`, `version`, `model`, `component` | values or glob patterns; versions as ranges | values |
 | plugin dimensions | whatever the plugin parses | whatever the plugin parses |
 
-Axes are declared on the {class}`~queryearth.Index` with one unit each, for example `qe.Axis("resolution", "km")`. The default facets can be replaced or extended with `Index(facets=...)`.
+Axes are declared on the {class}`~queryearth.Registry` with one unit each, for example `qe.Axis("resolution", "km")`. The default facets can be replaced or extended with `Registry(facets=...)`.
 
 A **code** is a prefix plus three or four digits, such as `CRU001`, or `ERA5-014` (a prefix that ends in a digit needs the hyphen). The prefix `QE` is reserved for the built-in coverage findings.
 
 ## Queries and findings
 
-A {class}`~queryearth.Query` gives any subset of the same dimensions. "Resolution 8 km" on its own is a complete query. {meth}`Index.query() <queryearth.Index.query>` takes a `Query` or its fields as keywords, and returns a sorted list of {class}`~queryearth.Finding` objects: most severe first, then by kind and code.
+A {class}`~queryearth.Query` gives any subset of the same dimensions. "Resolution 8 km" on its own is a complete query. {meth}`Registry.query() <queryearth.Registry.query>` takes a `Query` or its fields as keywords, and returns a sorted list of {class}`~queryearth.Finding` objects: most severe first, then by kind and code.
 
 A finding is the rule's outcome plus how it matched:
 
@@ -36,7 +36,7 @@ A finding is the rule's outcome plus how it matched:
 When a query leaves out a dimension that a rule constrains, the rule can neither match nor fail. Its finding is **conditional**: `conditional_on` names what is missing, for example `("space", "model")`. Conditional findings are hidden unless you pass `include_conditional=True`, which is a quick way to see every rule that might apply:
 
 ```python
-index.query(axes={"resolution": 8}, include_conditional=True)
+registry.query(axes={"resolution": 8}, include_conditional=True)
 ```
 
 ## Several products in one query: requests
@@ -44,7 +44,7 @@ index.query(axes={"resolution": 8}, include_conditional=True)
 A query can name the products it uses, each with its own variables, version, time and support. With the products of the [toy pack](example.md):
 
 ```python
-index.query(
+registry.query(
     space=domain,
     time=qe.interval("2020-01-01", "2020-12-31"),
     requests=[
@@ -56,7 +56,7 @@ index.query(
 
 Each request runs as its own sub-query, and every finding names its `product` and `request`. When the query gives no time, a request takes its product's coverage time. When a request gives no version, it takes the product's version. Either way, `Finding.assumed` lists what was filled in. `facets={"product": [...], "variable": [...]}` is shorthand for one request per product.
 
-Products are declared with {meth}`Index.add_product() <queryearth.Index.add_product>` or in a pack. A product's **coverage** (a time range and optionally an area) produces two built-in findings: **QE001** when part of the request lies outside its area, and **QE002** when part lies outside its time.
+Products are declared with {meth}`Registry.add_product() <queryearth.Registry.add_product>` or in a pack. A product's **coverage** (a time range and optionally an area) produces two built-in findings: **QE001** when part of the request lies outside its area, and **QE002** when part lies outside its time.
 
 ## Query with what you use
 

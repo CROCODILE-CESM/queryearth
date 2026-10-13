@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:queryearth:schema:rule:1",
   "title": "queryearth rule record or pack",
-  "description": "A rule record is a GeoJSON Feature (RFC 7946) with the OGC JSON-FG 1.0 'time' member and queryearth properties. A pack file is a FeatureCollection of rule records with an optional collection header. Checks that JSON Schema cannot express are done by the loader (design section 5.3): codes unique in the Index; a code's prefix, the part before the optional hyphen and the final digits, equal to a prefix the pack owns exactly (a pack owning CRU does not own CRUX001); no two packs claiming one prefix; 'periods' inside 'time'; dates valid in the proleptic Gregorian calendar, from year 1 to 9999; a box's south below its north; axis, facet, product and region names declared on the Index.",
+  "description": "A rule record is a GeoJSON Feature (RFC 7946) with the OGC JSON-FG 1.0 'time' member and queryearth properties. A pack file is a FeatureCollection of rule records with an optional collection header. Checks that JSON Schema cannot express are done by the loader (design section 5.3): codes unique in the Registry; a code's prefix, the part before the optional hyphen and the final digits, equal to a prefix the pack owns exactly (a pack owning CRU does not own CRUX001); no two packs claiming one prefix; 'periods' inside 'time'; dates valid in the proleptic Gregorian calendar, from year 1 to 9999; a box's south below its north; axis, facet, product and region names declared on the Registry.",
   "oneOf": [{"$ref": "#/$defs/rule"}, {"$ref": "#/$defs/pack"}],
   "$defs": {
     "code": {
@@ -103,7 +103,7 @@
       "additionalProperties": false
     },
     "regionRef": {
-      "description": "namespace:id of a named region registered on the Index (for example ar6:WSAF). Unresolved references are a load error.",
+      "description": "namespace:id of a named region registered on the Registry (for example ar6:WSAF). Unresolved references are a load error.",
       "type": "string",
       "pattern": "^[a-z][a-z0-9_.-]*:[A-Za-z0-9_.+-]+$"
     },
@@ -239,7 +239,7 @@
           "additionalProperties": {"$ref": "#/$defs/axisRange"}
         },
         "dimensions": {
-          "description": "Values for plugin dimensions declared on the Index, keyed by dimension name. Each value is validated at load against that dimension's own schema.",
+          "description": "Values for plugin dimensions declared on the Registry, keyed by dimension name. Each value is validated at load against that dimension's own schema.",
           "type": "object",
           "propertyNames": {"$ref": "#/$defs/slug"},
           "minProperties": 1

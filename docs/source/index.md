@@ -24,8 +24,8 @@ queryearth needs Python 3.11 or later, numpy, and shapely 2.1 or later. It is pr
 import queryearth as qe
 from queryearth import space as sp
 
-index = qe.Index("demo", axes=[qe.Axis("resolution", "km")])
-index.add(
+registry = qe.Registry("demo", axes=[qe.Axis("resolution", "km")])
+registry.add(
     qe.Rule(
         code="DEMO001",
         kind="caveat",
@@ -38,7 +38,7 @@ index.add(
         ),
     )
 )
-index.add(
+registry.add(
     qe.Rule(
         code="DEMO101",
         kind="recommendation",
@@ -50,7 +50,7 @@ index.add(
     )
 )
 
-for f in index.query(
+for f in registry.query(
     space=sp.box(-60, -70, -20, -40),  # west, south, east, north
     time=qe.interval("2000-01-01", "2005-12-31"),
     axes={"resolution": 8},

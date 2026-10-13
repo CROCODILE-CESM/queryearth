@@ -165,7 +165,7 @@ The last row is a pathological limit, not a target: cost grows with the number o
 
 ## Emission evidence
 
-Findings are the API. `Index.query` has no side effects: it returns a sorted list of `Finding` objects that a caller can filter, store with `to_dict()`, show in a dashboard or assert on in a test. `emit()` is an optional adapter that turns findings into log records, warnings or an exception, under a policy the caller controls. Warnings cannot be the API, for three reasons:
+Findings are the API. `Registry.query` has no side effects: it returns a sorted list of `Finding` objects that a caller can filter, store with `to_dict()`, show in a dashboard or assert on in a test. `emit()` is an optional adapter that turns findings into log records, warnings or an exception, under a policy the caller controls. Warnings cannot be the API, for three reasons:
 
 - Python's default warning filter shows an identical message only once per call site, so a loop over many lakes hides repeats. Five identical warnings from one line produced one record; five that differed only in the lake label produced five (design research, rechecked on Python 3.11.16).
 - `warnings.catch_warnings` changes process-wide state and is not thread-safe in Python 3.11 to 3.13, so a Panel dashboard or an MCP server cannot collect warnings reliably.

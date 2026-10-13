@@ -8,7 +8,7 @@ __all__ = ["DuplicateCodeError", "LoadError", "UnknownNameError"]
 
 
 class DuplicateCodeError(ValueError):
-    """A code the Index already holds was registered again (section 12.3)."""
+    """A code the Registry already holds was registered again (section 12.3)."""
 
 
 class UnknownNameError(KeyError):

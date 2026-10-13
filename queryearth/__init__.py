@@ -3,7 +3,7 @@
 queryearth.time holds time keys, intervals and their measures, and
 queryearth.space points, polygons and closed-set measures (imported as
 ``from queryearth import space as sp``). The rule engine is at the top level:
-an Index of dimensions, products, regions and rules answers queries with
+a Registry of dimensions, products, regions and rules answers queries with
 Finding objects, and emit() reports findings under a policy. See docs/design.md
 for the design.
 """
@@ -34,7 +34,13 @@ from queryearth.emit import (
     policy,
 )
 from queryearth.errors import DuplicateCodeError, LoadError, UnknownNameError
-from queryearth.index import Index, PointResult, ScoreFn, Suitability, default_score
+from queryearth.registry import (
+    Registry,
+    PointResult,
+    ScoreFn,
+    Suitability,
+    default_score,
+)
 from queryearth.objects import (
     Action,
     AxisOverlap,
@@ -70,7 +76,7 @@ __all__ = [
     "Dimension",
     "DuplicateCodeError",
     "Finding",
-    "Index",
+    "Registry",
     "InfoAdvisory",
     "Interval",
     "Kind",

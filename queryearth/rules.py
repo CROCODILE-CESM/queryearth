@@ -3,7 +3,7 @@
 Every rule kind implements RuleKind: a code, a scope and evaluate(query).
 Rule.evaluate and ComputedRule.evaluate are the reference semantics of
 design.md section 4.3, run on one part of a query (the base query or one
-request's sub-query, as Index.expand() returns them). Index.query calls
+request's sub-query, as Registry.expand() returns them). Registry.query calls
 evaluate() on every active rule, after any plugin prefilters.
 """
 
@@ -26,7 +26,7 @@ from queryearth.space import Space
 from queryearth.time import Interval, TimeSpec, overlap, parse_time, time_fraction
 
 if TYPE_CHECKING:
-    from queryearth.index import Index
+    from queryearth.registry import Registry
 
 __all__ = ["CheckResult", "ComputedRule", "Rule", "RuleFunc", "RuleKind"]
 
@@ -59,7 +59,7 @@ class RuleKind(Protocol):
     """Any rule: a code, a scope, and evaluate() on one query part.
 
     A third-party kind may also define outcomes(query, match) -> CheckResult
-    and an outcome attribute (an Outcome) (Q5): the Index then matches its scope
+    and an outcome attribute (an Outcome) (Q5): the Registry then matches its scope
     itself and calls outcomes() only for definite matches.
     """
 
@@ -82,9 +82,9 @@ class CompiledScope:
 
 @dataclass(frozen=True, eq=False)
 class Binding:
-    """What a rule needs from the Index it was added to."""
+    """What a rule needs from the Registry it was added to."""
 
-    index: Index
+    registry: Registry
     scope: CompiledScope
     source: str
 
@@ -92,7 +92,7 @@ class Binding:
 def binding_of(rule: Any) -> Binding:
     found = getattr(rule, "_qe_binding", None)
     if found is None:
-        raise TypeError(f"rule {getattr(rule, 'code', rule)!r} is not on an Index")
+        raise TypeError(f"rule {getattr(rule, 'code', rule)!r} is not on a Registry")
     return found
 
 
@@ -100,22 +100,25 @@ _GROUP_NAMES = ("space", "time", "axes", "facets", "dims")
 
 
 def match_scope(
-    index: Index, scope: CompiledScope, query: Query, parsed: Mapping | None = None
+    registry: Registry,
+    scope: CompiledScope,
+    query: Query,
+    parsed: Mapping | None = None,
 ) -> tuple[Match, dict[str, Any]] | None:
     """Match one scope against one query part, dimension by dimension (section 4.3).
 
     Returns None when some dimension fails; otherwise the Match, whose
-    conditional_on names the undecided dimensions in the Index's order (space,
+    conditional_on names the undecided dimensions in the Registry's order (space,
     time, axes, facets, other plugins, then context keys), and details that
     hold recurrence_months when time is undecided. Dimensions marked late run
     after the others, so the costly spatial test runs last.
     """
     if parsed is None:
-        parsed = index._parse_query(query)
+        parsed = registry._parse_query(query)
     undecided: set[str] = set()
     found: dict[str, DimMatch] = {}
     for late in (False, True):
-        for name, dimension, _ in index._groups:
+        for name, dimension, _ in registry._groups:
             if getattr(dimension, "late", False) != late:
                 continue
             rule, value = scope.values.get(name), parsed.get(name)
@@ -131,7 +134,7 @@ def match_scope(
             if found[name] is None:
                 return None
     groups: dict[str, dict[str, Any]] = {g: {} for g in _GROUP_NAMES}
-    for name, dimension, group in index._groups:
+    for name, dimension, group in registry._groups:
         if name in found:
             hit = found[name]
             if group == "dims" and hasattr(dimension, "to_json"):
@@ -144,7 +147,7 @@ def match_scope(
     if "time" in undecided and scope.values["time"].months is not None:
         details["recurrence_months"] = sorted(scope.values["time"].months)
     space, time = found.get("space"), found.get("time")
-    conditional = [name for name, _, _ in index._groups if name in undecided]
+    conditional = [name for name, _, _ in registry._groups if name in undecided]
     conditional += [f"context:{k}" for k in scope.requires if k not in query.context]
     match = Match(
         area_fraction=None if space is None else space.fraction,
@@ -263,12 +266,12 @@ def box_of(box: Any) -> Space:
 class Rule(Outcome):
     """A static record: one GeoJSON Feature (Rule.from_feature) or built in Python.
 
-    Index.add checks its names and resolves region_ref; evaluate() then runs
-    against that Index (a rule added to a second Index is added as a copy).
+    Registry.add checks its names and resolves region_ref; evaluate() then runs
+    against that Registry (a rule added to a second Registry is added as a copy).
     """
 
     scope: Scope = field(default_factory=Scope)
-    region_ref: tuple[str, ...] = ()  # resolved into a space by Index.add
+    region_ref: tuple[str, ...] = ()  # resolved into a space by Registry.add
     created: str | None = None  # record lifecycle time, not data time
     updated: str | None = None
     withdrawn: str | None = None  # kept for history, never matched
@@ -294,8 +297,8 @@ class Rule(Outcome):
         object.__setattr__(self, "extensions", dict(self.extensions))
 
     @classmethod
-    def from_feature(cls, feature: Mapping[str, Any], index: Index) -> Rule:
-        """Read one GeoJSON record (section 5); Index.add then checks its names.
+    def from_feature(cls, feature: Mapping[str, Any], registry: Registry) -> Rule:
+        """Read one GeoJSON record (section 5); Registry.add then checks its names.
 
         Checks by hand what reference/schema.json states, and plugin dimension
         values against their schemas; errors name the record's code.
@@ -303,14 +306,14 @@ class Rule(Outcome):
         props = feature.get("properties") if isinstance(feature, Mapping) else None
         code = props.get("code") if isinstance(props, Mapping) else None
         try:
-            return cls._read(feature, props, index)
+            return cls._read(feature, props, registry)
         except (ValueError, TypeError, KeyError) as err:
             if not isinstance(code, str) or str(err).startswith(f"{code}:"):
                 raise
             raise type(err)(f"{code}: {err}") from err
 
     @classmethod
-    def _read(cls, feature: Any, props: Any, index: Index) -> Rule:
+    def _read(cls, feature: Any, props: Any, registry: Registry) -> Rule:
         if not isinstance(feature, Mapping) or feature.get("type") != "Feature":
             raise ValueError("a record is a GeoJSON Feature")
         if not isinstance(props, Mapping) or "geometry" not in feature:
@@ -355,7 +358,7 @@ class Rule(Outcome):
             if not isinstance(value, (list, Mapping)):  # no bare strings in records
                 raise ValueError(f"facet {name!r} is a list of patterns or an object")
         for name, value in props.get("dimensions", {}).items():
-            problem = schema_problem(value, index._dimension(name, "dims")[0].schema)
+            problem = schema_problem(value, registry._dimension(name, "dims")[0].schema)
             if problem:
                 raise ValueError(f"dimension {name!r}: {problem}")
         scope = Scope(
@@ -372,7 +375,7 @@ class Rule(Outcome):
     def evaluate(self, query: Query) -> list[Finding]:
         """Findings for one query part (section 4.3)."""
         bound = binding_of(self)
-        found = match_scope(bound.index, bound.scope, query)
+        found = match_scope(bound.registry, bound.scope, query)
         if found is None:
             return []
         match, details = found
@@ -397,8 +400,8 @@ def check_meta(meta: Mapping[str, Any], owner: str) -> None:
 class ComputedRule:
     """A rule computed from the request or from data the caller holds.
 
-    Class keywords give its identity and scope: code, index (default
-    Index.default()), abstract, the Outcome fields (kind defaults to caveat,
+    Class keywords give its identity and scope: code, registry (default
+    Registry.default()), abstract, the Outcome fields (kind defaults to caveat,
     severity to WARNING or INFO for a recommendation, title and message to the
     docstring), facets, axes, dims, space (a Space), time and requires (keys
     of Query.context). Defining a subclass registers one instance; a subclass
@@ -411,14 +414,16 @@ class ComputedRule:
 
     code: ClassVar[str]
     meta: ClassVar[dict[str, Any]]
-    scope: Scope  # set by Index.add from meta, after checking the declared names
+    scope: Scope  # set by Registry.add from meta, after checking the declared names
 
     def __init_subclass__(
-        cls, code: str = "", index: Index | None = None, **meta: Any
+        cls, code: str = "", registry: Registry | None = None, **meta: Any
     ) -> None:
         super().__init_subclass__()
         abstract = meta.pop("abstract", False)
-        cls._qe_meta = dict(meta, **({} if index is None else {"index": index}))
+        cls._qe_meta = dict(
+            meta, **({} if registry is None else {"registry": registry})
+        )
         if abstract:
             return
         if not code:
@@ -426,13 +431,13 @@ class ComputedRule:
         merged: dict[str, Any] = {}
         for base in reversed(cls.__mro__):
             merged.update(base.__dict__.get("_qe_meta", {}))
-        target = merged.pop("index", None)
+        target = merged.pop("registry", None)
         check_meta(merged, cls.__name__)
         cls.code, cls.meta = code, merged
         if target is None:
-            from queryearth.index import Index
+            from queryearth.registry import Registry
 
-            target = Index.default()
+            target = Registry.default()
         target.add(cls())
 
     def _doc(self) -> str | None:
@@ -462,7 +467,7 @@ class ComputedRule:
     def evaluate(self, query: Query) -> list[Finding]:
         """Findings for one query part: the scope, then check() if definite."""
         bound = binding_of(self)
-        found = match_scope(bound.index, bound.scope, query)
+        found = match_scope(bound.registry, bound.scope, query)
         if found is None:
             return []
         match, details = found
@@ -481,7 +486,7 @@ class ComputedRule:
 
 
 class FunctionRule(ComputedRule, abstract=True):
-    """A plain function (query, match) -> CheckResult, wrapped by Index.rule()."""
+    """A plain function (query, match) -> CheckResult, wrapped by Registry.rule()."""
 
     def __init__(self, func: RuleFunc, code: str, meta: Mapping[str, Any]) -> None:
         check_meta(meta, code)

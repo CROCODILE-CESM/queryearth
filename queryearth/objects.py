@@ -349,7 +349,7 @@ def _mapping(value: Any, what: str) -> dict[str, Any]:
 class Scope:
     """A conjunction; an unconstrained dimension matches anything.
 
-    axes, facets and dims hold the rule-side values in record form; the Index
+    axes, facets and dims hold the rule-side values in record form; the Registry
     checks every name and parses each value with its dimension plugin.
     """
 
@@ -476,7 +476,7 @@ class Query:
     Pass the support (the cells and time steps a product contributes), never a
     buffered shape. A product facet, with variable and version, is shorthand
     for requests. request and assumed are set only on the sub-queries that
-    Index.expand() returns: the request's position, and the dimensions filled
+    Registry.expand() returns: the request's position, and the dimensions filled
     from its product.
     """
 
@@ -488,8 +488,8 @@ class Query:
     requests: tuple[Request, ...] = ()  # one sub-query per request
     context: Mapping[str, Any] = field(default_factory=dict, compare=False)
     label: str = ""  # the caller's name for the query, used in messages
-    request: int | None = None  # set by Index.expand() on a request's sub-query
-    assumed: tuple[str, ...] = ()  # set by Index.expand(): filled from the product
+    request: int | None = None  # set by Registry.expand() on a request's sub-query
+    assumed: tuple[str, ...] = ()  # set by Registry.expand(): filled from the product
 
     def __post_init__(self) -> None:
         _space_of(self.space, "a query's space")

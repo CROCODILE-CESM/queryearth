@@ -7,7 +7,7 @@ code_prefix = ["TOY"]
 license = "CC0-1.0"
 files = ["rules.geojson"]
 
-# The dimensions the records use. They must exist on the Index the pack is
+# The dimensions the records use. They must exist on the Registry the pack is
 # loaded into (play.py declares the resolution axis; the facets are defaults).
 [axes.resolution]
 unit = "km"

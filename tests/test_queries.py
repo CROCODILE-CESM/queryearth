@@ -1,5 +1,5 @@
 """The bulk path and the inverse query: fixture 6 on query_points, a property
-test of query_points against Index.query point by point, and suitable() on the
+test of query_points against Registry.query point by point, and suitable() on the
 worked example of design.md section 10.3.
 """
 
@@ -26,17 +26,17 @@ def caveat(code, severity="warning", **scope):
 
 # ---- fixture 6 on the bulk path --------------------------------------------------
 def test_fixture_6_closed_edges_on_the_bulk_path():
-    index = qe.Index("geo")
-    index.add(caveat("SQR001", space=sp.box(0, 0, 10, 10)))
+    registry = qe.Registry("geo")
+    registry.add(caveat("SQR001", space=sp.box(0, 0, 10, 10)))
     lon, lat = np.meshgrid(np.arange(-1, 11.25, 0.25), np.arange(-1, 11.25, 0.25))
     assert lon.size == 2_401
-    assert index.query_points(lon, lat).masks[(None, "SQR001")].sum() == 1_681
+    assert registry.query_points(lon, lat).masks[(None, "SQR001")].sum() == 1_681
 
 
 # ---- the bulk path in detail -----------------------------------------------------------
-def bulk_index():
-    index = qe.Index("bulk", axes=[qe.Axis("resolution", "km")])
-    index.add_product(
+def bulk_registry():
+    registry = qe.Registry("bulk", axes=[qe.Axis("resolution", "km")])
+    registry.add_product(
         qe.Product(
             "era5",
             variables=("tp",),
@@ -44,32 +44,32 @@ def bulk_index():
             coverage=qe.Coverage(space=sp.box(-60, -60, 60, 60)),
         )
     )
-    index.add_product(
+    registry.add_product(
         qe.Product("glorys", coverage=qe.Coverage(time=qe.interval("1993-01-01", "..")))
     )
-    index.add(caveat("ALL001"))
-    index.add(caveat("BOX001", "severe", space=sp.box(0, 0, 10, 10)))
-    index.add(caveat("RES001", axes={"resolution": {"lt": 10}}))
-    index.add(caveat("ERA001", facets={"product": ["era5"]}))
+    registry.add(caveat("ALL001"))
+    registry.add(caveat("BOX001", "severe", space=sp.box(0, 0, 10, 10)))
+    registry.add(caveat("RES001", axes={"resolution": {"lt": 10}}))
+    registry.add(caveat("ERA001", facets={"product": ["era5"]}))
 
-    class Wet(qe.ComputedRule, code="WET001", index=index, requires=["stn"]):
+    class Wet(qe.ComputedRule, code="WET001", registry=registry, requires=["stn"]):
         """Points east of 5E, by a mask hook"""
 
         def mask(self, lon, lat, query):
             return lon > 5.0
 
-    class Dry(qe.ComputedRule, code="DRY001", index=index):
+    class Dry(qe.ComputedRule, code="DRY001", registry=registry):
         """A computed rule without a mask hook"""
 
-    return index
+    return registry
 
 
 def test_query_points_keys_masks_and_skipped_rules_by_product_and_code():
-    index = bulk_index()
+    registry = bulk_registry()
     lon = np.array([[5.0, 8.0], [70.0, np.nan]])
     lat = np.array([[5.0, 5.0], [5.0, 5.0]])
     weights = np.array([[1.0, 1.0], [2.0, 9.0]])
-    result = index.query_points(
+    result = registry.query_points(
         lon,
         lat,
         weights,
@@ -94,7 +94,7 @@ def test_query_points_keys_masks_and_skipped_rules_by_product_and_code():
     assert found[("glorys", "QE002")].time_overlap == (("1990-01-01", "1992-12-31"),)
     assert result.any(qe.Severity.SEVERE).tolist() == [[True, True], [True, False]]
     assert result.any("warning").sum() == 3
-    with_conditional = index.query_points(lon, lat, include_conditional=True)
+    with_conditional = registry.query_points(lon, lat, include_conditional=True)
     conditional = [f for f in with_conditional.findings if f.conditional_on]
     assert {f.code: f.conditional_on for f in conditional} == {
         "RES001": ("resolution",),
@@ -102,14 +102,14 @@ def test_query_points_keys_masks_and_skipped_rules_by_product_and_code():
     }
     assert all((None, f.code) not in with_conditional.masks for f in conditional)
     with pytest.raises(ValueError, match="support"):
-        index.query_points(
+        registry.query_points(
             lon, lat, requests=[qe.Request("era5", support=sp.point(0, 0))]
         )
     with pytest.raises(TypeError):
-        index.query_points(lon, lat, context={"stn": 1})
+        registry.query_points(lon, lat, context={"stn": 1})
 
 
-# ---- property test: query_points agrees with Index.query point by point ------------------
+# ---- property test: query_points agrees with Registry.query point by point ------------------
 def random_space(rng):
     pick = rng.random()
     south = rng.choice([-90, -60, -10, 0, 30, 66.5])
@@ -131,16 +131,16 @@ def random_space(rng):
         return None
 
 
-def random_bulk_index(rng):
-    index = qe.Index("property", axes=[qe.Axis("resolution", "km")])
-    index.add_regions(
+def random_bulk_registry(rng):
+    registry = qe.Registry("property", axes=[qe.Axis("resolution", "km")])
+    registry.add_regions(
         "reg", {"A": sp.box(-20, -20, 20, 20), "B": sp.box(170, 50, -170, 80)}
     )
-    index.add_product(qe.Product("cru_ts", version="4.07"))
-    index.add_product(
+    registry.add_product(qe.Product("cru_ts", version="4.07"))
+    registry.add_product(
         qe.Product("era5", coverage=qe.Coverage(space=sp.box(-90, -45, 120, 70)))
     )
-    index.add_product(
+    registry.add_product(
         qe.Product("glorys", coverage=qe.Coverage(time=qe.interval("1993-01-01", "..")))
     )
     for k in range(80):
@@ -156,7 +156,7 @@ def random_bulk_index(rng):
         if rng.random() < 0.4:
             scope["facets"] = {"product": rng.choice([["cru_ts"], ["era5", "glorys"]])}
         severity = rng.choice(["info", "warning", "severe"])
-        index.add(
+        registry.add(
             qe.Rule(
                 code=f"RND{k:03d}",
                 kind="caveat",
@@ -167,7 +167,7 @@ def random_bulk_index(rng):
                 scope=qe.Scope(**scope),
             )
         )
-    return index
+    return registry
 
 
 def random_points(rng, n=60):
@@ -181,9 +181,9 @@ def random_points(rng, n=60):
     return np.array(lon), np.array(lat)
 
 
-def test_query_points_agrees_with_index_query_point_by_point():
+def test_query_points_agrees_with_registry_query_point_by_point():
     rng = random.Random(20261012)
-    index = random_bulk_index(rng)
+    registry = random_bulk_registry(rng)
     seen = 0
     for _ in range(6):
         lon, lat = random_points(rng)
@@ -194,10 +194,10 @@ def test_query_points_agrees_with_index_query_point_by_point():
             fields["axes"] = {"resolution": rng.choice([8.0, 30.0, (8.0, 12.0)])}
         if rng.random() < 0.6:
             fields["requests"] = rng.sample(["cru_ts", "era5", "glorys"], 2)
-        result = index.query_points(lon, lat, **fields)
+        result = registry.query_points(lon, lat, **fields)
         assert all(not m[-1] for m in result.masks.values())  # the NaN point
         for j in range(lon.size - 1):
-            single = index.query(space=sp.point(lon[j], lat[j]), **fields)
+            single = registry.query(space=sp.point(lon[j], lat[j]), **fields)
             expected = {(f.product, f.code) for f in single}
             got = {key for key, mask in result.masks.items() if mask[j]}
             assert got == expected, (lon[j], lat[j], fields)
@@ -206,9 +206,9 @@ def test_query_points_agrees_with_index_query_point_by_point():
 
 
 # ---- the inverse query: section 10.3 --------------------------------------------------
-def lake_index():
-    index = qe.Index("glhe")
-    index.add_regions("ar6", {"CAF": sp.box(10, -10, 30, 10)})
+def lake_registry():
+    registry = qe.Registry("glhe")
+    registry.add_regions("ar6", {"CAF": sp.box(10, -10, 30, 10)})
     for name, size, start, space in (
         ("cru_ts", 0.5, "1901-01-01", None),
         ("era5_land", 0.1, "1950-01-01", None),
@@ -217,13 +217,13 @@ def lake_index():
         unit = "km" if name == "nwm_retro" else "deg"
         end = "2022-12-31" if name == "cru_ts" else ".."
         coverage = qe.Coverage(space, qe.interval(start, end))
-        index.add_product(
+        registry.add_product(
             qe.Product(
                 name, variables=("pre",), coverage=coverage, resolution=(size, unit)
             )
         )
-    index.add_product(qe.Product("glorys", variables=("thetao",)))
-    index.add(
+    registry.add_product(qe.Product("glorys", variables=("thetao",)))
+    registry.add(
         qe.Rule(
             code="CRU001",
             kind="caveat",
@@ -237,7 +237,7 @@ def lake_index():
             ),
         )
     )
-    return index
+    return registry
 
 
 LAKE = sp.box(20.0, 0.0, 20.11, 0.11)  # about 150 km2 near the equator, in CAF
@@ -245,9 +245,9 @@ Y1991_2020 = qe.interval("1991-01-01", "2020-12-31")
 
 
 def test_suitable_ranks_by_known_concerns_and_drops_products_outside_coverage():
-    index = lake_index()
+    registry = lake_registry()
     assert LAKE.area_km2 == pytest.approx(150, rel=0.01)
-    ranked = index.suitable(qe.Query(space=LAKE, time=Y1991_2020), "pre")
+    ranked = registry.suitable(qe.Query(space=LAKE, time=Y1991_2020), "pre")
     assert [s.product.name for s in ranked] == ["era5_land", "cru_ts"]
     assert ranked[0].score == (0.0, 0.0, 0.0) and ranked[0].findings == ()
     worst, burden, misfit = ranked[1].score
@@ -255,7 +255,7 @@ def test_suitable_ranks_by_known_concerns_and_drops_products_outside_coverage():
     (cru001,) = ranked[1].findings
     assert cru001.assumed == () and cru001.area_fraction == 1.0
     assert round(cru001.time_fraction, 3) == 0.700
-    every = index.suitable(
+    every = registry.suitable(
         qe.Query(space=LAKE, time=Y1991_2020), "pre", include_dropped=True
     )
     assert every[:2] == ranked and every[2].product.name == "nwm_retro"
@@ -264,21 +264,21 @@ def test_suitable_ranks_by_known_concerns_and_drops_products_outside_coverage():
 
 
 def test_suitable_takes_named_products_and_a_custom_score():
-    index = lake_index()
+    registry = lake_registry()
     query = qe.Query(space=LAKE, time=Y1991_2020)
 
     def resolution_first(product, query, findings):
         worst, burden, misfit = qe.default_score(product, query, findings)
         return (misfit, worst, burden)
 
-    ranked = index.suitable(query, "pre", products=["CRU_TS", "era5_land"])
+    ranked = registry.suitable(query, "pre", products=["CRU_TS", "era5_land"])
     assert [s.product.name for s in ranked] == ["era5_land", "cru_ts"]
-    assert index.suitable(query, "pre", score=resolution_first)[1].score[0] > 2
+    assert registry.suitable(query, "pre", score=resolution_first)[1].score[0] > 2
     with pytest.raises(qe.UnknownNameError):
-        index.suitable(query, "pre", products=["merra2"])
+        registry.suitable(query, "pre", products=["merra2"])
     with pytest.raises(ValueError, match="do not offer"):
-        index.suitable(query, "pre", products=["glorys"])
+        registry.suitable(query, "pre", products=["glorys"])
     with pytest.raises(ValueError, match="requests"):
-        index.suitable(qe.Query(space=LAKE, requests=["cru_ts"]), "pre")
-    point = index.suitable(qe.Query(space=sp.point(20, 0), time=Y1991_2020), "pre")
+        registry.suitable(qe.Query(space=LAKE, requests=["cru_ts"]), "pre")
+    point = registry.suitable(qe.Query(space=sp.point(20, 0), time=Y1991_2020), "pre")
     assert point[1].score[2] == 0.0  # no misfit without an area

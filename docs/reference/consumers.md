@@ -2,7 +2,7 @@
 
 This is the full text behind [section 15 of design.md](../design.md#15-consumer-integration), with every line reference, both sketches in full, the changes each consumer needs outside queryearth, and the acceptance criteria. Section numbers refer to [design.md](../design.md); questions such as Q7 and Q46 to Q48 are in its [section 18.2](../design.md#182-outstanding-work), and the others in [decisions.md](decisions.md#questions-decided-by-adopting-their-defaults).
 
-GLHE and CrocoDash are the first two consumers. The integrations below are **acceptance tests for the design**: if the API cannot express them simply, the design is wrong. They are not changes to make now; each would become its own pull request in the consumer's repository. Line numbers refer to CrocoDash `main` at 507f2d6b and GLHE `main` at e26898d. The sketches are illustrative; `sp` is `queryearth.space`, and `ADVISORIES` and `INDEX` are each consumer's own Index, defined once in its adapter module.
+GLHE and CrocoDash are the first two consumers. The integrations below are **acceptance tests for the design**: if the API cannot express them simply, the design is wrong. They are not changes to make now; each would become its own pull request in the consumer's repository. Line numbers refer to CrocoDash `main` at 507f2d6b and GLHE `main` at e26898d. The sketches are illustrative; `sp` is `queryearth.space`, and `ADVISORIES` and `REGISTRY` are each consumer's own Registry, defined once in its adapter module.
 
 ## CrocoDash
 
@@ -75,7 +75,7 @@ def _advise(self, config: dict, strict: bool) -> list[dict]:
 
 GLHE processes one HydroLAKES polygon per run and passes no time range: `product_driver(polygon, debug, run_cleanly)` reads each product's whole record. It needs two hooks.
 
-**Pre-flight**, in `CLAY_driver.main` before the product loop (`GLHE/CLAY/CLAY_driver.py:140-162`). It makes one query with the lake outline and one request per product, and skips products that cannot serve the lake before anything is downloaded. Every product is judged on the lake outline (section [4.12](../design.md#412-several-products-in-one-query-requests)), against its own coverage. Each request takes its time and version from its own product, so time-scoped findings are definite and resolved in time although GLHE passes no period. Today NWM fails late: the NWM retrospective store GLHE reads lists 5,782 lakes, `find_lake_id` raises a generic `Exception` when the nearest of them is not inside the polygon (`data_access/NWM.py:81-83`), and the product loop logs it as "not available for this lake". With queryearth, NWM's `Product` carries a coverage: a polygon of its domain, or, as sketched below, a callable coverage that runs the same test once, up front, and a QE001 finding with action `do_not_use` turns off `run_on_start` and records why. `Index.suitable()` over the same lake answers the "Global Product API" that `Products.md:42-46` asks for.
+**Pre-flight**, in `CLAY_driver.main` before the product loop (`GLHE/CLAY/CLAY_driver.py:140-162`). It makes one query with the lake outline and one request per product, and skips products that cannot serve the lake before anything is downloaded. Every product is judged on the lake outline (section [4.12](../design.md#412-several-products-in-one-query-requests)), against its own coverage. Each request takes its time and version from its own product, so time-scoped findings are definite and resolved in time although GLHE passes no period. Today NWM fails late: the NWM retrospective store GLHE reads lists 5,782 lakes, `find_lake_id` raises a generic `Exception` when the nearest of them is not inside the polygon (`data_access/NWM.py:81-83`), and the product loop logs it as "not available for this lake". With queryearth, NWM's `Product` carries a coverage: a polygon of its domain, or, as sketched below, a callable coverage that runs the same test once, up front, and a QE001 finding with action `do_not_use` turns off `run_on_start` and records why. `Registry.suitable()` over the same lake answers the "Global Product API" that `Products.md:42-46` asks for.
 
 **Accessor rule**, in the CRU TS accessor. Today, when no cell centre falls inside the lake's bounding box, `subset_box` raises `ValueError` and the code retries with `polygon.buffer(0.5)` (`data_access/CRUTS.py:119-125`). Selecting the overlap cells, every cell whose intersection with the lake has positive area, never drops a small lake, so the fallback goes; `ERA5_Land.py` has the same fallback and gets the same change. The query runs in `product_driver` once the data are known, so the cached (pickled) path is covered too, and it passes the lake, the overlap cells as `Request.support`, the `stn` values of exactly those cells, and the lake's own area for GEN001. Which cells GLHE averages is GLHE's choice: today it averages, unweighted, a box padded by one cell, 50 to 100 times the lake's area for CRU TS (design research). The sketch assumes GLHE switches to the overlap cells; until it does, the adapter passes the padded box as `Request.support` (Q46). CRU001's `time_overlap` runs from 2000-01-01 to the end of CRU TS's declared coverage, 2022-12-31; CRU002's lists the flagged years.
 
@@ -84,7 +84,7 @@ GLHE processes one HydroLAKES polygon per run and passes no time range: `product
 lake = sp.polygon(self.lake_polygon)
 keys = list(self.data_products)  # "ERA5_Land", "CRUTS", "NWM" are declared aliases
 requests = [qe.Request(key, variables=READS[key]) for key in keys]
-found = INDEX.query(space=lake, requests=requests, label=lake_name)
+found = REGISTRY.query(space=lake, requests=requests, label=lake_name)
 for i, key in enumerate(keys):  # each finding names its request, so products never mix
     mine = [f for f in found if f.request == i]
     blocked = [f for f in mine if f.kind == "coverage" and f.action == "do_not_use"]
@@ -113,7 +113,7 @@ if "stn" in dataset:  # absent from some local files: CRU002 is then conditional
     stn = dataset["stn"].isel(cell)  # (time, cell): exactly the support cells
     ctx |= {"cru_ts.stn": stn.values, "cru_ts.year": dataset["time"].dt.year.values}
 request = qe.Request("CRUTS", variables=("pre",), support=support)
-found = INDEX.query(space=lake, requests=[request], context=ctx, label=lake_name)
+found = REGISTRY.query(space=lake, requests=[request], context=ctx, label=lake_name)
 qe.emit(found, mode="log")  # reaches GLHE_root.log through the root logger
 payload = [f.to_dict() for f in found]
 self.send_data_product_event(events.AdvisoryEvent("CRUTS", payload))
@@ -131,7 +131,7 @@ self.send_data_product_event(events.AdvisoryEvent("CRUTS", payload))
 2. For a lake smaller than one CRU TS cell, the support is one cell and no fallback runs; GEN001 is in the findings at `INFO` and is not emitted.
 3. For a Congo-basin lake, CRU002 is `SEVERE` with the climatology years in `time_overlap` (in a Congo box, 55% of land cells had zero stations in July 2021, design research), and CRU001 is definite with `time` and `version` in `assumed`.
 4. For a South African lake, CRU002 grades rather than flags: `WARNING` for thin years, or nothing if its cells keep more than two stations. The expected years must be computed from `stn` before this test is written.
-5. `INDEX.suitable(qe.Query(space=lake), variable="pre")` ranks the products that offer precipitation for the lake without describing any of them as good.
+5. `REGISTRY.suitable(qe.Query(space=lake), variable="pre")` ranks the products that offer precipitation for the lake without describing any of them as good.
 6. The pre-flight's single query returns findings that each name their product, with each product's time taken from its own coverage.
 
 ## Warning-fatigue trial

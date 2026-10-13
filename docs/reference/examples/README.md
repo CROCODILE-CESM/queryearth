@@ -55,12 +55,12 @@ Each entry says what the rule states, what it demonstrates, and whether its cont
 | CROC101 | An Arctic recommendation with suggestions | Latitude band 66.5N to 90N; model `mom6` | recommendation, info | Ocean debugger knowledge base; keys illustrative |
 | CROC102 | Resolution only | `resolution` below 10 km | recommendation, info | Knowledge base; suggestion illustrative |
 | CROC103 | Resolution and space together | Box at the Strait of Gibraltar; `resolution` at or above 25 km | recommendation, info | Knowledge base; target and key illustrative |
-| CROC104 | A computed recommendation that sets a model parameter (Python, [below](#index-setup-and-the-nwm-coverage)) | Latitude band 66.5N to 90N; model `mom6`; needs `resolution` | recommendation, info; suggests MOM_input `DT` | Knowledge base; DT formula illustrative |
+| CROC104 | A computed recommendation that sets a model parameter (Python, [below](#registry-setup-and-the-nwm-coverage)) | Latitude band 66.5N to 90N; model `mom6`; needs `resolution` | recommendation, info; suggests MOM_input `DT` | Knowledge base; DT formula illustrative |
 | GEN001 | A predicate on the request itself, once per request (Python, [below](#gen001)) | Product `["*"]`; needs `request_km2` in the context | caveat, info | Design research |
 | BIO001 | Occurrence-record sampling bias, with a custom facet | Box over Amazonia; up to 1999; `gbif`; `basis_of_record` | caveat, warning | Illustrative |
 | UAS001 | A geozone for uncrewed aircraft systems (UAS, drones): recurring months and a second axis | Small polygon; March to August every year; `altitude_agl` 0 to 120 m; activity `uas` | caveat, severe | Fictional |
 | EPI001 | An epidemiological surveillance gap across the antimeridian, in two periods, for a fictional feed of influenza-like illness (ILI) counts | Box from 170E to 170W; two periods in 2021 | caveat, warning | Fictional |
-| `nwm_retro` | Coverage declared on a product in Python ([below](#index-setup-and-the-nwm-coverage)) | A box over the contiguous United States; 1979-02-01 to 2023-01-31 | coverage, severe (QE001, QE002) | Design research |
+| `nwm_retro` | Coverage declared on a product in Python ([below](#registry-setup-and-the-nwm-coverage)) | A box over the contiguous United States; 1979-02-01 to 2023-01-31 | coverage, severe (QE001, QE002) | Design research |
 
 Notes on individual records:
 
@@ -74,27 +74,27 @@ Notes on individual records:
 
 - **CROC101 to CROC104 (grounding).** The ocean debugger knowledge base (expert interviews, paraphrased; queried again while revising this document) supports their messages: the time step has to be set from the smallest grid cells in the domain, and at higher latitudes a polar projection usually makes more sense (CROC104's `DT` and CROC101's `crs`); sea ice becomes a factor when a domain extends far north, chiefly its seasonal formation and retreat and its advection by currents; about 1/10 degree is generally considered eddy-resolving, and finer grids may conflict with parameterizations designed for coarser resolution; the Strait of Gibraltar is under 50 km wide and cannot be closed in a coarse model, because it is the Mediterranean's only exchange with the Atlantic. The keys `ice_component`, `THICKNESSDIFFUSE` and `strait_of_gibraltar` are illustrative (the knowledge base returned no advice for `THICKNESSDIFFUSE`), and so is CROC104's formula: the knowledge base says to set the time step from the smallest cells but gives no coefficient. The `crs` suggestion is grounded in mom6_forge, whose `Grid.from_projection` builds polar stereographic grids such as EPSG:3995 and, according to its docstring, keeps grid metrics accurate at high latitudes. The thresholds 66.5N, 10 km and 25 km are author choices.
 
-## Index setup and the NWM coverage
+## Registry setup and the NWM coverage
 
-The extra axis and facets are declared on the Index. CRU002 (the simple form in [usage.py](../usage.py)), GEN001 ([below](#gen001)) and CROC104 (below) are registered on the same Index.
+The extra axis and facets are declared on the Registry. CRU002 (the simple form in [usage.py](../usage.py)), GEN001 ([below](#gen001)) and CROC104 (below) are registered on the same Registry.
 
 ```python
 import queryearth as qe
 from queryearth import space as sp
 
-index = qe.Index(
+registry = qe.Registry(
     "examples",
     axes=[
         qe.Axis("resolution", "km", "horizontal grid spacing"),
         qe.Axis("altitude_agl", "m", "height above ground level"),
     ],
-    facets=qe.Index.FACETS + ("activity", "basis_of_record"),
+    facets=qe.Registry.FACETS + ("activity", "basis_of_record"),
 )
-index.load_pack("docs/reference/examples")  # pack.toml + rules.geojson
+registry.load_pack("docs/reference/examples")  # pack.toml + rules.geojson
 
 # NWM retrospective v3.0 lake output covers a set of lakes, not an area;
 # here its coverage is simplified to a box over the contiguous United States.
-index.add_product(
+registry.add_product(
     qe.Product(
         name="nwm_retro",
         aliases=("NWM", "NWM v3.0"),
@@ -109,7 +109,7 @@ index.add_product(
 )
 
 
-@index.rule(
+@registry.rule(
     "CROC104",
     kind="recommendation",
     severity=qe.Severity.INFO,
@@ -134,7 +134,7 @@ NWM's retrospective lake output is a set of 5,782 lake features (from the CONUS 
 GEN001 is a function rule (section [12.2](../../design.md#122-computed-rules)): it compares the caller's own area, passed in the context, with the support the query describes, once per request.
 
 ```python
-@index.rule(
+@registry.rule(
     "GEN001",
     kind="caveat",
     severity=qe.Severity.INFO,
@@ -155,7 +155,7 @@ In the research prototype, a 6.7 km² lake was compared with a CRU TS cell of ab
 
 ## CRU002, graded form
 
-The graded form of CRU002 (section [12.4](../../design.md#124-raster-derived-rules-cru002)) reports SEVERE for years of climatology and WARNING for thin years, with hysteresis between them. It replaces the simple form rather than joining it: the five queries below assume the simple form of [usage.py](../usage.py), and registering both on one Index raises `DuplicateCodeError`.
+The graded form of CRU002 (section [12.4](../../design.md#124-raster-derived-rules-cru002)) reports SEVERE for years of climatology and WARNING for thin years, with hysteresis between them. It replaces the simple form rather than joining it: the five queries below assume the simple form of [usage.py](../usage.py), and registering both on one Registry raises `DuplicateCodeError`.
 
 ```python
 import numpy as np
@@ -179,7 +179,7 @@ def year_runs(years: list[int]) -> tuple[tuple[str, str], ...]:
 class CruStations(
     qe.ComputedRule,
     code="CRU002",
-    index=index,  # instead of the simple form, not alongside it
+    registry=registry,  # instead of the simple form, not alongside it
     facets=CRU_PRE,
     requires=["cru_ts.stn", "cru_ts.year"],
 ):
@@ -226,7 +226,7 @@ cru = {"product": "CRUTS", "variable": "pre"}  # CRUTS is an alias of cru_ts
 kariba = sp.polygon(kariba_geojson)  # HydroLAKES outline
 # stn: station counts for the support cells and months; request_km2 for GEN001
 ctx = {"cru_ts.stn": stn, "request_km2": kariba.area_km2}
-q1 = index.query(
+q1 = registry.query(
     space=kariba,
     time=y2013_2022,
     requests=[qe.Request("CRUTS", variables=("pre",))],  # CRUTS: alias of cru_ts
@@ -237,7 +237,7 @@ q1 = index.query(
 # 2. An Arctic MOM6 domain (CrocoDash), closed along the pole: the cap north of
 # 70.6N, where a +-1500 km polar stereographic square ends.
 domain = sp.box(-180, 70.6, 180, 90)
-q2 = index.query(
+q2 = registry.query(
     space=domain,
     time=qe.interval("2020-01-01", "2020-12-31"),
     axes={"resolution": (8.0, 12.0)},  # illustrative: finest and coarsest spacing
@@ -251,16 +251,16 @@ q2 = index.query(
 )
 
 # 3. Resolution only.
-q3 = index.query(axes={"resolution": 8.0}, include_conditional=True)
+q3 = registry.query(axes={"resolution": 8.0}, include_conditional=True)
 
 # 4. Bulk: every 0.5 degree cell centre, weighted by cell area.
 glon, glat = np.meshgrid(np.arange(-179.75, 180, 0.5), np.arange(-89.75, 90, 0.5))
 lon, lat = glon.ravel(), glat.ravel()
-q4 = index.query_points(lon, lat, weights=np.cos(np.radians(lat)), facets=cru)
+q4 = registry.query_points(lon, lat, weights=np.cos(np.radians(lat)), facets=cru)
 weak = q4.any(qe.Severity.WARNING)  # q4.masks[("cru_ts", "CRU001")] is one mask
 
 # 5. Which product has the fewest known concerns for precipitation at this lake?
-ranked = index.suitable(
+ranked = registry.suitable(
     qe.Query(space=kariba, time=y2013_2022, context={"cru_ts.stn": stn}),
     variable="pre",
 )

@@ -1,6 +1,6 @@
 """Dimension plugins (Axis, Labels, Versions) and the core objects of queryearth.objects.
 
-The Index-level parts of fixtures 17, 20, 21 and 27 are in test_index.py; this
+The Registry-level parts of fixtures 17, 20, 21 and 27 are in test_registry.py; this
 file checks the plugins one rule value against one query value.
 """
 
@@ -261,15 +261,16 @@ def test_finding_to_dict_is_json_ready():
 
 def test_rule_from_feature_needs_properties_and_a_geometry():
     with pytest.raises(ValueError, match="properties and a geometry"):
-        qe.Rule.from_feature({"type": "Feature"}, qe.Index())
+        qe.Rule.from_feature({"type": "Feature"}, qe.Registry())
 
 
 def test_space_and_time_are_built_in_dimensions():
     from queryearth.dimensions import SpaceDimension, TimeDimension
 
-    assert [name for name, _, _ in qe.Index("x")._groups] == ["space", "time"] + list(
-        qe.Index.FACETS
-    )
+    assert [name for name, _, _ in qe.Registry("x")._groups] == [
+        "space",
+        "time",
+    ] + list(qe.Registry.FACETS)
     space, time = SpaceDimension(), TimeDimension()
     square = sp.box(0, 0, 2, 2)
     assert space.match(None, square).fraction == 1.0  # unconstrained: measured only

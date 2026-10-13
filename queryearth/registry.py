@@ -1,6 +1,6 @@
-"""The Index: declared dimensions, products, regions and rules, and the query.
+"""The Registry: declared dimensions, products, regions and rules, and the query.
 
-Index.query follows design.md section 9.1: it splits the query into its base
+Registry.query follows design.md section 9.1: it splits the query into its base
 query and one sub-query per request (section 4.12), calls evaluate() on every
 active rule of each part (after any plugin prefilters), adds the built-in
 coverage findings QE001 and QE002, and sorts.
@@ -63,7 +63,7 @@ from queryearth.rules import (
 from queryearth.space import Space
 from queryearth.time import DAY, Interval, TimeSpec, overlap, time_fraction
 
-__all__ = ["Index", "PointResult", "ScoreFn", "Suitability", "default_score"]
+__all__ = ["Registry", "PointResult", "ScoreFn", "Suitability", "default_score"]
 
 _SLUG = re.compile(r"[a-z][a-z0-9_]*")
 _REGION = re.compile(r"[a-z][a-z0-9_.-]*:[A-Za-z0-9_.+-]+")
@@ -71,7 +71,7 @@ _GROUPS = {"space": -2, "time": -1, "axes": 0, "facets": 1, "dims": 2}
 _KINDS = {"coverage": 0, "caveat": 1, "recommendation": 2}
 _PER_REQUEST = ("product", "variable", "version")
 
-_default: Index | None = None
+_default: Registry | None = None
 _default_lock = threading.Lock()
 
 
@@ -98,11 +98,11 @@ def _strings(value: Any) -> tuple[str, ...]:
     return (value,) if isinstance(value, str) else tuple(value or ())
 
 
-class Index:
+class Registry:
     """Declared dimensions, products, regions and rules; answers queries.
 
-    There is no hidden global registry: a library keeps its own Index, and
-    Index.default() is the application default for scripts and notebooks.
+    There is no hidden global registry: a library keeps its own Registry, and
+    Registry.default() is the application default for scripts and notebooks.
     """
 
     FACETS = ("product", "variable", "version", "model", "component")
@@ -140,15 +140,15 @@ class Index:
             self.add_dimension(dimension)
 
     def __repr__(self) -> str:
-        return f"Index({self.name!r}, rules={len(self._entries)})"
+        return f"Registry({self.name!r}, rules={len(self._entries)})"
 
     @classmethod
-    def default(cls) -> Index:
-        """The application default Index, made on first use."""
+    def default(cls) -> Registry:
+        """The application default Registry, made on first use."""
         global _default
         with _default_lock:
             if _default is None:
-                _default = Index("default")
+                _default = Registry("default")
             return _default
 
     # ---- declarations -------------------------------------------------------------
@@ -218,12 +218,12 @@ class Index:
         """Load a data-only pack directory (section 5.4); returns the codes loaded.
 
         Raises LoadError listing every problem with its file, the feature's
-        position and its code, and then leaves the Index as it was.
+        position and its code, and then leaves the Registry as it was.
         """
         return packs.load_pack(self, path)
 
     def _add(self, rule: Any, source: str) -> None:
-        """Index.add; source names a record's pack ("python" from Python)."""
+        """Registry.add; source names a record's pack ("python" from Python)."""
         if isinstance(rule, ComputedRule):
             form, get = "computed", rule.meta.get
             scope = Scope(
@@ -250,12 +250,14 @@ class Index:
         if at is not None and (
             qualname is None or self._entries[at].qualname != qualname
         ):
-            raise DuplicateCodeError(f"code {code!r} is already on index {self.name!r}")
+            raise DuplicateCodeError(
+                f"code {code!r} is already on registry {self.name!r}"
+            )
         bound = getattr(rule, "_qe_binding", None)
-        if bound is not None and bound.index is not self:
+        if bound is not None and bound.registry is not self:
             if form != "record":
                 raise ValueError(
-                    f"{code}: this rule object is already on another Index"
+                    f"{code}: this rule object is already on another Registry"
                 )
             rule = copy.copy(rule)
         if form == "computed":
@@ -395,7 +397,7 @@ class Index:
         )
         if query.request is not None or query.assumed:
             raise ValueError(
-                "request and assumed are set by Index.expand(), not callers"
+                "request and assumed are set by Registry.expand(), not callers"
             )
         return query
 
@@ -777,7 +779,7 @@ def _sorted(findings: Iterable[Finding]) -> list[Finding]:
 # ---- results of the bulk path and the inverse query -------------------------------
 @dataclass(frozen=True, eq=False)
 class PointResult:
-    """What Index.query_points found, keyed by (product, code), product None
+    """What Registry.query_points found, keyed by (product, code), product None
     on the base query. Masks are shaped like lon; conditional findings have none.
     """
 
@@ -799,7 +801,7 @@ class PointResult:
 
 
 class Suitability(NamedTuple):
-    """A product ranked by Index.suitable; a low score is not "good data"."""
+    """A product ranked by Registry.suitable; a low score is not "good data"."""
 
     product: Product
     score: tuple[float, ...]  # for ordering only; () for a dropped product

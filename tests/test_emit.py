@@ -89,8 +89,8 @@ def test_fixture_28_a_sink_receives_every_kept_finding():
 # ---- the emit() parts of fixtures 6 and 19 -----------------------------------------
 def test_fixture_6_min_overlap_decides_whether_a_touching_box_is_emitted():
     for minimum, expected in ((0.0, 1), (0.01, 0)):
-        index = qe.Index("geo")
-        index.add(
+        registry = qe.Registry("geo")
+        registry.add(
             qe.Rule(
                 code="SQR001",
                 kind="caveat",
@@ -100,7 +100,7 @@ def test_fixture_6_min_overlap_decides_whether_a_touching_box_is_emitted():
                 scope=qe.Scope(space=sp.box(0, 0, 10, 10)),
             )
         )
-        (touching,) = index.query(space=sp.box(10, 0, 20, 10))
+        (touching,) = registry.query(space=sp.box(10, 0, 20, 10))
         assert touching.area_fraction == 0.0
         with logged() as (_, caught):
             assert len(qe.emit([touching])) == expected
@@ -108,9 +108,9 @@ def test_fixture_6_min_overlap_decides_whether_a_touching_box_is_emitted():
 
 
 def test_fixture_19_conditional_findings_are_never_emitted():
-    index = qe.Index("x", axes=[qe.Axis("resolution", "km")])
-    index.add_product(qe.Product("cru_ts", version="4.07"))
-    index.add(
+    registry = qe.Registry("x", axes=[qe.Axis("resolution", "km")])
+    registry.add_product(qe.Product("cru_ts", version="4.07"))
+    registry.add(
         qe.Rule(
             code="CRU001",
             kind="caveat",
@@ -124,7 +124,7 @@ def test_fixture_19_conditional_findings_are_never_emitted():
             ),
         )
     )
-    found = index.query(axes={"resolution": 8.0}, include_conditional=True)
+    found = registry.query(axes={"resolution": 8.0}, include_conditional=True)
     assert found and all(f.conditional_on for f in found)
     with logged() as (records, caught):
         assert qe.emit(found, mode="raise") == []

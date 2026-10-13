@@ -1,7 +1,7 @@
 """Packs: a pack.toml and its FeatureCollections of rule records (section 5.4).
 
 Loading never runs code. Every problem is reported at once, naming its file,
-the feature's position and its code; a failed load leaves the Index as it was.
+the feature's position and its code; a failed load leaves the Registry as it was.
 """
 
 from __future__ import annotations
@@ -21,7 +21,7 @@ from queryearth.rules import Rule, box_of, code_prefix
 from queryearth.time import parse_time
 
 if TYPE_CHECKING:
-    from queryearth.index import Index
+    from queryearth.registry import Registry
 
 _ERRORS = (ValueError, TypeError, KeyError)
 _TABLES = set("pack axes facets dimensions products regions".split())
@@ -30,30 +30,30 @@ _PRODUCT = set("aliases variables resolution version coverage".split())
 
 
 @contextlib.contextmanager
-def atomic(index: Index) -> Iterator[None]:
-    """Restore the Index's declarations and rules if the block raises."""
-    saved = {k: copy.copy(v) for k, v in vars(index).items()}
+def atomic(registry: Registry) -> Iterator[None]:
+    """Restore the Registry's declarations and rules if the block raises."""
+    saved = {k: copy.copy(v) for k, v in vars(registry).items()}
     try:
         yield
     except BaseException:
-        vars(index).clear()
-        vars(index).update(saved)
+        vars(registry).clear()
+        vars(registry).update(saved)
         raise
 
 
-def add_mapping(index: Index, mapping: Mapping[str, Any]) -> None:
-    """Index.add for one GeoJSON Feature, or a FeatureCollection added whole."""
+def add_mapping(registry: Registry, mapping: Mapping[str, Any]) -> None:
+    """Registry.add for one GeoJSON Feature, or a FeatureCollection added whole."""
     if mapping.get("type") != "FeatureCollection":
-        index._add(Rule.from_feature(mapping, index), "python")
+        registry._add(Rule.from_feature(mapping, registry), "python")
         return
-    with atomic(index):
-        problems = add_collection(index, mapping, "collection", "python", None)[1]
+    with atomic(registry):
+        problems = add_collection(registry, mapping, "collection", "python", None)[1]
         if problems:
             raise LoadError(problems)
 
 
 def add_collection(
-    index: Index,
+    registry: Registry,
     collection: Any,
     where: str,
     source: str,
@@ -72,13 +72,13 @@ def add_collection(
         props = feature.get("properties") if isinstance(feature, Mapping) else None
         code = props.get("code") if isinstance(props, Mapping) else None
         try:
-            rule = Rule.from_feature(feature, index)
+            rule = Rule.from_feature(feature, registry)
             prefix = code_prefix(rule.code)
             if prefixes is not None and prefix not in prefixes:
                 raise ValueError(
                     f"prefix {prefix!r} is not one the pack owns, {sorted(prefixes)}"
                 )
-            index._add(rule, source)
+            registry._add(rule, source)
             codes.append(rule.code)
         except _ERRORS as err:
             text = str(err).removeprefix(f"{code}: ")
@@ -86,8 +86,8 @@ def add_collection(
     return codes, problems
 
 
-def load_pack(index: Index, path: Any) -> list[str]:
-    """Index.load_pack: declare a pack's products and regions, add its records."""
+def load_pack(registry: Registry, path: Any) -> list[str]:
+    """Registry.load_pack: declare a pack's products and regions, add its records."""
     toml = Path(path)
     toml = toml / "pack.toml" if toml.is_dir() else toml
     try:
@@ -98,12 +98,12 @@ def load_pack(index: Index, path: Any) -> list[str]:
     pack = meta.get("pack", {})
     name, prefixes = pack.get("name"), pack.get("code_prefix")
     prefixes = frozenset([prefixes] if isinstance(prefixes, str) else prefixes or ())
-    claimed = {p: n for n, owned in index._packs.items() for p in owned}
+    claimed = {p: n for n, owned in registry._packs.items() for p in owned}
     for problem in (
         set(meta) - _TABLES and f"unknown tables {sorted(set(meta) - _TABLES)}",
         set(pack) - _PACK and f"unknown [pack] keys {sorted(set(pack) - _PACK)}",
         not (isinstance(name, str) and name) and "[pack] needs a name",
-        name in index._packs and f"pack {name!r} is already loaded",
+        name in registry._packs and f"pack {name!r} is already loaded",
         not isinstance(pack.get("version"), str) and "[pack] needs a version",
         not prefixes and "[pack] needs a code_prefix",
         "QE" in prefixes and "the code prefix QE is reserved",
@@ -121,22 +121,22 @@ def load_pack(index: Index, path: Any) -> list[str]:
         for group, table in (("facets", "facets"), ("dims", "dimensions"))
         for n in meta.get(table, {}).get("names", ())
     ]
-    for group, n, unit in declared:  # they must agree with the Index (Q13)
+    for group, n, unit in declared:  # they must agree with the Registry (Q13)
         try:
-            dimension = index._dimension(n, group)[0]
+            dimension = registry._dimension(n, group)[0]
             if group == "axes" and dimension.unit != unit:
                 raise ValueError(
                     f"axis {n!r} has unit {dimension.unit!r}, not {unit!r}"
                 )
         except (UnknownNameError, ValueError) as err:
-            problems.append(f"{toml.name}: does not agree with the Index: {err}")
+            problems.append(f"{toml.name}: does not agree with the Registry: {err}")
     root = toml.parent
-    with atomic(index):
+    with atomic(registry):
         for namespace, table in meta.get("regions", {}).items():
-            problems += _regions(index, root, namespace, table)
+            problems += _regions(registry, root, namespace, table)
         for slug, table in meta.get("products", {}).items():
             try:
-                _product(index, slug, table)
+                _product(registry, slug, table)
             except _ERRORS as err:
                 problems.append(f"{toml.name}: [products.{slug}]: {err}")
         codes: list[str] = []
@@ -156,16 +156,16 @@ def load_pack(index: Index, path: Any) -> list[str]:
                 said = (header.get("pack"), header.get("version"), stated)
                 if header and said != (name, pack.get("version"), prefixes):
                     problems.append(f"{file.name}: its metadata disagrees with [pack]")
-                found, more = add_collection(index, data, file.name, name, prefixes)
+                found, more = add_collection(registry, data, file.name, name, prefixes)
                 codes += found
                 problems += more
         if problems:
             raise LoadError(problems)
-        index._packs[name] = tuple(sorted(prefixes))
+        registry._packs[name] = tuple(sorted(prefixes))
     return codes
 
 
-def _regions(index: Index, root: Path, namespace: str, table: Any) -> list[str]:
+def _regions(registry: Registry, root: Path, namespace: str, table: Any) -> list[str]:
     """Declare a [regions.<namespace>] file of named polygons; returns problems."""
     try:
         file = root / table["file"]
@@ -180,14 +180,14 @@ def _regions(index: Index, root: Path, namespace: str, table: Any) -> list[str]:
         except _ERRORS as err:
             problems.append(f"{file.name}: feature {i}: {err}")
     try:
-        index.add_regions(namespace, regions)
+        registry.add_regions(namespace, regions)
     except ValueError as err:
         problems.append(f"{file.name}: {err}")
     return problems
 
 
-def _product(index: Index, slug: str, table: Any) -> None:
-    """Declare one [products.<slug>]; product names are global in an Index."""
+def _product(registry: Registry, slug: str, table: Any) -> None:
+    """Declare one [products.<slug>]; product names are global in a Registry."""
     if set(table) - _PRODUCT:
         raise ValueError(f"unknown keys {sorted(set(table) - _PRODUCT)}")
     coverage = table.get("coverage", {})
@@ -199,12 +199,14 @@ def _product(index: Index, slug: str, table: Any) -> None:
         space = box_of(coverage["box"])
     elif "region_ref" in coverage:
         refs = coverage["region_ref"]
-        space = index._region((refs,) if isinstance(refs, str) else tuple(refs), slug)
+        space = registry._region(
+            (refs,) if isinstance(refs, str) else tuple(refs), slug
+        )
     time = None
     if "time" in coverage:
         time = parse_time({"interval": list(coverage["time"])})
     resolution = table.get("resolution")
-    index.add_product(
+    registry.add_product(
         Product(
             slug,
             aliases=tuple(table.get("aliases", ())),

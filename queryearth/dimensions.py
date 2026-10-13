@@ -1,8 +1,8 @@
 """Dimensions: every kind of scope, through one interface (section 4.13).
 
 A dimension decides only whether one rule value meets one query value; the
-Index does everything else (conditional findings, unknown names, requests,
-sorting). Space and time are built in on every Index and cannot be replaced.
+Registry does everything else (conditional findings, unknown names, requests,
+sorting). Space and time are built in on every Registry and cannot be replaced.
 Axis (numeric ranges), Labels (facets matched by glob patterns) and Versions
 (OSV-style version ranges) are the built-in plugins, and a user plugin
 implements the same four members.
@@ -55,7 +55,7 @@ class DimMatch:
 
 @runtime_checkable
 class Dimension(Protocol):
-    """One kind of scope, declared on an Index under a unique name.
+    """One kind of scope, declared on a Registry under a unique name.
 
     Optional members, looked up with getattr: comparable(rule, query) -> bool
     (False makes the finding conditional on the dimension); build(pairs) ->
@@ -81,7 +81,7 @@ class Prefilter(Protocol):
     def candidates(self, query: Any) -> set[int]: ...
 
 
-# ---- space and time: built in on every Index --------------------------------------
+# ---- space and time: built in on every Registry --------------------------------------
 class SpaceDimension:
     """Space: closed-set meeting, then the area fraction and overlap in km².
 
