@@ -1128,15 +1128,14 @@ def random_query(rng):
     return qe.Query(**fields)
 
 
-def test_fast_path_matches_the_reference_path_on_random_queries():
+def test_random_queries_hide_only_conditional_findings():
     rng = random.Random(20261012)
     index = random_index(rng)
     seen = 0
     for i in range(250):
         query = random_query(rng)
-        for conditional in (False, True):
-            fast = index.query(query, include_conditional=conditional)
-            reference = index._query_reference(query, include_conditional=conditional)
-            assert fast == reference, f"query {i}: {query}"
-            seen += len(fast)
+        definite = index.query(query)
+        every = index.query(query, include_conditional=True)
+        assert definite == [f for f in every if not f.conditional_on], f"query {i}"
+        seen += len(every)
     assert seen > 1000  # the queries reach the rules

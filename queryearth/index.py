@@ -1,12 +1,9 @@
 """The Index: declared dimensions, products, regions and rules, and the query.
 
 Index.query follows design.md section 9.1: it splits the query into its base
-query and one sub-query per request (section 4.12), prunes each part's rules
-with vectorised prefilters (facet value maps, axis and time arrays, an STRtree
-over the envelopes of normalised parts), calls evaluate() on the survivors,
-adds the built-in coverage findings QE001 and QE002, and sorts. The prefilters
-only drop rules that evaluate() would drop, which a property test checks
-against Index._query_reference.
+query and one sub-query per request (section 4.12), calls evaluate() on every
+active rule of each part (after any plugin prefilters), adds the built-in
+coverage findings QE001 and QE002, and sorts.
 """
 
 from __future__ import annotations
@@ -65,10 +62,6 @@ _REGION = re.compile(r"[a-z][a-z0-9_.-]*:[A-Za-z0-9_.+-]+")
 _GROUPS = {"axes": 0, "facets": 1, "dims": 2}
 _KINDS = {"coverage": 0, "caveat": 1, "recommendation": 2}
 _PER_REQUEST = ("product", "variable", "version")
-_I64 = np.iinfo(np.int64)
-_POLES = tuple(
-    (at, shapely.LineString([(-180, at), (180, at)])) for at in (90.0, -90.0)
-)
 
 _default: Index | None = None
 _default_lock = threading.Lock()
@@ -82,6 +75,7 @@ class _Entry:
     qualname: str | None  # a redefinition with the same name replaces it (Q10)
     withdrawn: bool
     supersedes: tuple[str, ...]
+    per_request: bool  # constrains product, variable or version
 
 
 @dataclass(eq=False)
@@ -90,10 +84,6 @@ class _Part:
     rules: str  # the rules it evaluates: "all", "base" or "request"
     product: Product | None = None
     coverage: Coverage | None = None
-
-
-def _clip(key: int | None, default: int) -> int:
-    return default if key is None else min(max(key, _I64.min), _I64.max)
 
 
 def _strings(value: Any) -> tuple[str, ...]:
@@ -125,7 +115,7 @@ class Index:
         self._entries: list[_Entry] = []
         self._codes: dict[str, int] = {}
         self._packs: dict[str, tuple[str, ...]] = {}  # loaded pack -> its prefixes
-        self._tables_cache: Any = None
+        self._prefilters_cache: dict[str, Any] | None = None
         self._last: tuple[Any, Any] = (None, None)  # the last query parsed
         for axis in axes:
             if not isinstance(axis, Axis):
@@ -263,13 +253,14 @@ class Index:
             source = source if form == "record" else "computed"
             object.__setattr__(rule, "_qe_binding", Binding(self, compiled, source))
         lifecycle = bool(get("withdrawn", None)), _strings(get("supersedes", ()))
-        entry = _Entry(rule, form, compiled, qualname, *lifecycle)
+        per_request = any(k in compiled.values for k in _PER_REQUEST)
+        entry = _Entry(rule, form, compiled, qualname, *lifecycle, per_request)
         if at is None:
             self._codes[code] = len(self._entries)
             self._entries.append(entry)
         else:
             self._entries[at] = entry
-        self._tables_cache = None
+        self._prefilters_cache = None
 
     def rule(self, code: str, **meta: Any) -> Callable[[RuleFunc], RuleFunc]:
         """Register a function (query, match) -> CheckResult as a computed rule.
@@ -285,11 +276,10 @@ class Index:
 
     def rule_counts(self) -> dict[str | None, int]:
         """How many active rules concern each product; None counts the others (Q35)."""
-        tables = self._tables()
         counts: dict[str | None, int] = dict.fromkeys(self._products, 0)
         counts[None] = 0
-        for i in np.flatnonzero(tables.active):
-            patterns = tables.entries[i].scope.values.get("product")
+        for entry in self._active():
+            patterns = entry.scope.values.get("product")
             if patterns is None:
                 counts[None] += 1
                 continue
@@ -479,29 +469,58 @@ class Index:
         self._last = (None, None)  # holds the caller's context until cleared
         return _sorted(found)
 
-    def _query_reference(
-        self, query: Query | None = None, /, **fields: Any
-    ) -> list[Finding]:
-        """Index.query without prefilters: evaluate() on every rule of every part."""
-        conditional = fields.pop("include_conditional", False)
-        tables, found = self._tables(), []
-        for part in self._expand(self._make_query(query, fields)):
-            for i in np.flatnonzero(tables.active):
-                entry = tables.entries[i]
-                if (
-                    part.rules == "all"
-                    or (part.rules == "request") == tables.per_request[i]
-                ):
-                    found += entry.rule.evaluate(part.query)
-            found += self._coverage(part)
-        return _sorted(f for f in found if conditional or not f.conditional_on)
+    def _active(self) -> list[_Entry]:
+        """The rules that are neither withdrawn nor superseded."""
+        superseded = {code for e in self._entries for code in e.supersedes}
+        return [
+            e
+            for e in self._entries
+            if not e.withdrawn and e.rule.code not in superseded
+        ]
+
+    def _prefilters(self) -> dict[str, Any]:
+        """Plugin prefilters (a Dimension's optional build()), rebuilt after a change."""
+        if self._prefilters_cache is None:
+            entries = list(enumerate(self._entries))
+            self._prefilters_cache = {
+                name: dimension.build(
+                    [
+                        (i, e.scope.values[name])
+                        for i, e in entries
+                        if name in e.scope.values
+                    ]
+                )
+                for name, dimension, _ in self._groups
+                if type(dimension) not in (Axis, Labels)
+                and callable(getattr(dimension, "build", None))
+                and not hasattr(dimension, "comparable")
+            }
+        return self._prefilters_cache
+
+    def _candidates(self, part: _Part) -> list[_Entry]:
+        """The active rules one part evaluates, narrowed by any plugin prefilters."""
+        parsed = self._parse_query(part.query)
+        allowed = {
+            name: prefilter.candidates(parsed[name])
+            for name, prefilter in self._prefilters().items()
+            if name in parsed
+        }
+        position = {id(e): i for i, e in enumerate(self._entries)}
+        return [
+            e
+            for e in self._active()
+            if (part.rules == "all" or (part.rules == "request") == e.per_request)
+            and all(
+                name not in e.scope.values or position[id(e)] in keep
+                for name, keep in allowed.items()
+            )
+        ]
 
     def _run(self, part: _Part, conditional: bool) -> list[Finding]:
-        """Prune one part's rules with the vectorised tables, then evaluate the rest."""
-        query, tables = part.query, self._tables()
+        """Evaluate one part's rules and add its coverage findings."""
+        query = part.query
         found: list[Finding] = []
-        for i in np.flatnonzero(self._alive(part, conditional)):
-            entry = tables.entries[i]
+        for entry in self._candidates(part):
             if entry.form != "hooked":
                 found += entry.rule.evaluate(query)
                 continue
@@ -514,106 +533,6 @@ class Index:
                 )
         found += self._coverage(part)
         return [f for f in found if conditional or not f.conditional_on]
-
-    def _alive(
-        self, part: _Part, conditional: bool, context: bool = True
-    ) -> np.ndarray:
-        """The rules one part evaluates that survive the prefilters (stages 1 to 4).
-
-        context=False keeps rules whose Query.context keys are missing.
-        """
-        query, tables = part.query, self._tables()
-        alive = tables.active.copy()
-        if part.rules != "all":
-            alive &= (
-                tables.per_request if part.rules == "request" else ~tables.per_request
-            )
-        hard = ~tables.foreign  # a foreign rule's own evaluate() decides undecided ones
-
-        def omitted(rules: np.ndarray) -> None:  # the query omits what these constrain
-            if not conditional:
-                alive[rules & hard] = False
-
-        parsed = self._parse_query(query)
-        for name, _, _ in self._groups:
-            rules = tables.constrains[name] & alive
-            if not rules.any():
-                continue
-            if name not in parsed:
-                omitted(rules)
-                continue
-            value = parsed[name]
-            if name in tables.axes:
-                lo, hi, lo_closed, hi_closed = tables.axes[name]
-                start, end = np.maximum(lo, value[0]), np.minimum(hi, value[1])
-                closed = np.where(lo >= value[0], lo_closed, True)
-                closed &= np.where(hi <= value[1], hi_closed, True)
-                alive[rules & ~((start < end) | ((start == end) & closed))] = False
-            elif name in tables.literal:
-                literal, keep = tables.literal[name]
-                keep = keep.copy()  # rules with globs or none_of are decided later
-                for v in value:
-                    keep[literal.get(v, [])] = True
-                alive[rules & ~keep] = False
-            elif name in tables.prefilters:
-                keep = np.zeros(alive.size, bool)
-                keep[list(tables.prefilters[name].candidates(value))] = True
-                alive[rules & ~keep] = False
-        timed = tables.timed & alive
-        if query.time is None:
-            omitted(timed)
-        elif timed.any():
-            start, end = query.time.extent
-            lo, hi = _clip(start, _I64.min), _clip(end, _I64.max)
-            alive[timed & ~((tables.t_lo <= hi) & (tables.t_hi >= lo))] = False
-        placed = tables.placed & alive
-        if query.space is None:
-            omitted(placed)
-        elif placed.any():
-            alive[placed & ~self._space_candidates(tables, query.space)] = False
-        if context and not conditional:
-            for i in np.flatnonzero(alive & hard):
-                if any(
-                    k not in query.context for k in tables.entries[i].scope.requires
-                ):
-                    alive[i] = False
-        return alive
-
-    def _space_candidates(self, tables: Any, space: Space) -> np.ndarray:
-        """Rules whose space may meet the query's; object-id rules are kept."""
-        if space.kind == "features":
-            return tables.placed.copy()  # decided or undecided rule by rule
-        found = tables.ids.copy()
-        if space.kind == "polygon":
-            targets = list(shapely.get_parts(space.geometry))
-        elif space.kind in ("point", "points"):
-            if space.kind == "point":
-                lon, lat = np.array([space.geometry.x]), np.array([space.geometry.y])
-            else:
-                ok = np.isfinite(space.points[0]) & np.isfinite(space.points[1])
-                lon, lat = space.points[0][ok], space.points[1][ok]
-            seam = np.abs(lon) == 180.0  # +180 and -180 are one meridian
-            targets = [
-                shapely.box(x.min(), y.min(), x.max(), y.max())
-                for x, y in ((lon, lat), (-lon[seam], lat[seam]))
-                if x.size
-            ]
-            targets += [edge for at, edge in _POLES if np.any(lat == at)]
-        else:
-            targets = []
-        if tables.tree is None or not targets:
-            return found
-        found[tables.owner[tables.tree.query(targets)[1]]] = True
-        west, south, east, north = shapely.total_bounds(targets)
-        if north == 90.0:  # in lon/lat a pole is a line; shapes reaching it meet there
-            found |= tables.north
-        if south == -90.0:
-            found |= tables.south
-        if west == -180.0:
-            found |= tables.east
-        if east == 180.0:
-            found |= tables.west
-        return found
 
     def _coverage(self, part: _Part) -> list[Finding]:
         """QE001 and QE002 for a request's product: what lies outside its coverage."""
@@ -768,7 +687,6 @@ class Index:
         if any(r.support is not None for r in query.requests):
             raise ValueError("the points are the support of every request; give none")
         inside, total = _point_tester(x, y, valid), w[valid].sum()
-        tables = self._tables()
         found: list[Finding] = []
         masks: dict[tuple[str | None, str], np.ndarray] = {}
         fractions: dict[tuple[str | None, str], float] = {}
@@ -783,12 +701,8 @@ class Index:
             q = part.query
             product = q.facets["product"][0] if q.request is not None else None
             flat = dataclasses.replace(q, space=None)
-            for i in np.flatnonzero(self._alive(part, conditional, context=False)):
-                entry = tables.entries[i]
+            for entry in self._candidates(part):
                 rule, key = entry.rule, (product, entry.rule.code)
-                if entry.form in ("hooked", "foreign"):  # no outcome to mask
-                    skipped.append(key)
-                    continue
                 scope = dataclasses.replace(entry.scope, requires=())
                 ids = scope.space is not None and scope.space.kind == "features"
                 if not ids:  # ids against points stay conditional on space
@@ -797,9 +711,14 @@ class Index:
                 if matched is None:
                     continue
                 match, details = matched
+                if match.conditional_on and not conditional:
+                    continue
                 space = entry.scope.space
                 mask = valid.copy() if space is None or ids else inside(space.geometry)
                 if not mask.any():
+                    continue
+                if entry.form in ("hooked", "foreign"):  # no outcome to mask
+                    skipped.append(key)
                     continue
                 computed = entry.form == "computed"
                 if not match.conditional_on:  # conditional findings get no mask
@@ -829,79 +748,6 @@ class Index:
         self._last = (None, None)
         found = _sorted(f for f in found if conditional or not f.conditional_on)
         return PointResult(tuple(found), masks, fractions, tuple(skipped), shape)
-
-    # ---- tables (section 9.1, "Index internals") ----------------------------------
-    def _tables(self) -> Any:
-        """The prefilter arrays, rebuilt on the first query after any change."""
-        if self._tables_cache is not None:
-            return self._tables_cache
-        entries = list(self._entries)
-        n = len(entries)
-        superseded = {code for e in entries for code in e.supersedes}
-        t = types.SimpleNamespace(entries=entries, axes={}, literal={}, prefilters={})
-        t.active = np.array(
-            [not e.withdrawn and e.rule.code not in superseded for e in entries], bool
-        )
-        t.per_request = np.array(
-            [any(k in e.scope.values for k in _PER_REQUEST) for e in entries], bool
-        )
-        t.foreign = np.array([e.form == "foreign" for e in entries], bool)
-        t.constrains = {}
-        for name, dimension, _ in self._groups:
-            where = [i for i, e in enumerate(entries) if name in e.scope.values]
-            values = [entries[i].scope.values[name] for i in where]
-            t.constrains[name] = np.isin(np.arange(n), where)
-            if type(dimension) is Axis:
-                bounds = np.tile([-np.inf, np.inf, 0.0, 0.0], (n, 1))
-                for i, v in zip(where, values):
-                    bounds[i] = v.lo, v.hi, v.lo_closed, v.hi_closed
-                t.axes[name] = (
-                    bounds[:, 0],
-                    bounds[:, 1],
-                    bounds[:, 2] > 0,
-                    bounds[:, 3] > 0,
-                )
-            elif type(dimension) is Labels:
-                literal: dict[str, list[int]] = {}
-                patterned = np.zeros(n, bool)
-                for i, v in zip(where, values):
-                    if v.any_of is None or v.none_of or any(map(is_glob, v.any_of)):
-                        patterned[i] = True
-                    for value in v.any_of if not patterned[i] else ():
-                        literal.setdefault(value, []).append(i)
-                t.literal[name] = (literal, patterned)
-            elif callable(getattr(dimension, "build", None)) and not hasattr(
-                dimension, "comparable"
-            ):
-                t.prefilters[name] = dimension.build(list(zip(where, values)))
-        extents = [
-            e.scope.time.extent if e.scope.time else (None,) * 2 for e in entries
-        ]
-        t.timed = np.array([e.scope.time is not None for e in entries], bool)
-        t.t_lo = np.array([_clip(a, _I64.min) for a, _ in extents], np.int64)
-        t.t_hi = np.array([_clip(b, _I64.max) for _, b in extents], np.int64)
-        spaces = [e.scope.space for e in entries]
-        t.placed = np.array([s is not None for s in spaces], bool)
-        t.ids = np.array([s is not None and s.kind == "features" for s in spaces], bool)
-        envelopes, owner = [], []
-        for i, s in enumerate(spaces):
-            if s is not None and s.kind == "polygon":
-                box = getattr(s, "envelope", None)  # sp.deferred: not yet built
-                parts = [shapely.box(*box)] if box else shapely.get_parts(s.geometry)
-                envelopes += list(shapely.envelope(parts))
-                owner += [i] * len(parts)
-        t.owner = np.array(owner, dtype=np.intp)
-        t.tree = shapely.STRtree(envelopes) if envelopes else None
-        x0, y0, x1, y1 = shapely.bounds(envelopes).reshape(-1, 4).T
-        on = lambda edge: np.isin(np.arange(n), t.owner[edge])  # noqa: E731
-        t.west, t.south, t.east, t.north = (
-            on(x0 == -180),
-            on(y0 == -90),
-            on(x1 == 180),
-            on(y1 == 90),
-        )
-        self._tables_cache = t
-        return t
 
 
 def _sorted(findings: Iterable[Finding]) -> list[Finding]:
