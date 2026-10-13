@@ -112,7 +112,7 @@ def test_cftime_values_are_read_by_their_fields():
     assert interval(noleap, noleap).to_wire() == (
         ("2001-02-28T12:00:00Z", "2001-02-28T12:00:00Z"),
     )
-    with pytest.raises(ValueError, match="day is out of range"):
+    with pytest.raises(ValueError, match="proleptic Gregorian"):
         interval(cftime.Datetime360Day(2001, 2, 30), None)
 
 

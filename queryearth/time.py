@@ -47,6 +47,8 @@ def _instant(value: Any) -> tuple[int, Precision] | None:
         if isinstance(value, str) or "datetime64" in str(getattr(value, "dtype", "")):
             text = str(value)  # numpy writes ISO 8601, such as 2020-01-09T06:00:00
             day = len(text) <= 10  # a date, such as 2020-01-09
+            if text[11:13] == "24":  # Python 3.14 reads it as the next midnight
+                raise ValueError("hour 24 is not allowed")
             value = (_dt.date if day else _dt.datetime).fromisoformat(text)
         if isinstance(value, _dt.datetime) and value.utcoffset() is not None:
             value = value.astimezone(_dt.timezone.utc)
