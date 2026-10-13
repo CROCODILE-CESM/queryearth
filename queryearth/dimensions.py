@@ -1,8 +1,7 @@
 """Dimensions: every kind of scope, through one interface (section 4.13).
 
 A dimension decides only whether one rule value meets one query value; the
-Registry does everything else (conditional findings, unknown names, requests,
-sorting). Space and time are built in on every Registry and cannot be replaced.
+Registry does everything else (conditional findings, unknown names, sorting). Space and time are built in on every Registry and cannot be replaced.
 Axis (numeric ranges), Labels (facets matched by glob patterns) and Versions
 (OSV-style version ranges) are the built-in plugins, and a user plugin
 implements the same four members.
@@ -336,12 +335,6 @@ _LABELS_SCHEMA: Mapping[str, Any] = {
         },
     ]
 }
-_GLOB = frozenset("*?[")
-
-
-def is_glob(pattern: str) -> bool:
-    """Whether a facet pattern uses fnmatch syntax rather than a literal value."""
-    return not _GLOB.isdisjoint(pattern)
 
 
 @dataclass(frozen=True)

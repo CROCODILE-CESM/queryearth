@@ -1,11 +1,10 @@
 # queryearth
 
-queryearth answers one question: given where (a point or a polygon), when (a time range) and anything else that matters (grid resolution, product, variable, model and so on), which registered rules apply, how much of the request does each one cover, and what does it say to watch out for or to do?
+queryearth answers one question: given where (a point or a polygon), when (a time range) and anything else that matters (grid resolution, product, variable, model and so on), which registered rules apply, how much of the query does each one cover, and what does it say to watch out for or to do?
 
-Rules are short Python objects or GeoJSON records. A query returns **findings** of three kinds:
+Rules are short Python objects or GeoJSON records. A query returns **findings** of two kinds:
 
-- **warnings**, such as "these values are climatology, not observations";
-- **coverage gaps**, such as "this product does not reach part of your request";
+- **warnings**, such as "these values are climatology, not observations" or "this product does not reach part of your area";
 - **suggestions** of structured actions, such as "set this model parameter".
 
 queryearth is an engine only: it ships no rules of its own. You bring yours.
@@ -56,7 +55,7 @@ for f in registry.query(
     print(f.code, f.kind, f"area {f.area_fraction:.0%}", f"time {f.time_fraction:.0%}")
 ```
 
-This prints DEMO001 first, because a warning's level, WARNING, is above a suggestion's, INFO. DEMO001 covers 58% of the box's area and 67% of its period. Then it prints DEMO101, which applies to the whole request at 8 km.
+This prints DEMO001 first, because a warning's level, WARNING, is above a suggestion's, INFO. DEMO001 covers 58% of the box's area and 67% of its period. Then it prints DEMO101, which applies to the whole query at 8 km.
 
 ```{toctree}
 :maxdepth: 2

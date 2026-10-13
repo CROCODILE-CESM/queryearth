@@ -23,32 +23,6 @@ names = ["product", "variable", "version", "model", "activity", "basis_of_record
 [dimensions]
 names = []  # plugin dimensions, such as "basin"; their code is registered in Python
 
-[products.cru_ts]
-aliases = ["CRUTS", "CRU TS"]
-variables = ["pre", "tmp"]
-resolution = [0.5, "deg"]
-version = "4.07"
-coverage = { time = ["1901-01-01", "2022-12-31"] }
-
-[products.era5]
-variables = ["pre", "t2m", "skt", "siconc"]  # pack names; ERA5 itself calls precipitation "tp"
-resolution = [0.25, "deg"]
-version = "ERA5"
-coverage = { time = ["1940-01-01", ".."] }
-
-[products.glorys]
-aliases = ["GLORYS12V1", "GLORYS12"]
-variables = ["thetao", "so", "uo", "vo", "zos"]
-resolution = [0.083, "deg"]
-coverage = { time = ["1993-01-01", ".."] }
-
-[products.gbif]
-variables = ["occurrence"]
-
-[products.demo_ili]  # fictional surveillance feed
-variables = ["ili_cases"]
-coverage = { time = ["2015-01-01", ".."], box = { west = 170, width = 20, south = -25, north = -10 } }
-
 [regions.ar6]
 file = "regions/ar6_land.geojson"  # IPCC AR6 reference regions
 id_property = "abbrev"

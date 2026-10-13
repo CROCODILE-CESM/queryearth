@@ -15,17 +15,15 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from queryearth import space as sp
-from queryearth.objects import Coverage, LoadError, Product, UnknownNameError
-from queryearth.rules import Rule, box_of, code_prefix
-from queryearth.time import parse_time
+from queryearth.objects import LoadError, UnknownNameError
+from queryearth.rules import Rule, code_prefix
 
 if TYPE_CHECKING:
     from queryearth.registry import Registry
 
 _ERRORS = (ValueError, TypeError, KeyError)
-_TABLES = set("pack axes facets dimensions products regions".split())
+_TABLES = set("pack axes facets dimensions regions".split())
 _PACK = set("name version code_prefix license files".split())
-_PRODUCT = set("aliases variables resolution version coverage".split())
 
 
 @contextlib.contextmanager
@@ -61,7 +59,7 @@ def add_collection(
     """Add every record of a FeatureCollection; returns (codes, problems).
 
     prefixes are the code prefixes a pack owns; None for rules added from
-    Python, which may use any prefix but QE.
+    Python, which may use any prefix.
     """
     features = collection.get("features") if isinstance(collection, Mapping) else None
     if collection.get("type") != "FeatureCollection" or not isinstance(features, list):
@@ -86,7 +84,7 @@ def add_collection(
 
 
 def load_pack(registry: Registry, path: Any) -> list[str]:
-    """Registry.load_pack: declare a pack's products and regions, add its records."""
+    """Registry.load_pack: declare a pack's regions, add its records."""
     toml = Path(path)
     toml = toml / "pack.toml" if toml.is_dir() else toml
     try:
@@ -105,7 +103,6 @@ def load_pack(registry: Registry, path: Any) -> list[str]:
         name in registry._packs and f"pack {name!r} is already loaded",
         not isinstance(pack.get("version"), str) and "[pack] needs a version",
         not prefixes and "[pack] needs a code_prefix",
-        "QE" in prefixes and "the code prefix QE is reserved",
         *(
             f"prefix {p!r} is claimed by pack {claimed[p]!r}"
             for p in prefixes & set(claimed)
@@ -133,11 +130,6 @@ def load_pack(registry: Registry, path: Any) -> list[str]:
     with atomic(registry):
         for namespace, table in meta.get("regions", {}).items():
             problems += _regions(registry, root, namespace, table)
-        for slug, table in meta.get("products", {}).items():
-            try:
-                _product(registry, slug, table)
-            except _ERRORS as err:
-                problems.append(f"{toml.name}: [products.{slug}]: {err}")
         codes: list[str] = []
         for pattern in pack.get("files", ()):
             files = sorted(root.glob(pattern))
@@ -183,35 +175,3 @@ def _regions(registry: Registry, root: Path, namespace: str, table: Any) -> list
     except ValueError as err:
         problems.append(f"{file.name}: {err}")
     return problems
-
-
-def _product(registry: Registry, slug: str, table: Any) -> None:
-    """Declare one [products.<slug>]; product names are global in a Registry."""
-    if set(table) - _PRODUCT:
-        raise ValueError(f"unknown keys {sorted(set(table) - _PRODUCT)}")
-    coverage = table.get("coverage", {})
-    keys = set(coverage)
-    if keys - {"time", "box", "region_ref"} or {"box", "region_ref"} <= keys:
-        raise ValueError("a coverage holds time, and a box or a region_ref")
-    space = None
-    if "box" in coverage:
-        space = box_of(coverage["box"])
-    elif "region_ref" in coverage:
-        refs = coverage["region_ref"]
-        space = registry._region(
-            (refs,) if isinstance(refs, str) else tuple(refs), slug
-        )
-    time = None
-    if "time" in coverage:
-        time = parse_time({"interval": list(coverage["time"])})
-    resolution = table.get("resolution")
-    registry.add_product(
-        Product(
-            slug,
-            aliases=tuple(table.get("aliases", ())),
-            variables=tuple(table.get("variables", ())),
-            coverage=Coverage(space, time),
-            resolution=None if resolution is None else tuple(resolution),
-            version=table.get("version"),
-        )
-    )

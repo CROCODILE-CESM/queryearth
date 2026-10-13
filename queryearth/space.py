@@ -26,7 +26,6 @@ __all__ = [
     "box",
     "measure",
     "meets",
-    "nowhere",
     "point",
     "points_mask",
     "polygon",
@@ -188,11 +187,6 @@ def polygon(shape: Any) -> Space:
     return _finish(geometry)
 
 
-def nowhere() -> Space:
-    """An empty polygon, for a callable coverage that does not serve a query."""
-    return Space("polygon", shapely.Polygon(), 0.0)
-
-
 # ---- areas (design.md section 6.3) ---------------------------------------------
 def _ring_area(coords: Any) -> float:
     """Signed area of a closed ring with straight lon/lat edges; CCW is positive.
@@ -251,7 +245,7 @@ def points_mask(rule: Rule, lon: Any, lat: Any) -> np.ndarray:
     if rule is None:
         return np.isfinite(lon) & np.isfinite(lat)
     shape = _shape(rule)
-    x0, y0, x1, y1 = shape.bounds  # NaN for an empty shape, so nothing is near
+    x0, y0, x1, y1 = shape.bounds
     seam = np.abs(lon) == 180.0
     near = (lat >= y0) & (lat <= y1) & ((lon >= x0) & (lon <= x1) | seam)
     mask = np.zeros(lon.shape, dtype=bool)
@@ -265,11 +259,9 @@ def meets(rule: Rule, query: Space) -> bool:
     """Whether a query space meets a normalised rule shape, as closed sets.
 
     rule is a polygon Space or shapely geometry, or None for a global rule. A
-    point on an edge meets the shape, shapes that touch across +-180 meet
-    there, and an empty query meets nothing.
+    point on an edge meets the shape, and shapes that touch across +-180 meet
+    there.
     """
-    if query.geometry.is_empty:
-        return False
     if rule is None:
         return True
     shape, other = _shape(rule), query.geometry
@@ -288,10 +280,8 @@ def measure(rule: Rule, query: Space) -> tuple[float | None, float | None]:
 
     area_fraction is 1.0 or 0.0 for a point, and for a polygon the spherical
     area of the intersection over the query's area. overlap_km2 is None for a
-    point. A global rule (None) covers all; an empty query has no measures.
+    point. A global rule (None) covers all.
     """
-    if query.geometry.is_empty:
-        return None, None
     if query.kind == "point":
         return (1.0 if meets(rule, query) else 0.0), None
     if rule is None:

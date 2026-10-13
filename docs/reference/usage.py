@@ -2,9 +2,8 @@
 
 lake_geojson, outline and stn stand for the caller's own data: a lake polygon, an
 Arctic domain's outer cell corners closed along 90N, and station counts. The
-demo pack declares cru_ts (alias CRUTS) and era5_land. CRU002 here is the simple
-form; design.md section 12.4 describes the graded one, whose code is in
-examples/README.md.
+demo pack holds CRU001 and CROC101. CRU002 here is the simple form; design.md
+section 12.4 describes the graded one, whose code is in examples/README.md.
 """
 
 import logging
@@ -17,8 +16,9 @@ from queryearth import space as sp
 registry = qe.Registry(
     "demo", axes=[qe.Axis("resolution", "km", "horizontal grid spacing")]
 )
-registry.load_pack("packs/demo")  # products cru_ts and era5_land, CRU001, CROC101
+registry.load_pack("packs/demo")  # CRU001 and CROC101
 cru, mom6 = {"product": "cru_ts", "variable": "pre"}, {"model": "mom6"}
+cru_407 = {**cru, "version": "4.07"}  # a query names the version it uses
 y1991_2020 = qe.interval("1991-01-01", "2020-12-31")
 
 croc102 = qe.Rule(  # a record built in Python; the MOM_input key is illustrative
@@ -50,19 +50,19 @@ class CruStations(
 
 
 lake = sp.polygon(lake_geojson)  # a HydroLAKES polygon; never lake.buffer(0.5)
-found = registry.query(  # an adapter that reads CRU TS cells passes them as support=
-    space=lake,
+found = registry.query(
+    space=lake,  # an adapter that reads CRU TS cells passes them instead
     time=y1991_2020,
-    requests=[qe.Request("CRUTS", variables=("pre",))],  # version 4.07 assumed
+    facets=cru_407,
     context={"cru_ts.stn": stn},  # station counts for the cells read
     label="lake 1234",
 )
-pair = registry.query(  # each product with its own variables and time
-    space=lake,
-    requests=[qe.Request("cru_ts", ("pre",)), qe.Request("era5_land", ("tas",))],
-    label="lake 1234",
-)
-named = [(f.product, f.code) for f in pair]  # every finding names its product
+per_product = {  # one query per product, each with its own variables
+    product: registry.query(
+        space=lake, time=y1991_2020, facets={"product": product, "variable": var}
+    )
+    for product, var in [("cru_ts", "pre"), ("era5_land", "tas")]
+}
 
 only_res = registry.query(axes={"resolution": 8.0}, include_conditional=True)
 # CROC102 is definite; CROC101 is conditional_on ("space", "model"), and so on.
@@ -76,15 +76,14 @@ todo = [s for f in arctic if f.kind == "suggestion" for s in f.suggestions]
 
 glon, glat = np.meshgrid(np.arange(-179.75, 180, 0.5), np.arange(-89.75, 90, 0.5))
 lon, lat = glon.ravel(), glat.ravel()  # every 0.5 degree cell centre
-bulk = registry.query_points(lon, lat, weights=np.cos(np.radians(lat)), facets=cru)
+weights = np.cos(np.radians(lat))
+bulk = registry.query_points(lon, lat, weights, time=y1991_2020, facets=cru_407)
 weak = bulk.any(logging.WARNING)  # per-point mask
-share = bulk.fractions[("cru_ts", "CRU001")]  # keyed by (product, code)
-
-ranked = registry.suitable(qe.Query(space=lake, time=y1991_2020), variable="pre")
+share = bulk.fractions["CRU001"]  # keyed by code
 
 log = logging.getLogger("glhe")
 for f in found + arctic:
     log.log(f.level, f)  # "[CRU001] ... (lake 1234; area 100%; ...)"
-gaps = [f for f in found if f.kind == "coverage"]  # QE001 or QE002 would stop here
-if gaps:
-    raise RuntimeError("\n".join(map(str, gaps)))
+stop = [f for f in found if f.action == "do_not_use"]  # such as a coverage rule
+if stop:
+    raise RuntimeError("\n".join(map(str, stop)))

@@ -15,23 +15,3 @@ description = "horizontal grid spacing"
 
 [facets]
 names = ["product", "variable", "model"]
-
-# A global ocean reanalysis, from 1993 onwards.
-[products.toy_ocean]
-aliases = ["TOYO"]
-variables = ["thetao", "so", "zos"]
-resolution = [0.25, "deg"]
-coverage = { time = ["1993-01-01", ".."] }
-
-# A global atmosphere reanalysis, from 1950 onwards.
-[products.toy_atmos]
-variables = ["t2m", "tp"]
-resolution = [0.5, "deg"]
-coverage = { time = ["1950-01-01", ".."] }
-
-# A regional ocean product that covers one box (roughly the Gulf of Mexico)
-# for 2010 to 2023 only.
-[products.toy_coastal]
-variables = ["thetao", "so"]
-resolution = [2.0, "km"]
-coverage = { time = ["2010-01-01", "2023-12-31"], box = { west = -98, width = 18, south = 18, north = 31 } }

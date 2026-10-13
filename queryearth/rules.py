@@ -2,9 +2,8 @@
 
 Every rule kind implements RuleKind: a code, a scope and evaluate(query).
 Rule.evaluate and ComputedRule.evaluate are the reference semantics of
-design.md section 4.3, run on one part of a query (the base query or one
-request's sub-query, as Registry.expand() returns them). Registry.query calls
-evaluate() on every active rule, after any plugin prefilters.
+design.md section 4.3. Registry.query calls evaluate() on every active rule,
+after any plugin prefilters.
 """
 
 from __future__ import annotations
@@ -34,7 +33,7 @@ CheckResult = bool | Mapping[str, Any] | Iterable[Mapping[str, Any]] | None
 RuleFunc = Callable[[Query, Match], CheckResult]
 
 # A prefix plus three or four digits, with a hyphen after a prefix that ends in
-# a digit, so every code parses one way (Q8); QE is reserved.
+# a digit, so every code parses one way (Q8).
 CODE = re.compile(r"(?:[A-Z][A-Z0-9]{0,10}[A-Z]-?|[A-Z][A-Z0-9]{0,10}[0-9]-)[0-9]{3,4}")
 
 
@@ -46,8 +45,6 @@ def check_code(code: Any) -> None:
             "digits, such as CRU001, with a hyphen after a prefix that ends in a "
             "digit (ERA5-014)"
         )
-    if re.fullmatch(r"QE-?[0-9]+", code):
-        raise ValueError(f"{code!r} uses the prefix QE, which is reserved")
 
 
 def code_prefix(code: str) -> str:
@@ -56,7 +53,7 @@ def code_prefix(code: str) -> str:
 
 
 class RuleKind(Protocol):
-    """Any rule: a code, a scope, and evaluate() on one query part.
+    """Any rule: a code, a scope, and evaluate() on one query.
 
     A third-party kind may also define outcomes(query, match) -> CheckResult
     and an outcome attribute (an Outcome) (Q5): the Registry then matches its scope
@@ -75,9 +72,6 @@ class CompiledScope:
 
     values: Mapping[str, Any]  # dimension name -> parsed rule value, space and time too
     requires: tuple[str, ...] = ()
-
-    def constrains(self, name: str) -> bool:
-        return name in self.values
 
 
 @dataclass(frozen=True, eq=False)
@@ -105,7 +99,7 @@ def match_scope(
     query: Query,
     parsed: Mapping | None = None,
 ) -> tuple[Match, dict[str, Any]] | None:
-    """Match one scope against one query part, dimension by dimension (section 4.3).
+    """Match one scope against one query, dimension by dimension (section 4.3).
 
     Returns None when some dimension fails; otherwise the Match, whose
     conditional_on names the undecided dimensions in the Registry's order (space,
@@ -158,17 +152,12 @@ def match_scope(
         matched_facets=groups["facets"],
         dims=groups["dims"],
         conditional_on=tuple(conditional),
-        assumed=tuple(d for d in query.assumed if scope.constrains(d)),
-        product=query.facets["product"][0] if query.request is not None else None,
-        request=query.request,
     )
     return match, details
 
 
 # ---- findings ---------------------------------------------------------------------
-_LOCKED = frozenset(
-    {"code", "product", "request", "query_label", "source", "conditional_on", "assumed"}
-)
+_LOCKED = frozenset({"code", "query_label", "source", "conditional_on"})
 
 
 def _time_override(value: Any, query: TimeSpec | None) -> tuple:
@@ -281,8 +270,6 @@ class Rule(Outcome):
 
     def __post_init__(self) -> None:
         Outcome.__post_init__(self)
-        if self.kind not in ("warning", "suggestion"):
-            raise ValueError(f"{self.code}: coverage is declared on products")
         if self.kind == "suggestion" and not self.suggestions:
             raise ValueError(f"{self.code}: a suggestion lists one or more suggestions")
         if not isinstance(self.scope, Scope):
@@ -367,7 +354,7 @@ class Rule(Outcome):
         return cls(**fields, scope=scope, extensions=extensions)
 
     def evaluate(self, query: Query) -> list[Finding]:
-        """Findings for one query part (section 4.3)."""
+        """Findings for one query (section 4.3)."""
         bound = binding_of(self)
         found = match_scope(bound.registry, bound.scope, query)
         if found is None:
@@ -392,7 +379,7 @@ def check_meta(meta: Mapping[str, Any], owner: str) -> None:
 
 
 class ComputedRule:
-    """A rule computed from the request or from data the caller holds.
+    """A rule computed from the query or from data the caller holds.
 
     Class keywords give its identity and scope: code, registry (default
     Registry.default()), abstract, the Outcome fields (kind defaults to warning,
@@ -444,10 +431,7 @@ class ComputedRule:
     def outcome(self) -> Outcome:
         """The declared outcome, before check() overrides it."""
         fields = {k: self.meta[k] for k in OUTCOME_KEYS if k in self.meta}
-        if fields.setdefault("kind", "warning") not in ("warning", "suggestion"):
-            raise ValueError(
-                f"{self.code}: a computed rule is a warning or a suggestion"
-            )
+        fields.setdefault("kind", "warning")
         lines = inspect.cleandoc(self._doc() or "").splitlines()
         fields.setdefault("title", lines[0] if lines else "")
         if not fields["title"]:
@@ -456,7 +440,7 @@ class ComputedRule:
         return Outcome(code=self.code, **fields)
 
     def evaluate(self, query: Query) -> list[Finding]:
-        """Findings for one query part: the scope, then check() if definite."""
+        """Findings for one query: the scope, then check() if definite."""
         bound = binding_of(self)
         found = match_scope(bound.registry, bound.scope, query)
         if found is None:

@@ -166,7 +166,7 @@ def test_levels_default_by_kind_and_accept_level_names():
     def level(kind, **given):
         return qe.Outcome(code="X001", kind=kind, title="t", message="m", **given).level
 
-    assert [level(k) for k in ("warning", "suggestion", "coverage")] == [30, 20, 40]
+    assert [level(k) for k in ("warning", "suggestion")] == [30, 20]
     assert level("warning", level="Error") == logging.ERROR
     assert level("suggestion", level=logging.CRITICAL) == 50
     with pytest.raises(ValueError):
@@ -194,11 +194,9 @@ def test_query_accepts_shorthands():
         time=("2020-01-01", "2020-12-31"),
         axes={"resolution": 8},
         facets={"model": "mom6"},
-        requests=["cru_ts", qe.Request("era5", "t2m")],
     )
     assert query.axes == {"resolution": (8.0, 8.0)}
     assert query.facets == {"model": ("mom6",)}
-    assert query.requests == (qe.Request("cru_ts"), qe.Request("era5", ("t2m",)))
     assert query.time.to_wire() == (("2020-01-01", "2020-12-31"),)
     assert qe.Query(time={"date": "2007-01-01"}).time.to_wire() == (
         ("2007-01-01", "2007-01-01"),
@@ -211,19 +209,11 @@ def test_objects_with_mappings_compare_by_value_but_do_not_hash():
         hash(qe.Query())
     with pytest.raises(TypeError):
         hash(qe.Scope())
-    lake = sp.point(0, 0)
-    assert hash(qe.Request("cru_ts", support=lake)) == hash(
-        qe.Request("cru_ts", support=lake)
-    )
 
 
 @pytest.mark.parametrize(
     "build",
     [
-        lambda: qe.Product("CRU TS"),  # not a slug
-        lambda: qe.Product("x", resolution=(0.5, "miles")),
-        lambda: qe.Coverage(space=sp.point(0, 0)),
-        lambda: qe.Coverage(time=qe.parse_time(None, recurrence={"months": [1]})),
         lambda: qe.Outcome(code="X001", kind="note", title="t", message="m"),
         lambda: qe.Outcome(
             code="X001", kind="warning", title="t", message="m", min_overlap=2
@@ -275,7 +265,7 @@ def test_finding_to_dict_is_json_ready():
         "hi_closed": False,
     }
     assert out["dims"] == {"basin": {"overlap": ["14"], "fraction": 1.0}}
-    assert out["code"] == "CROC102" and out["product"] is None
+    assert out["code"] == "CROC102"
 
 
 def test_rule_from_feature_needs_properties_and_a_geometry():

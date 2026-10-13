@@ -1,6 +1,6 @@
-"""Registry: fixtures 12 (Registry-level), 17, 19 to 21, 23, 24 and 27 of
-docs/reference/fixtures.md; fixtures 2, 6, 9 and 13 as queries; coverage,
-computed rules, codes and lifecycle; and the fast path against the reference.
+"""Registry: fixtures 12 (Registry-level), 17, 19 to 21 and 27 of
+docs/reference/fixtures.md; fixtures 2, 6, 9 and 13 as queries; computed rules,
+codes and lifecycle; and the fast path against the reference.
 """
 
 import logging
@@ -18,24 +18,8 @@ LAKE = sp.box(0.30, 0.30, 0.45, 0.45)
 
 
 def make_registry(**kw):
-    """Products cru_ts, era5_land and era5, and a resolution axis."""
-    registry = qe.Registry("test", axes=[qe.Axis("resolution", "km")], **kw)
-    registry.add_product(
-        qe.Product(
-            "cru_ts",
-            aliases=("CRUTS", "CRU TS"),
-            variables=("pre", "tmp"),
-            version="4.07",
-            coverage=qe.Coverage(time=qe.interval("1901-01-01", "2022-12-31")),
-        )
-    )
-    registry.add_product(
-        qe.Product(
-            "era5_land", coverage=qe.Coverage(time=qe.interval("1950-01-01", ".."))
-        )
-    )
-    registry.add_product(qe.Product("era5", version="ERA5"))
-    return registry
+    """A resolution axis and the default facets."""
+    return qe.Registry("test", axes=[qe.Axis("resolution", "km")], **kw)
 
 
 def warning_rule(code, **scope):
@@ -67,11 +51,11 @@ def test_fixture_12_untimed_rules_and_queries():
     c = {f.code: f for f in registry.query(include_conditional=True)}
     assert c["TST002"].conditional_on == ("time",)
     assert c["TST002"].time_overlap == (("2000-01-01", "2006-12-31"),)
-    d = {f.code: f for f in registry.query(facets={"product": "cru_ts"})}
-    assert d["TST003"].conditional_on == () and d["TST003"].assumed == ("time",)
+    cru_ts = ("1901-01-01", "2022-12-31")
+    d = {f.code: f for f in registry.query(facets={"product": "cru_ts"}, time=cru_ts)}
+    assert d["TST003"].conditional_on == ()
     assert d["TST003"].time_fraction == pytest.approx(2557 / 44560)
     assert round(d["TST003"].time_fraction, 4) == 0.0574
-    assert "TST002" not in d  # on the base query, which has no time
 
 
 # ---- fixture 17: resolution only -----------------------------------------------------
@@ -184,58 +168,47 @@ def test_fixture_19_conditional_findings():
     assert "CRU001" not in codes(
         registry.query(space=sp.point(0, 60), include_conditional=True)
     )
-    found = registry.query(
-        requests=[qe.Request("cru_ts", ("pre",))], include_conditional=True
-    )
+    cru_pre = {"product": "cru_ts", "variable": "pre"}
+    found = registry.query(facets=cru_pre, include_conditional=True)
     cru002 = next(f for f in found if f.code == "CRU002")
     assert cru002.conditional_on == ("context:cru_ts.stn",) and cru002.details == {}
-    assert "CRU002" not in codes(
-        registry.query(requests=[qe.Request("cru_ts", ("pre",))])
-    )
+    assert "CRU002" not in codes(registry.query(facets=cru_pre))
 
 
 def test_computed_rule_check_runs_for_definite_matches_only():
     registry = cru_registry()
+    cru_pre = {"product": "cru_ts", "variable": "pre"}
     stn = np.array([0, 3, 4])
-    found = registry.query(
-        requests=[qe.Request("CRUTS", "pre")], context={"cru_ts.stn": stn}
-    )
+    found = registry.query(facets=cru_pre, context={"cru_ts.stn": stn})
     (cru002,) = [f for f in found if f.code == "CRU002"]
     assert cru002.level == logging.ERROR and cru002.source == "computed"
     assert cru002.details == {"stn0_fraction": pytest.approx(1 / 3)}
     thick = {"cru_ts.stn": np.array([5, 6])}
-    found = registry.query(requests=[qe.Request("cru_ts", "pre")], context=thick)
+    found = registry.query(facets=cru_pre, context=thick)
     assert "CRU002" not in codes(found)  # check() returned False
 
 
-def test_glhe_lake_query_assumes_time_and_version():
+def test_glhe_lake_query():
     registry = cru_registry()
     (cru001,) = registry.query(
-        space=sp.box(20, 0, 20.1, 0.1), requests=[qe.Request("CRUTS", "pre")]
+        space=sp.box(20, 0, 20.1, 0.1),
+        time=("1901-01-01", "2022-12-31"),
+        facets={"product": "cru_ts", "variable": "pre", "version": "4.07"},
     )
-    assert cru001.product == "cru_ts" and cru001.request == 0
-    assert cru001.assumed == ("time", "version")
     assert cru001.area_fraction == 1.0
     assert cru001.time_overlap == (("2000-01-01", "2022-12-31"),)
     assert round(cru001.time_fraction, 3) == 0.189  # section 7.3
 
 
-# ---- fixture 20: facet aliases and wildcards -------------------------------------------
-def test_fixture_20_aliases():
+# ---- fixture 20: facet wildcards ------------------------------------------------------
+def test_product_is_a_plain_facet():
     registry = make_registry()
-    registry.add(
-        warning_rule("TST010", facets={"product": "CRUTS"})
-    )  # rule side resolves too
-    (found,) = registry.query(facets={"product": "cru ts"})
-    assert (
-        found.matched_facets == {"product": ("cru_ts",)} and found.product == "cru_ts"
-    )
-    with pytest.raises(qe.UnknownNameError):
-        registry.query(facets={"product": "CRU-TS"})
-    with pytest.raises(qe.UnknownNameError):
-        registry.add(warning_rule("TST011", facets={"product": "cruts4"}))
-    with pytest.raises(ValueError, match="matches no declared product"):
-        registry.add(warning_rule("TST012", facets={"product": ["merra*"]}))  # Q3
+    registry.add(warning_rule("TST010", facets={"product": ["era5*"]}))
+    registry.add(warning_rule("TST011", facets={"product": ["CRUTS"]}))
+    (found,) = registry.query(facets={"product": ("era5_land", "cru_ts")})
+    assert found.code == "TST010"
+    assert found.matched_facets == {"product": ("era5_land",)}
+    assert registry.query(facets={"product": "cruts"}) == []  # exact, no aliases
 
 
 def test_fixture_20_wildcard_is_not_an_omitted_facet():
@@ -244,7 +217,7 @@ def test_fixture_20_wildcard_is_not_an_omitted_facet():
     (found,) = registry.query(include_conditional=True)
     assert found.conditional_on == ("product",)
     (found,) = registry.query(facets={"product": "era5"})
-    assert found.conditional_on == () and found.product == "era5"
+    assert found.conditional_on == () and found.matched_facets == {"product": ("era5",)}
 
 
 def test_fixture_20_none_of_and_case():
@@ -258,7 +231,7 @@ def test_fixture_20_none_of_and_case():
 
 
 # ---- fixture 21: version ranges on the Registry -----------------------------------------
-def test_fixture_21_versions_filled_from_products():
+def test_fixture_21_version_facet():
     registry = make_registry()
     with pytest.raises(ValueError):
         registry.add(
@@ -269,82 +242,11 @@ def test_fixture_21_versions_filled_from_products():
             "TST041", facets={"version": {"introduced": "4.00", "fixed": "4.09"}}
         )
     )
-    (found,) = registry.query(facets={"product": "cru_ts"})
-    assert found.assumed == ("version",) and found.matched_facets == {
-        "version": ("4.07",)
-    }
-    (found,) = registry.query(requests=["cru_ts", "era5"])
-    assert (found.product, found.request, found.assumed) == ("cru_ts", 0, ("version",))
-    (found,) = registry.query(facets={"version": "4.07"})
-    assert found.product is None and found.assumed == ()
+    (found,) = registry.query(facets={"product": "cru_ts", "version": "4.07"})
+    assert found.matched_facets == {"version": ("4.07",)}
+    (found,) = registry.query(facets={"version": ("4.9", "4.07")})
+    assert found.matched_facets == {"version": ("4.07",)}
     assert registry.query(facets={"product": "cru_ts", "version": "4.9"}) == []
-    with pytest.raises(ValueError):  # a shorthand version needs exactly one product
-        registry.query(facets={"product": ["cru_ts", "era5"], "version": "4.07"})
-
-
-# ---- fixture 23: requests do not cross --------------------------------------------------
-def test_fixture_23_requests_do_not_cross():
-    registry = make_registry()
-    registry.add(
-        warning_rule("TSA001", facets={"product": "cru_ts", "variable": "pre"})
-    )
-    registry.add(
-        warning_rule("TSB001", facets={"product": "era5_land", "variable": "pre"})
-    )
-    registry.add(warning_rule("TSC001", axes={"resolution": {"lt": 10}}))
-    query = qe.Query(
-        axes={"resolution": 8},
-        requests=[qe.Request("cru_ts", ("pre",)), qe.Request("era5_land", ("tas",))],
-    )
-    assert [(f.code, f.product, f.request) for f in registry.query(query)] == [
-        ("TSA001", "cru_ts", 0),
-        ("TSC001", None, None),
-    ]
-    shorthand = qe.Query(
-        axes={"resolution": 8},
-        facets={
-            "product": ["cru_ts", "era5_land", "CRUTS"],
-            "variable": ["pre", "tas"],
-        },
-    )
-    base, first, second = registry.expand(shorthand)
-    assert base.request is None and "product" not in base.facets
-    assert (first.request, first.facets["product"], first.facets["variable"]) == (
-        0,
-        ("cru_ts",),
-        ("pre", "tas"),
-    )
-    assert (second.request, second.facets["product"]) == (1, ("era5_land",))
-    assert [(f.code, f.request) for f in registry.query(shorthand)] == [
-        ("TSA001", 0),
-        ("TSB001", 1),
-        ("TSC001", None),
-    ]
-    with pytest.raises(ValueError):
-        registry.query(requests=["cru_ts"], facets={"variable": "pre"})
-
-
-# ---- fixture 24: per-product default time --------------------------------------------
-def test_fixture_24_per_product_default_time():
-    registry = make_registry()
-    period = qe.interval("1940-01-01", "1960-12-31")
-    registry.add(
-        warning_rule("TSD001", time=period, facets={"product": ["cru_ts", "era5_land"]})
-    )
-    registry.add(warning_rule("TSE001", time=period))
-    found = registry.query(requests=["cru_ts", "era5_land"], include_conditional=True)
-    cru, era, untimed = found
-    assert (cru.code, cru.product, cru.assumed) == ("TSD001", "cru_ts", ("time",))
-    assert cru.time_overlap == (("1940-01-01", "1960-12-31"),)
-    assert cru.time_fraction == pytest.approx(7671 / 44560)
-    assert (era.product, era.assumed, era.time_fraction) == (
-        "era5_land",
-        ("time",),
-        None,
-    )
-    assert era.time_overlap == (("1950-01-01", "1960-12-31"),)
-    assert untimed.code == "TSE001" and untimed.conditional_on == ("time",)
-    assert untimed.time_overlap == (("1940-01-01", "1960-12-31"),)
 
 
 # ---- fixture 27: a plugin dimension --------------------------------------------------
@@ -518,75 +420,6 @@ def test_month_recurrence_counts_as_time():
     assert winter.time_fraction == pytest.approx(90 / 116)
 
 
-# ---- coverage: QE001 and QE002 -------------------------------------------------------
-def coverage_registry():
-    registry = qe.Registry("cov")
-    registry.add_product(
-        qe.Product(
-            "demo",
-            coverage=qe.Coverage(
-                space=sp.box(170, -25, -170, -10),
-                time=qe.interval("2015-01-01", ".."),
-            ),
-        )
-    )
-    registry.add_product(
-        qe.Product("gone", coverage=lambda query: qe.Coverage(space=sp.nowhere()))
-    )
-    return registry
-
-
-def test_coverage_partly_outside_in_space_and_time():
-    registry = coverage_registry()
-    found = registry.query(
-        space=sp.box(160, -20, 175, -15),
-        time=("2010-01-01", "2016-12-31"),
-        requests=["demo"],
-    )
-    qe001, qe002 = found
-    assert (qe001.code, qe001.kind, qe001.level) == ("QE001", "coverage", logging.ERROR)
-    assert qe001.action == "use_with_caution" and qe001.product == "demo"
-    assert qe001.area_fraction == pytest.approx(2 / 3) and qe001.source == "builtin"
-    assert qe002.time_overlap == (("2010-01-01", "2014-12-31"),)
-    assert qe002.time_fraction == pytest.approx(1826 / 2557)
-    assert qe002.area_fraction is None and qe002.action == "use_with_caution"
-
-
-def test_coverage_entirely_outside_is_do_not_use():
-    registry = coverage_registry()
-    (qe001,) = registry.query(
-        space=sp.box(0, 0, 1, 1), time=("2020-01-01", "2020-12-31"), requests=["demo"]
-    )
-    assert qe001.action == "do_not_use" and qe001.area_fraction == 1.0
-    (qe002,) = registry.query(time=("2000-01-01", "2001-12-31"), requests=["demo"])
-    assert qe002.code == "QE002" and qe002.action == "do_not_use"
-    assert registry.query(requests=["demo"]) == []  # time filled from the coverage
-
-
-def test_coverage_nowhere_and_undecided():
-    registry = coverage_registry()
-    (gone,) = registry.query(requests=["gone"])  # Q7
-    assert (gone.code, gone.action, gone.area_fraction) == ("QE001", "do_not_use", 1.0)
-    assert registry.query(requests=["demo"]) == []
-    (undecided,) = registry.query(requests=["demo"], include_conditional=True)
-    assert undecided.code == "QE001" and undecided.conditional_on == ("space",)
-
-
-def test_coverage_callable_is_evaluated_once_per_request_with_its_sub_query():
-    seen = []
-
-    def coverage(query):
-        seen.append((query.request, query.facets["product"]))
-        return qe.Coverage(time=qe.interval("2000-01-01", "2000-12-31"))
-
-    registry = qe.Registry("cov")
-    registry.add_product(qe.Product("live", coverage=coverage))
-    registry.add(warning_rule("LIV001", facets={"product": "live"}))
-    (found,) = registry.query(requests=["live"])
-    assert found.assumed == () and found.time_overlap == (("2000-01-01", "2000-12-31"),)
-    assert seen == [(0, ("live",))]
-
-
 # ---- computed rules, codes and lifecycle ---------------------------------------------
 def test_function_rule_croc104_suggests_a_time_step():
     registry = croc_registry()
@@ -625,7 +458,7 @@ def test_function_rule_croc104_suggests_a_time_step():
     )
 
 
-def test_gen001_runs_once_per_request():
+def test_gen001_compares_the_caller_area_with_the_support():
     registry = make_registry()
 
     @registry.rule(
@@ -639,19 +472,12 @@ def test_gen001_runs_once_per_request():
         ratio = query.context["request_km2"] / query.space.area_km2
         return {"details": {"request_to_support": ratio}} if ratio < 0.1 else None
 
-    found = registry.query(
-        space=LAKE, requests=["cru_ts", "era5"], include_conditional=True
-    )
-    assert [(f.code, f.request, f.conditional_on) for f in found] == [
-        ("GEN001", 0, ("context:request_km2",)),
-        ("GEN001", 1, ("context:request_km2",)),
-    ]
+    cru = {"product": "cru_ts"}
+    (found,) = registry.query(space=LAKE, facets=cru, include_conditional=True)
+    assert found.conditional_on == ("context:request_km2",)
     cell = sp.box(0, 0, 0.5, 0.5)  # the product cell the lake lies in
-    (found,) = registry.query(
-        space=LAKE,
-        requests=[qe.Request("cru_ts", support=cell)],
-        context={"request_km2": LAKE.area_km2},
-    )
+    context = {"request_km2": LAKE.area_km2}
+    (found,) = registry.query(space=cell, facets=cru, context=context)
     assert found.details["request_to_support"] == pytest.approx(0.09, rel=0.01)
 
 
@@ -759,8 +585,6 @@ def test_duplicate_codes_and_the_q10_replacement():
         ("GLORYS001", True),
         ("CROC1001", True),
         ("ERA5001", True),  # prefix ERA and number 5001: one parse only (Q8)
-        ("QE001", False),
-        ("QE-001", False),
         ("cru001", False),
         ("ABC12001", False),
         ("CRU01", False),
@@ -802,7 +626,7 @@ def test_withdrawn_and_superseded_rules_never_match():
         registry.add(warning_rule("CRU003"))
 
 
-def test_findings_are_sorted_by_level_kind_code_and_part():
+def test_findings_are_sorted_by_level_kind_and_code():
     registry = make_registry()
     registry.add(
         qe.Rule(
@@ -827,31 +651,11 @@ def test_findings_are_sorted_by_level_kind_code_and_part():
     registry.add(
         qe.Rule(code="SRT003", kind="warning", title="t", message="m", level="error")
     )
-    found = registry.query(
-        space=sp.point(0, 0),
-        time=("1800-01-01", "1900-12-31"),
-        requests=["era5", "cru_ts"],
-    )
-    assert [(f.code, f.request) for f in found] == [
-        ("QE002", 1),
-        ("SRT003", None),
-        ("SRT002", None),
-        ("SRT001", 0),
-        ("SRT001", 1),
-    ]
+    found = registry.query(space=sp.point(0, 0), facets={"product": "era5"})
+    assert codes(found) == ["SRT003", "SRT002", "SRT001"]
 
 
-def test_rule_counts_products_and_the_default_registry():
-    registry = make_registry()
-    registry.add(warning_rule("CNT001", facets={"product": ["era5*"]}))
-    registry.add(warning_rule("CNT002", facets={"product": {"none_of": ["era5"]}}))
-    registry.add(warning_rule("CNT003"))
-    assert registry.rule_counts() == {"cru_ts": 1, "era5_land": 2, "era5": 1, None: 1}
-    with pytest.raises(TypeError):
-        registry.products["x"] = None
-    assert registry.products["cru_ts"].version == "4.07"
-    with pytest.raises(ValueError):
-        registry.add_product(qe.Product("other", aliases=("cruts",)))
+def test_the_default_registry_is_made_once():
     assert qe.Registry.default() is qe.Registry.default()
 
 
@@ -897,14 +701,10 @@ def test_third_party_rule_kinds():
     assert codes(registry.query()) == ["FOR001"]  # the foreign kind decides for itself
 
 
-def test_requests_need_declared_names():
+def test_queries_need_declared_names():
     registry = make_registry(facets=("product",))
     with pytest.raises(qe.UnknownNameError):
-        registry.query(requests=[qe.Request("cru_ts", ("pre",))])  # no variable facet
-    with pytest.raises(qe.UnknownNameError):
-        registry.query(requests=["merra2"])
-    with pytest.raises(ValueError):
-        registry.query(qe.Query(request=0))
+        registry.query(facets={"product": "cru_ts", "variable": "pre"})
 
 
 # ---- the fast path against the reference path ----------------------------------------
@@ -994,29 +794,6 @@ def random_registry(rng):
             "C": sp.box(-180, 80, 180, 90),
         },
     )
-    registry.add_product(
-        qe.Product(
-            "cru_ts",
-            aliases=("CRUTS",),
-            version="4.07",
-            coverage=qe.Coverage(time=qe.interval("1901-01-01", "2022-12-31")),
-        )
-    )
-    registry.add_product(
-        qe.Product(
-            "era5", version="ERA5", coverage=qe.Coverage(space=sp.box(-60, -60, 60, 60))
-        )
-    )
-    registry.add_product(
-        qe.Product(
-            "era5_land", coverage=qe.Coverage(time=qe.interval("1950-01-01", ".."))
-        )
-    )
-    registry.add_product(
-        qe.Product(
-            "glorys", coverage=lambda q: qe.Coverage(space=sp.box(-180, -80, 180, 80))
-        )
-    )
     for k in range(120):
         scope, region_ref = random_rule_scope(rng)
         registry.add(
@@ -1064,8 +841,6 @@ def random_query(rng):
         space = sp.point(lon, rng.choice([rng.uniform(-90, 90), 90.0, -90.0]))
     elif pick < 0.6:
         space = random_box(rng)
-    elif pick < 0.65:
-        space = sp.nowhere()
     fields = {"space": space}
     if rng.random() < 0.6:
         fields["time"] = random_time(rng)
@@ -1076,16 +851,10 @@ def random_query(rng):
     facets = {}
     if rng.random() < 0.5:
         facets["model"] = rng.choice(["mom6", "cesm", ("mom6", "x")])
-    pick = rng.random()
-    if pick < 0.35:
-        fields["requests"] = [
-            qe.Request(p, rng.choice([(), ("pre",), ("tp", "tas")]))
-            for p in rng.sample(PRODUCTS, rng.randint(1, 3))
-        ]
-    elif pick < 0.55:
+    if rng.random() < 0.5:
         facets["product"] = rng.sample(PRODUCTS, rng.randint(1, 2))
         facets["variable"] = rng.choice(["pre", ("tp", "t2m")])
-    if "requests" not in fields and "product" not in facets and rng.random() < 0.3:
+    if rng.random() < 0.3:
         facets["version"] = rng.choice(["4.07", "ERA5", "4.10"])
     fields["facets"] = facets
     if rng.random() < 0.3:

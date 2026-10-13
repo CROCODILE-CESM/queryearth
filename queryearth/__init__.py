@@ -3,9 +3,9 @@
 queryearth.time holds time keys, intervals and their measures, and
 queryearth.space points, polygons and closed-set measures (imported as
 ``from queryearth import space as sp``). The rule engine is at the top level:
-a Registry of dimensions, products, regions and rules answers queries with
-Finding objects, which callers log with the logging module. See docs/design.md
-for the design.
+a Registry of dimensions, regions and rules answers queries with Finding
+objects, which callers log with the logging module. See docs/design.md for the
+design.
 """
 
 try:
@@ -22,27 +22,18 @@ from queryearth.dimensions import (
     Prefilter,
     Versions,
 )
-from queryearth.registry import (
-    Registry,
-    PointResult,
-    ScoreFn,
-    Suitability,
-    default_score,
-)
+from queryearth.registry import Registry, PointResult
 from queryearth.objects import (
     Action,
     AxisOverlap,
     Confidence,
-    Coverage,
     DuplicateCodeError,
     Finding,
     Kind,
     LoadError,
     Match,
     Outcome,
-    Product,
     Query,
-    Request,
     Scope,
     Status,
     Suggestion,
@@ -59,7 +50,6 @@ __all__ = [
     "CheckResult",
     "ComputedRule",
     "Confidence",
-    "Coverage",
     "DimMatch",
     "Dimension",
     "DuplicateCodeError",
@@ -73,23 +63,18 @@ __all__ = [
     "Outcome",
     "PointResult",
     "Prefilter",
-    "Product",
     "Query",
-    "Request",
     "Rule",
     "RuleFunc",
     "RuleKind",
     "Scope",
-    "ScoreFn",
     "Space",
     "Status",
     "Suggestion",
-    "Suitability",
     "TimeSpec",
     "UnknownNameError",
     "Versions",
     "__version__",
-    "default_score",
     "interval",
     "parse_time",
     "space",

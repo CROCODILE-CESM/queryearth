@@ -189,7 +189,7 @@ def test_fixture_12_untimed_rules_and_queries():
     assert time_fraction(overlap(None, year), year) == 1.0
     rule = parse_time({"interval": ["2000-01-01", "2006-12-31"]})  # (c) own periods
     assert rule.to_wire() == (("2000-01-01", "2006-12-31"),)
-    cru_ts = interval("1901-01-01", "2022-12-31")  # (d) the product's coverage
+    cru_ts = interval("1901-01-01", "2022-12-31")  # (d) a query over CRU TS's period
     found = overlap(rule, cru_ts)
     assert found.to_wire() == (("2000-01-01", "2006-12-31"),)
     assert time_fraction(found, cru_ts) == pytest.approx(2557 / 44560)

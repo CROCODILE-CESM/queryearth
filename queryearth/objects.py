@@ -1,11 +1,10 @@
-"""Core objects: outcomes, matches, findings, scopes, products, requests, queries,
-and the error classes.
+"""Core objects: outcomes, matches, findings, scopes, queries, and the error classes.
 
 All are frozen dataclasses (design.md section 4.11). Constructors accept the
 Python shorthands the design allows (a bare string for a one-item tuple, a
 number for a one-point axis range, a pair of wire strings for a time) and store
 the normalised form. Objects that hold mappings compare by value but are not
-hashable; Request hashes, with its support by identity.
+hashable.
 """
 
 from __future__ import annotations
@@ -13,8 +12,7 @@ from __future__ import annotations
 import dataclasses
 import logging
 import math
-import re
-from collections.abc import Callable, Iterable, Mapping, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Literal
 
@@ -30,38 +28,29 @@ __all__ = [
     "Action",
     "AxisOverlap",
     "Confidence",
-    "Coverage",
     "DuplicateCodeError",
     "Finding",
     "Kind",
     "LoadError",
     "Match",
     "Outcome",
-    "Product",
     "Query",
-    "Request",
     "Scope",
     "Status",
     "Suggestion",
     "UnknownNameError",
 ]
 
-Kind = Literal["coverage", "warning", "suggestion"]
+Kind = Literal["warning", "suggestion"]
 Confidence = Literal["observed", "likely", "possible", "unknown"]  # CAP certainty
 Action = Literal["can_be_used", "use_with_caution", "do_not_use", "replaced"]
 Status = Literal["draft", "reviewed", "deprecated"]
 
-KINDS = ("coverage", "warning", "suggestion")  # in the order findings sort
-LEVELS = {
-    "coverage": logging.ERROR,
-    "warning": logging.WARNING,
-    "suggestion": logging.INFO,
-}
+KINDS = ("warning", "suggestion")  # in the order findings sort
+LEVELS = {"warning": logging.WARNING, "suggestion": logging.INFO}
 CONFIDENCES = ("observed", "likely", "possible", "unknown")
 ACTIONS = ("can_be_used", "use_with_caution", "do_not_use", "replaced")
 STATUSES = ("draft", "reviewed", "deprecated")
-
-_SLUG = re.compile(r"[a-z][a-z0-9_]*")
 
 
 def _set(obj: Any, name: str, value: Any) -> None:
@@ -79,8 +68,8 @@ def level_of(value: Any) -> int:
     )
 
 
-def _strings(value: Any, what: str, *, empty: bool = True) -> tuple[str, ...]:
-    """A tuple of strings from one string or an iterable of them."""
+def _strings(value: Any, what: str) -> tuple[str, ...]:
+    """A non-empty tuple of strings from one string or an iterable of them."""
     if isinstance(value, str):
         value = (value,)
     elif not isinstance(value, Iterable) or isinstance(value, Mapping):
@@ -88,7 +77,7 @@ def _strings(value: Any, what: str, *, empty: bool = True) -> tuple[str, ...]:
     items = tuple(value)
     if not all(isinstance(v, str) and v for v in items):
         raise TypeError(f"{what} must be non-empty strings, got {items!r}")
-    if not empty and not items:
+    if not items:
         raise ValueError(f"{what} needs at least one value")
     return items
 
@@ -273,7 +262,6 @@ def _match_post_init(m: Any) -> None:
     _set(m, "matched_facets", {k: tuple(v) for k, v in m.matched_facets.items()})
     _set(m, "dims", dict(m.dims))
     _set(m, "conditional_on", tuple(m.conditional_on))
-    _set(m, "assumed", tuple(m.assumed))
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -292,9 +280,6 @@ class Match:
     matched_facets: Mapping[str, tuple[str, ...]] = field(default_factory=dict)
     dims: Mapping[str, DimMatch] = field(default_factory=dict)  # plugin dimensions
     conditional_on: tuple[str, ...] = ()  # e.g. ("space", "product")
-    assumed: tuple[str, ...] = ()  # product-filled dimensions the rule constrains
-    product: str | None = None  # the request's product; None on the base query
-    request: int | None = None  # position of the request; None on the base query
 
     def __post_init__(self) -> None:
         _match_post_init(self)
@@ -336,7 +321,7 @@ class Finding(Outcome, Match):
         )
 
 
-# ---- scopes, products, requests, queries -----------------------------------------
+# ---- scopes and queries -----------------------------------------------------------
 def _mapping(value: Any, what: str) -> dict[str, Any]:
     if not isinstance(value, Mapping):
         raise TypeError(f"{what} is a mapping of names to values, not {value!r}")
@@ -367,96 +352,6 @@ class Scope:
             _set(self, name, _mapping(getattr(self, name), f"scope {name}"))
 
 
-@dataclass(frozen=True)
-class Coverage:
-    """Where and when a product has data; None means global or all time.
-
-    A callable coverage gives space=sp.nowhere(), an empty polygon, for a
-    request its product does not serve.
-    """
-
-    space: Space | None = None
-    time: TimeSpec | None = None
-
-    def __post_init__(self) -> None:
-        _space_of(self.space, "a coverage space")
-        if self.space is not None and self.space.kind != "polygon":
-            raise ValueError(
-                f"a coverage space is a polygon or nowhere(), not a {self.space.kind!r}"
-            )
-        if self.time is not None:
-            if not isinstance(self.time, TimeSpec):
-                raise TypeError("a coverage time is a TimeSpec or None")
-            if self.time.months is not None:
-                raise ValueError("a coverage time cannot carry a month recurrence")
-
-
-@dataclass(frozen=True)
-class Product:
-    """A dataset that queries can name, with its coverage and version."""
-
-    name: str  # canonical lowercase slug, e.g. "cru_ts"
-    aliases: tuple[str, ...] = ()  # e.g. ("CRUTS", "CRU TS")
-    variables: tuple[str, ...] = ()
-    coverage: Coverage | Callable[[Query], Coverage] = Coverage()
-    resolution: tuple[float, Literal["deg", "km"]] | None = None
-    version: str | None = None  # version in use; fills an omitted version facet
-
-    def __post_init__(self) -> None:
-        if not isinstance(self.name, str) or not _SLUG.fullmatch(self.name):
-            raise ValueError(
-                f"a product name is a lowercase slug such as 'cru_ts', not {self.name!r}"
-            )
-        _set(self, "aliases", _strings(self.aliases, "aliases"))
-        _set(self, "variables", _strings(self.variables, "variables"))
-        if not isinstance(self.coverage, Coverage) and not callable(self.coverage):
-            raise TypeError("a product coverage is a Coverage or a callable")
-        if self.resolution is not None:
-            if isinstance(self.resolution, str) or len(self.resolution) != 2:
-                raise ValueError("a resolution is (size, 'deg' or 'km')")
-            size, unit = self.resolution
-            _choice(unit, ("deg", "km"), "resolution unit")
-            size = _number(size, "resolution")
-            if size <= 0.0:
-                raise ValueError("a resolution must be positive")
-            _set(self, "resolution", (size, unit))
-        if self.version is not None and (
-            not isinstance(self.version, str) or not self.version
-        ):
-            raise TypeError("a product version is a non-empty string or None")
-
-
-@dataclass(frozen=True)
-class Request:
-    """One product as the caller uses it (section 4.12)."""
-
-    product: str  # canonical name or alias
-    variables: tuple[str, ...] = ()  # a plain string means one variable
-    version: str | None = None  # default: Product.version, listed in assumed
-    time: TimeSpec | None = None  # default: the query's time, else the coverage
-    support: Space | None = None  # a point or polygon; default: query.space
-
-    def __post_init__(self) -> None:
-        if not isinstance(self.product, str) or not self.product:
-            raise TypeError("a request names its product with a non-empty string")
-        _set(self, "variables", _strings(self.variables, "variables"))
-        if self.version is not None and (
-            not isinstance(self.version, str) or not self.version
-        ):
-            raise TypeError("a request version is a non-empty string or None")
-        _set(self, "time", time_of(self.time))
-        _space_of(self.support, "a request's support")
-
-
-def request_of(value: Any) -> Request:
-    """A Request from itself or a product name."""
-    if isinstance(value, Request):
-        return value
-    if isinstance(value, str):
-        return Request(value)
-    raise TypeError(f"a request is a Request or a product name, not {value!r}")
-
-
 def _axis_range(name: str, value: Any) -> tuple[float, float]:
     if isinstance(value, (str, bytes)) or not isinstance(value, Sequence):
         v = _number(value, f"axis {name!r}")
@@ -474,10 +369,7 @@ class Query:
     """What the caller is about to use; every part is optional.
 
     Pass the support (the cells and time steps a product contributes), never a
-    buffered shape. A product facet, with variable and version, is shorthand
-    for requests. request and assumed are set only on the sub-queries that
-    Registry.expand() returns: the request's position, and the dimensions filled
-    from its product.
+    buffered shape.
     """
 
     space: Space | None = None
@@ -485,11 +377,8 @@ class Query:
     axes: Mapping[str, tuple[float, float]] = field(default_factory=dict)
     facets: Mapping[str, tuple[str, ...]] = field(default_factory=dict)
     dims: Mapping[str, Any] = field(default_factory=dict)  # other plugin dimensions
-    requests: tuple[Request, ...] = ()  # one sub-query per request
     context: Mapping[str, Any] = field(default_factory=dict, compare=False)
     label: str = ""  # the caller's name for the query, used in messages
-    request: int | None = None  # set by Registry.expand() on a request's sub-query
-    assumed: tuple[str, ...] = ()  # set by Registry.expand(): filled from the product
 
     def __post_init__(self) -> None:
         _space_of(self.space, "a query's space")
@@ -500,20 +389,12 @@ class Query:
         _set(
             self,
             "facets",
-            {k: _strings(v, f"facet {k!r}", empty=False) for k, v in facets.items()},
+            {k: _strings(v, f"facet {k!r}") for k, v in facets.items()},
         )
         _set(self, "dims", _mapping(self.dims, "query dims"))
-        if isinstance(self.requests, (str, Request)):
-            raise TypeError("requests is a sequence of Request objects")
-        _set(self, "requests", tuple(request_of(r) for r in self.requests))
         _set(self, "context", _mapping(self.context, "query context"))
         if not isinstance(self.label, str):
             raise TypeError("a query label is a string")
-        if self.request is not None and (
-            isinstance(self.request, bool) or not isinstance(self.request, int)
-        ):
-            raise TypeError("request is the position of a request, an int")
-        _set(self, "assumed", tuple(self.assumed))
 
 
 # ---- errors ---------------------------------------------------------------------
@@ -525,7 +406,7 @@ class DuplicateCodeError(ValueError):
 
 
 class UnknownNameError(KeyError):
-    """An undeclared axis, facet, dimension, product or region name.
+    """An undeclared axis, facet, dimension or region name.
 
     A misspelt name would otherwise look like "no known issues", so the engine
     refuses it in rules and queries alike (sections 4.6 and 4.7).

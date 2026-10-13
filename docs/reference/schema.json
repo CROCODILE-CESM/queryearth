@@ -2,14 +2,13 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:queryearth:schema:rule:1",
   "title": "queryearth rule record or pack",
-  "description": "A rule record is a GeoJSON Feature (RFC 7946) with the OGC JSON-FG 1.0 'time' member and queryearth properties. A pack file is a FeatureCollection of rule records with an optional collection header. Checks that JSON Schema cannot express are done by the loader (design section 5.3): codes unique in the Registry; a code's prefix, the part before the optional hyphen and the final digits, equal to a prefix the pack owns exactly (a pack owning CRU does not own CRUX001); no two packs claiming one prefix; 'periods' inside 'time'; dates valid in the proleptic Gregorian calendar, from year 1 to 9999; a box's south below its north; axis, facet, product and region names declared on the Registry.",
+  "description": "A rule record is a GeoJSON Feature (RFC 7946) with the OGC JSON-FG 1.0 'time' member and queryearth properties. A pack file is a FeatureCollection of rule records with an optional collection header. Checks that JSON Schema cannot express are done by the loader (design section 5.3): codes unique in the Registry; a code's prefix, the part before the optional hyphen and the final digits, equal to a prefix the pack owns exactly (a pack owning CRU does not own CRUX001); no two packs claiming one prefix; 'periods' inside 'time'; dates valid in the proleptic Gregorian calendar, from year 1 to 9999; a box's south below its north; axis, facet and region names declared on the Registry.",
   "oneOf": [{"$ref": "#/$defs/rule"}, {"$ref": "#/$defs/pack"}],
   "$defs": {
     "code": {
-      "description": "Namespace prefix plus 3-4 digits, as in ruff and pylint (CRU001, ERA5-014). A hyphen is optional after a prefix that ends in a letter and required after one that ends in a digit, so every code parses one way (Q8). The prefix QE is reserved for the built-in coverage rules.",
+      "description": "Namespace prefix plus 3-4 digits, as in ruff and pylint (CRU001, ERA5-014). A hyphen is optional after a prefix that ends in a letter and required after one that ends in a digit, so every code parses one way (Q8).",
       "type": "string",
-      "pattern": "^(?:[A-Z][A-Z0-9]{0,10}[A-Z]-?|[A-Z][A-Z0-9]{0,10}[0-9]-)[0-9]{3,4}$",
-      "not": {"pattern": "^QE-?[0-9]{3,4}$"}
+      "pattern": "^(?:[A-Z][A-Z0-9]{0,10}[A-Z]-?|[A-Z][A-Z0-9]{0,10}[0-9]-)[0-9]{3,4}$"
     },
     "slug": {"type": "string", "pattern": "^[a-z][a-z0-9_]*$"},
     "conformsTo": {
@@ -127,7 +126,7 @@
       "not": {"anyOf": [{"required": ["gt", "ge"]}, {"required": ["lt", "le"]}]}
     },
     "pattern": {
-      "description": "Facet value or glob pattern (fnmatch, case-sensitive after product-alias resolution).",
+      "description": "Facet value or glob pattern (fnmatch, case-sensitive).",
       "type": "string",
       "minLength": 1
     },
@@ -369,7 +368,7 @@
             "pack": {"type": "string", "pattern": "^[a-z][a-z0-9_-]*$"},
             "version": {"type": "string", "minLength": 1},
             "code_prefix": {
-              "description": "The code prefix or prefixes this pack owns. Every code in the pack starts with one of them, and two loaded packs may not claim the same prefix. QE is reserved for built-in rules.",
+              "description": "The code prefix or prefixes this pack owns. Every code in the pack starts with one of them, and two loaded packs may not claim the same prefix.",
               "oneOf": [
                 {"type": "string", "pattern": "^[A-Z][A-Z0-9]{1,11}$"},
                 {

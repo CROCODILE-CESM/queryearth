@@ -5,13 +5,11 @@ Everything that varies between users plugs in through a small interface, so exte
 | To add | Write |
 |---|---|
 | A new kind of scope: a hierarchy, a taxonomy, a network | A `Dimension` plugin, passed to `Registry(dimensions=...)` |
-| A rule computed from the request or from data you hold | A `ComputedRule` subclass or an `@registry.rule` function |
+| A rule computed from the query or from data you hold | A `ComputedRule` subclass or an `@registry.rule` function |
 | A computed rule on the bulk path | A `mask(lon, lat, query)` method on that rule |
 | A new kind of rule altogether | Any object with `code`, `scope` and `evaluate(query)` (the `RuleKind` protocol), passed to `Registry.add` |
 | Rules from another format | Build records and pass them to `Registry.add`, or `Rule.from_feature` per feature |
-| Availability known only at run time | A callable `Product.coverage`, which takes the request's sub-query and returns a `Coverage` |
 | Named regions | `Registry.add_regions(namespace, regions)` |
-| A ranking of products | A score function, passed as `suitable(score=...)` |
 
 Geometry and time semantics are not pluggable. Space and time are dimensions inside the engine, but `SpaceDimension` and `TimeDimension` are built into every Registry and cannot be replaced, so "overlaps" means the same thing for every rule.
 
@@ -23,7 +21,7 @@ A dimension has a `name`, a `schema` (JSON Schema for the value in records), and
 - `parse_query(value)` does the same for a query's value;
 - `match(rule, query)` returns a `DimMatch(overlap, fraction)` when they meet, or `None` when they do not.
 
-The Registry does everything else: conditional findings, unknown names, requests and sorting. This plugin matches HydroBASINS Pfafstetter basin codes, where basin 1423 lies inside basin 14:
+The Registry does everything else: conditional findings, unknown names and sorting. This plugin matches HydroBASINS Pfafstetter basin codes, where basin 1423 lies inside basin 14:
 
 ```python
 class Pfafstetter:

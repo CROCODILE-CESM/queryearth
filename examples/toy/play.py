@@ -6,9 +6,9 @@ from the repository root:
     pip install -e .
     python examples/toy/play.py
 
-Everything in the toy pack is invented: the products (toy_ocean, toy_atmos,
-toy_coastal), the rules (TOY...) and the parameter names. Edit pack.toml,
-rules.geojson or this file and rerun to see what changes.
+Everything in the toy pack is invented: the products the rules name (toy_ocean,
+toy_atmos, toy_coastal), the rules (TOY...) and the parameter names. Edit
+pack.toml, rules.geojson or this file and rerun to see what changes.
 """
 
 # %% Set up: a Registry with a resolution axis, then load the toy pack.
@@ -24,7 +24,6 @@ HERE = Path(globals().get("__file__", "play.py")).resolve().parent
 
 registry = qe.Registry("toy", axes=[qe.Axis("resolution", "km")])
 print("loaded:", registry.load_pack(HERE))
-print("products:", list(registry.products))
 
 
 def show(findings):
@@ -36,13 +35,11 @@ def show(findings):
             "-" if x is None else f"{x:.0%}" for x in (f.area_fraction, f.time_fraction)
         )
         level = logging.getLevelName(f.level)
-        print(f"  {f.code:7} {f.kind:10} {level:8} {f.product or '-':11}")
+        print(f"  {f.code:7} {f.kind:10} {level}")
         print(f"          {f.title}")
         print(f"          area {area}, time {time}, periods {f.time_overlap}")
         if f.conditional_on:
             print(f"          conditional on {f.conditional_on}")
-        if f.assumed:
-            print(f"          filled from the product: {f.assumed}")
         for s in f.suggestions:
             print(f"          -> set {s.target}:{s.key} = {s.value!r}")
 
@@ -52,43 +49,30 @@ def show(findings):
 # TOY101 needs the Arctic, and only the top of this domain is north of 66.5N.
 bering = sp.box(165, 52, -160, 70)  # west, south, east, north
 winter = qe.interval("2000-11-01", "2001-03-31")
+ocean = {"model": ["mom6"], "product": ["toy_ocean"], "variable": ["thetao", "so"]}
 show(
     registry.query(
         space=bering,
         time=winter,
         axes={"resolution": (8, 8)},
-        facets={"model": ["mom6"]},
-        requests=[qe.Request("toy_ocean", variables=("thetao", "so"))],
+        facets=ocean,
     )
 )
 
-# %% 2. The same domain with no time: each product's coverage is used instead,
-# and the findings say so in "filled from the product".
-show(
-    registry.query(
-        space=bering,
-        axes={"resolution": (8, 8)},
-        requests=[qe.Request("toy_ocean", variables="so")],
-    )
-)
-
-# %% 3. Resolution only. TOY102 applies outright; with include_conditional=True
+# %% 2. Resolution only. TOY102 applies outright; with include_conditional=True
 # the other rules come back too, each naming what the query left out.
 show(registry.query(axes={"resolution": (3, 3)}, include_conditional=True))
 
-# %% 4. Coverage gaps. toy_coastal covers one box from 2010 to 2023 only, so
-# asking for it in the Bering Sea gives QE001 (space) and in 2005 QE002 (time).
-show(registry.query(space=bering, time=winter, requests=["toy_coastal"]))
+# %% 3. Coverage limits are ordinary rules. toy_coastal covers one box from 2010
+# to 2023 only, so asking for it in the Bering Sea gives TOY006 (outside its box)
+# and in the Gulf in 2005 gives TOY004 (before 2010).
+coastal = {"product": ["toy_coastal"]}
+show(registry.query(space=bering, time=winter, facets=coastal))
 gulf = sp.box(-95, 22, -85, 29)
-show(
-    registry.query(
-        space=gulf,
-        time=qe.interval("2005-01-01", "2005-12-31"),
-        requests=["toy_coastal"],
-    )
-)
+year_2005 = qe.interval("2005-01-01", "2005-12-31")
+show(registry.query(space=gulf, time=year_2005, facets=coastal))
 
-# %% 5. Rules written in Python. A static rule, and a computed rule whose
+# %% 4. Rules written in Python. A static rule, and a computed rule whose
 # suggestion depends on the query (a made-up time step from the finest cells).
 registry.add(
     qe.Rule(
@@ -120,18 +104,17 @@ show(
         space=bering,
         time=winter,
         axes={"resolution": (4, 12)},
-        requests=["toy_atmos"],
+        facets={"product": ["toy_atmos"]},
     )
 )
 
-# %% 6. Findings are data. Log each at its own level, and raise for anything at
-# ERROR or above (nothing here; try requests=["toy_coastal"]).
+# %% 5. Findings are data. Log each at its own level, and raise for anything at
+# ERROR or above (nothing here; try the product toy_coastal).
 findings = registry.query(
     space=bering,
     time=winter,
     axes={"resolution": (8, 8)},
-    facets={"model": ["mom6"]},
-    requests=[qe.Request("toy_ocean", variables=("thetao", "so"))],
+    facets=ocean,
 )
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s", force=True)
 for f in findings:
@@ -141,26 +124,25 @@ errors = [f for f in findings if f.level >= logging.ERROR]
 if errors:
     raise RuntimeError("\n".join(map(str, errors)))
 
-# %% 7. Which product suits salinity in the Gulf in 2000? toy_coastal starts in
-# 2010 so it drops out; toy_ocean stays, with TOY001 against it. A low score
-# means fewer known concerns, not better data.
-for s in registry.suitable(
-    qe.Query(space=gulf, time=qe.interval("2000-01-01", "2000-12-31")),
-    "so",
-    include_dropped=True,
-):
-    print(f"  {s.product.name:11} score {s.score}  {[f.code for f in s.findings]}")
+# %% 6. Which product suits salinity in the Gulf in 2000? Ask once per product.
+# toy_coastal starts in 2010, so TOY004 says not to use it; toy_ocean has TOY001
+# against it. No findings means only that no rule matched, not good data.
+year_2000 = qe.interval("2000-01-01", "2000-12-31")
+for product in ["toy_ocean", "toy_coastal"]:
+    salinity = {"product": [product], "variable": ["so"]}
+    found = registry.query(space=gulf, time=year_2000, facets=salinity)
+    print(f"  {product:11} {[f.code for f in found]}")
 
-# %% 8. Many points at once: every 1-degree cell centre, January 2001, toy_ocean.
+# %% 7. Many points at once: every 1-degree cell centre, January 2001, toy_ocean.
 lon, lat = np.meshgrid(np.arange(-179.5, 180, 1.0), np.arange(-89.5, 90, 1.0))
 result = registry.query_points(
     lon,
     lat,
     time=qe.interval("2001-01-01", "2001-01-31"),
-    requests=[qe.Request("toy_ocean", variables="thetao")],
+    facets={"product": ["toy_ocean"], "variable": ["thetao"]},
 )
-for key, mask in result.masks.items():
-    print(f"  {key}: {mask.sum()} of {mask.size} points")
+for code, mask in result.masks.items():
+    print(f"  {code}: {mask.sum()} of {mask.size} points")
 
 try:
     import matplotlib.pyplot as plt

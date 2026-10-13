@@ -1,6 +1,6 @@
 # Writing rules
 
-There are three ways to write a rule: a {class}`~queryearth.Rule` built in Python, a computed rule whose outcome depends on the request, or a record in a GeoJSON **pack**. All three end up on an {class}`~queryearth.Registry`.
+There are three ways to write a rule: a {class}`~queryearth.Rule` built in Python, a computed rule whose outcome depends on the query, or a record in a GeoJSON **pack**. All three end up on an {class}`~queryearth.Registry`.
 
 ## Rules in Python
 
@@ -28,7 +28,7 @@ registry.add(
 
 ## Computed rules
 
-A computed rule decides its outcome from the request, or from data the caller passes in `Query.context`. Register a function with `@registry.rule`; its docstring is the title:
+A computed rule decides its outcome from the query, or from data the caller passes in `Query.context`. Register a function with `@registry.rule`; its docstring is the title:
 
 ```python
 @registry.rule("MINE102", kind="suggestion", axes={"resolution": {"gt": 0}})
@@ -44,13 +44,13 @@ The function runs only when the scope matches definitely. It returns `True` (one
 
 A pack is a directory with a `pack.toml` and one or more GeoJSON FeatureCollections, loaded with {meth}`Registry.load_pack() <queryearth.Registry.load_pack>`. Loading never runs code. Every problem is reported at once in a `LoadError` that names the file, the feature's position and its code, and the Registry is left unchanged.
 
-`pack.toml` declares the pack's name, version, the code prefixes it owns and its files. It also declares the axes, facets and products its records use, and any named regions:
+`pack.toml` declares the pack's name, version, the code prefixes it owns and its files. It also declares the axes and facets its records use, and any named regions:
 
 ```{literalinclude} ../../examples/toy/pack.toml
 :language: toml
 ```
 
-The axes and facets a pack declares must exist on the Registry it is loaded into. A product under `[products.<name>]` has `aliases`, `variables`, `resolution`, `version` and a `coverage` with a `time` range and, optionally, a `box`. Named regions go under `[regions.<namespace>]`, with a GeoJSON `file` and the `id_property` that names each region. Records then refer to them as `region_ref = "namespace:id"`.
+The axes and facets a pack declares must exist on the Registry it is loaded into. Products are not declared: records name them in the `product` facet. Named regions go under `[regions.<namespace>]`, with a GeoJSON `file` and the `id_property` that names each region. Records then refer to them as `region_ref = "namespace:id"`.
 
 ### Records
 
@@ -61,7 +61,7 @@ Each rule is one GeoJSON Feature. Its `geometry` is a Polygon, a MultiPolygon or
 | Identity and outcome | `code`, `kind` (`warning` or `suggestion`), `title` and `message`, all required; `level` (`info`, `warning` or `error`; by default `warning` for a warning and `info` for a suggestion) |
 | Advice | `instruction`, `confidence`, `action`, and `suggestions` (required for a suggestion) |
 | Scope | `facets`, `axes`, `dimensions` (for plugin dimensions), `region_ref` or `box` (`{west, width, south, north}`; geometry must then be null), `periods` (intervals inside `time`), `recurrence` (`{"months": [12, 1, 2]}`), and the fallback `time_start` and `time_end` |
-| Overlap | `min_overlap`, an area fraction from 0 to 1 below which the finding is too small to count when ranking products, and which you can filter on |
+| Overlap | `min_overlap`, an area fraction from 0 to 1 below which the finding is too small to count, which you can filter on |
 | Provenance | `evidence`, `references`, `aliases` |
 | Lifecycle | `status` (`draft`, `reviewed` or `deprecated`; a reviewed record cites a reference), `created`, `updated`, `withdrawn` (kept for history, never matched), `supersedes` |
 | Extensions | `x_*` fields, kept and ignored |

@@ -295,17 +295,11 @@ def test_points_with_nan_are_inside_no_rule():
         sp.points_mask(None, [0, 1], [0])
 
 
-def test_global_rules_and_nowhere():
+def test_global_rules():
     lake = sp.box(0, 0, 1, 1)
     assert sp.meets(None, lake)
     assert sp.measure(None, lake) == (1.0, lake.area_km2)
     assert sp.measure(None, sp.point(0, 0)) == (1.0, None)
-    nowhere = sp.nowhere()
-    assert nowhere.kind == "polygon" and nowhere.area_km2 == 0.0
-    assert not sp.meets(lake, nowhere) and not sp.meets(nowhere, lake)
-    assert sp.measure(nowhere, lake) == (0.0, 0.0)
-    assert sp.measure(lake, nowhere) == (None, None)
-    assert not sp.points_mask(nowhere, [0.5], [0.5]).any()
 
 
 def test_points_are_measured_without_area():

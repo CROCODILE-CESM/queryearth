@@ -1,4 +1,4 @@
-"""Packs and records: the example pack and its five queries, loader checks, the
+"""Packs and records: the example pack and its four queries, loader checks, the
 record parts of fixtures 17 and 27 of docs/reference/fixtures.md, and the
 agreement between the loader and docs/reference/schema.json.
 """
@@ -32,6 +32,7 @@ AR6 = {
 NE = {"caspian_sea": (46, 36, 55, 47)}
 KARIBA = sp.polygon([(26.7, -18.0), (26.9, -18.1), (29.0, -16.6), (28.8, -16.5)])
 Y2013_2022 = qe.interval("2013-01-01", "2022-12-31")
+CRU = {"product": "cru_ts", "variable": "pre", "version": "4.07"}
 
 
 def boxes(regions, key):
@@ -73,17 +74,20 @@ def example_registry(tmp_path):
         facets=qe.Registry.FACETS + ("activity", "basis_of_record"),
     )
     codes = registry.load_pack(example_pack(tmp_path))
-    registry.add_product(
-        qe.Product(
-            name="nwm_retro",
-            aliases=("NWM", "NWM v3.0"),
-            variables=("inflow", "outflow", "water_sfc_elev"),
-            coverage=qe.Coverage(
-                space=sp.box(-125, 24, -66, 50),  # the conterminous United States
-                time=qe.interval("1979-02-01", "2023-01-31"),
+    world = [(-180, -90), (180, -90), (180, 90), (-180, 90)]
+    conus = [(-125, 24), (-66, 24), (-66, 50), (-125, 50)]
+    registry.add(
+        qe.Rule(
+            code="NWM001",
+            kind="warning",
+            title="Outside the NWM retrospective lakes",
+            message="Lake output covers 5,782 lakes in the contiguous United States.",
+            level="error",
+            action="do_not_use",
+            scope=qe.Scope(
+                space=sp.polygon({"type": "Polygon", "coordinates": [world, conus]}),
+                facets={"product": ["nwm_retro"]},
             ),
-            resolution=(1.0, "km"),
-            version="3.0",
         )
     )
 
@@ -142,12 +146,6 @@ def test_example_pack_loads(tmp_path):
     registry, codes = example_registry(tmp_path)
     assert codes == [f["properties"]["code"] for f in RULES["features"]]
     assert len(codes) == 14 and registry._packs["examples"][0] == "BIO"
-    cru = registry.products["cru_ts"]
-    assert cru.resolution == (0.5, "deg")
-    assert cru.coverage.time.to_wire() == (("1901-01-01", "2022-12-31"),)
-    assert registry.products["era5"].coverage.time.to_wire() == (("1940-01-01", ".."),)
-    ili = registry.products["demo_ili"].coverage.space  # a box across the antimeridian
-    assert ili.geometry.bounds == (-180.0, -25.0, 180.0, -10.0)
     rules = {e.rule.code: e.rule for e in registry._entries}
     assert rules["ERA5-024"].scope.time.months == frozenset({12, 1, 2})
     assert rules["EPI001"].scope.time.to_wire() == (
@@ -155,7 +153,8 @@ def test_example_pack_loads(tmp_path):
         ("2021-09-01", "2021-10-31"),
     )
     assert "x_scope_note" in rules["ERA5-014"].extensions
-    assert registry.rule_counts()["cru_ts"] == 4  # CRU001, CRU004, CRU002 and GEN001
+    (nwm001,) = registry.query(space=KARIBA, facets={"product": "nwm_retro"})
+    assert nwm001.code == "NWM001" and nwm001.area_fraction == 1.0
     with pytest.raises(qe.LoadError, match="already loaded"):
         registry.load_pack(tmp_path)
 
@@ -166,7 +165,7 @@ def test_example_query_1_lake_kariba(tmp_path):
     found = registry.query(
         space=KARIBA,
         time=Y2013_2022,
-        requests=[qe.Request("CRUTS", variables=("pre",))],
+        facets=CRU,
         context={"cru_ts.stn": stn, "request_km2": KARIBA.area_km2},
         label="Kariba",
     )
@@ -178,44 +177,36 @@ def test_example_query_1_lake_kariba(tmp_path):
     }
     cru002, cru001 = found[:2]
     assert cru002.level == logging.ERROR and cru002.details["stn0_fraction"]
-    assert cru001.assumed == ("version",) and cru001.source == "examples"
+    assert cru001.source == "examples"
     assert cru001.area_fraction == 1.0 and cru001.time_fraction == 1.0
     assert cru001.time_overlap == (("2013-01-01", "2022-12-31"),)
-    assert all(f.product == "cru_ts" and f.request == 0 for f in found)
     hidden = registry.query(
-        space=KARIBA,
-        time=Y2013_2022,
-        requests=[qe.Request("CRUTS", variables=("pre",))],
-        include_conditional=True,
+        space=KARIBA, time=Y2013_2022, facets=CRU, include_conditional=True
     )
-    croc102 = by_code(hidden)["CROC102"]
-    assert croc102.conditional_on == ("resolution",) and croc102.request is None
+    assert by_code(hidden)["CROC102"].conditional_on == ("resolution",)
 
 
 def test_example_query_2_arctic_mom6_domain(tmp_path):
     registry, _ = example_registry(tmp_path)
     domain = sp.box(-180, 70.6, 180, 90)  # an Arctic cap, closed along the pole
-    found = registry.query(
-        space=domain,
-        time=qe.interval("2020-01-01", "2020-12-31"),
-        axes={"resolution": (8.0, 12.0)},
-        facets={"model": "mom6"},
-        requests=[
-            qe.Request("glorys", variables=("thetao", "so")),
-            qe.Request("era5", variables=("t2m", "skt")),
-        ],
-        label="arctic-demo",
-        include_conditional=True,
-    )
-    assert [(f.code, f.request) for f in found] == [
-        ("ERA5-024", 1),
-        ("GEN001", 0),
-        ("GEN001", 1),
-        ("CROC101", None),
-        ("CROC102", None),
-        ("CROC104", None),
-    ]
-    found = by_code(found)
+    q2 = {
+        product: registry.query(
+            space=domain,
+            time=qe.interval("2020-01-01", "2020-12-31"),
+            axes={"resolution": (8.0, 12.0)},
+            facets={"model": "mom6", "product": product, "variable": variables},
+            label="arctic-demo",
+            include_conditional=True,
+        )
+        for product, variables in [
+            ("glorys", ("thetao", "so")),
+            ("era5", ("t2m", "skt")),
+        ]
+    }
+    base = ["GEN001", "CROC101", "CROC102", "CROC104"]
+    assert [f.code for f in q2["glorys"]] == base
+    assert [f.code for f in q2["era5"]] == ["ERA5-024"] + base
+    found = by_code(q2["era5"])
     assert found["CROC101"].area_fraction == 1.0
     assert [s.value for s in found["CROC101"].suggestions] == ["CICE", "EPSG:3995"]
     assert found["CROC104"].suggestions[0].value == 240.0
@@ -250,6 +241,7 @@ def test_example_query_3_resolution_only(tmp_path):
         "UAS001": space_time + ("altitude_agl", "activity"),
         "CRU002": ("product", "variable", "context:cru_ts.stn"),
         "GEN001": ("product", "context:request_km2"),
+        "NWM001": ("space", "product"),
     }
     assert by_code(found)["CROC102"].axes["resolution"] == qe.AxisOverlap(8, 8)
 
@@ -258,32 +250,23 @@ def test_example_query_4_bulk(tmp_path):
     registry, _ = example_registry(tmp_path)
     glon, glat = np.meshgrid(np.arange(-179.75, 180, 0.5), np.arange(-89.75, 90, 0.5))
     lon, lat = glon.ravel(), glat.ravel()
-    cru = {"product": "CRUTS", "variable": "pre"}
-    q4 = registry.query_points(lon, lat, weights=np.cos(np.radians(lat)), facets=cru)
-    assert set(q4.masks) == {("cru_ts", "CRU001"), ("cru_ts", "CRU004")}
-    assert set(q4.skipped) == {("cru_ts", "CRU002"), ("cru_ts", "GEN001")}
+    q4 = registry.query_points(
+        lon,
+        lat,
+        weights=np.cos(np.radians(lat)),
+        time=("1901-01-01", "2022-12-31"),
+        facets=CRU,
+    )
+    assert set(q4.masks) == {"CRU001", "CRU004"}
+    assert set(q4.skipped) == {"CRU002", "GEN001"}
     found = by_code(q4.findings)
-    assert found["CRU004"].assumed == ("time", "version")
     assert found["CRU004"].time_overlap == (("2010-01-01", "2022-12-31"),)
     assert found["CRU001"].time_overlap == (("2000-01-01", "2022-12-31"),)
-    assert q4.masks[("cru_ts", "CRU004")].sum() == 858
-    assert found["CRU001"].area_fraction == q4.fractions[("cru_ts", "CRU001")] < 0.1
+    assert q4.masks["CRU004"].sum() == 858
+    assert found["CRU001"].area_fraction == q4.fractions["CRU001"] < 0.1
     weak = q4.any(logging.WARNING)
-    union = q4.masks[("cru_ts", "CRU001")] | q4.masks[("cru_ts", "CRU004")]
+    union = q4.masks["CRU001"] | q4.masks["CRU004"]
     assert (weak == union).all() and weak.shape == lon.shape
-
-
-def test_example_query_5_suitable(tmp_path):
-    registry, _ = example_registry(tmp_path)
-    stn = np.array([[0, 3], [2, 4]])
-    ranked = registry.suitable(
-        qe.Query(space=KARIBA, time=Y2013_2022, context={"cru_ts.stn": stn}),
-        variable="pre",
-    )
-    assert [s.product.name for s in ranked] == ["era5", "cru_ts"]
-    assert ranked[0].score == (0.0, 0.0, 0.0) and ranked[0].findings == ()
-    assert ranked[1].score[0] == 40.0
-    assert [f.code for f in ranked[1].findings] == ["CRU002", "CRU001"]
 
 
 # ---- loader checks (section 5.3) ----------------------------------------------------
@@ -307,7 +290,7 @@ def test_loader_reports_every_problem_and_leaves_the_registry_unchanged(tmp_path
     registry.add(qe.Rule(code="OLD001", kind="warning", title="t", message="m"))
     features = [
         record("TST001"),
-        record("TST002", facets={"product": ["nope"]}),
+        record("TST002", facets={"colour": ["red"]}),
         record("OTH003"),
         record("TST004", axes={"resolution": {"lt": 10, "unit": "deg"}}),  # 17
         record("TST001"),
@@ -318,7 +301,7 @@ def test_loader_reports_every_problem_and_leaves_the_registry_unchanged(tmp_path
     problems = err.value.problems
     assert [p.split(":")[0] for p in problems] == ["rules.geojson"] * 5
     assert problems[0].startswith("rules.geojson: feature 1 (TST002): ")
-    assert "unknown product 'nope'" in problems[0]
+    assert "undeclared dimension 'colour'" in problems[0]
     assert "feature 2 (OTH003): prefix 'OTH' is not one the pack owns" in problems[1]
     assert "feature 3 (TST004): " in problems[2] and "'deg'" in problems[2]
     assert "feature 4 (TST001): " in problems[3] and "already" in problems[3]
@@ -329,32 +312,25 @@ def test_loader_reports_every_problem_and_leaves_the_registry_unchanged(tmp_path
 
 def test_pack_toml_must_agree_with_the_registry(tmp_path):
     toml = '[axes.resolution]\nunit = "deg"\n[facets]\nnames = ["model", "colour"]\n'
-    toml += '[dimensions]\nnames = ["basin"]\n'
+    toml += '[dimensions]\nnames = ["basin"]\n[products.cru_ts]\nversion = "4.07"\n'
     registry = qe.Registry("x", axes=[qe.Axis("resolution", "km")])
     with pytest.raises(qe.LoadError) as err:
-        registry.load_pack(write_pack(tmp_path, [record()], toml, '["TST", "QE"]'))
+        registry.load_pack(write_pack(tmp_path, [record()], toml))
     text = "\n".join(err.value.problems)
-    for expected in ("reserved", "'km', not 'deg'", "'colour'", "'basin'"):
+    for expected in ("['products']", "'km', not 'deg'", "'colour'", "'basin'"):
         assert expected in text
 
 
-def test_prefixes_are_exclusive_between_packs_and_product_names_are_global(
-    tmp_path,
-):
+def test_prefixes_are_exclusive_between_packs(tmp_path):
     registry = qe.Registry("x")
     first, second = tmp_path / "a", tmp_path / "b"
     first.mkdir()
     second.mkdir()
-    product = '[products.cru_ts]\naliases = ["CRUTS"]\nversion = "4.07"\n'
-    assert registry.load_pack(write_pack(first, [record()], product)) == ["TST001"]
+    assert registry.load_pack(write_pack(first, [record()])) == ["TST001"]
     with pytest.raises(qe.LoadError, match="claimed by pack 'test'"):
         registry.load_pack(write_pack(second, [record("TST002")], name="other"))
-    write_pack(second, [record("OTH002")], product, '"OTH"', "other")
-    with pytest.raises(qe.LoadError, match="already name a declared product"):
-        registry.load_pack(second)
     write_pack(second, [record("OTH002")], "", '"OTH"', "other")
     assert registry.load_pack(second) == ["OTH002"]
-    assert registry.products["cru_ts"].aliases == ("CRUTS",)
     registry.add(
         qe.Rule(code="TST009", kind="warning", title="t", message="m")
     )  # Python
@@ -477,7 +453,6 @@ BAD = {
     "a calendar": {"calendar": "noleap"},
 }
 BAD_FEATURES = {
-    "reserved prefix QE": record("QE001"),
     "five digits after a letter prefix": record("ABC12001"),
     "box with a polygon": {
         **record(box={"west": 0, "width": 1, "south": 0, "north": 1}),

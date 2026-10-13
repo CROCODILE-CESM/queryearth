@@ -117,6 +117,124 @@
     },
     {
       "type": "Feature",
+      "id": "TOY004",
+      "geometry": null,
+      "time": {
+        "interval": [
+          "..",
+          "2009-12-31"
+        ]
+      },
+      "properties": {
+        "code": "TOY004",
+        "kind": "warning",
+        "title": "toy_coastal starts in 2010",
+        "message": "toy_coastal has no data before 2010.",
+        "level": "error",
+        "action": "do_not_use",
+        "facets": {
+          "product": [
+            "toy_coastal"
+          ]
+        },
+        "status": "draft"
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "TOY005",
+      "geometry": null,
+      "time": {
+        "interval": [
+          "2024-01-01",
+          ".."
+        ]
+      },
+      "properties": {
+        "code": "TOY005",
+        "kind": "warning",
+        "title": "toy_coastal ends in 2023",
+        "message": "toy_coastal has no data after 2023.",
+        "level": "error",
+        "action": "do_not_use",
+        "facets": {
+          "product": [
+            "toy_coastal"
+          ]
+        },
+        "status": "draft"
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "TOY006",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -180,
+              -90
+            ],
+            [
+              180,
+              -90
+            ],
+            [
+              180,
+              90
+            ],
+            [
+              -180,
+              90
+            ],
+            [
+              -180,
+              -90
+            ]
+          ],
+          [
+            [
+              -98,
+              18
+            ],
+            [
+              -80,
+              18
+            ],
+            [
+              -80,
+              31
+            ],
+            [
+              -98,
+              31
+            ],
+            [
+              -98,
+              18
+            ]
+          ]
+        ]
+      },
+      "time": null,
+      "properties": {
+        "code": "TOY006",
+        "kind": "warning",
+        "title": "toy_coastal covers only the Gulf of Mexico",
+        "message": "toy_coastal has data only in one box, roughly the Gulf of Mexico.",
+        "level": "error",
+        "action": "do_not_use",
+        "facets": {
+          "product": [
+            "toy_coastal"
+          ]
+        },
+        "status": "draft"
+      }
+    },
+    {
+      "type": "Feature",
       "id": "TOY101",
       "geometry": null,
       "time": null,
