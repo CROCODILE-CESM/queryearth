@@ -1,4 +1,4 @@
-"""Dimension plugins (Axis, Labels, Versions) and the core objects of queryearth.model.
+"""Dimension plugins (Axis, Labels, Versions) and the core objects of queryearth.objects.
 
 The Index-level parts of fixtures 17, 20, 21 and 27 are in test_index.py; this
 file checks the plugins one rule value against one query value.

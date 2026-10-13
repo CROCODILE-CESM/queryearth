@@ -28,7 +28,7 @@ from queryearth import packs
 from queryearth import space as sp
 from queryearth.dimensions import Axis, Labels, Patterns, Versions, is_glob
 from queryearth.errors import DuplicateCodeError, UnknownNameError
-from queryearth.model import (
+from queryearth.objects import (
     Coverage,
     Finding,
     Product,

@@ -16,7 +16,7 @@ from collections.abc import Callable, Iterable, Iterator
 from dataclasses import dataclass
 from typing import Any, Literal
 
-from queryearth.model import Finding, Severity, severity_of
+from queryearth.objects import Finding, Severity, severity_of
 
 __all__ = [
     "AdvisoryError",

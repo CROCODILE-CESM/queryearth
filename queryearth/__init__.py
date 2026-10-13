@@ -35,7 +35,7 @@ from queryearth.emit import (
 )
 from queryearth.errors import DuplicateCodeError, LoadError, UnknownNameError
 from queryearth.index import Index, PointResult, ScoreFn, Suitability, default_score
-from queryearth.model import (
+from queryearth.objects import (
     Action,
     AxisOverlap,
     Confidence,

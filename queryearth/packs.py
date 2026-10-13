@@ -16,7 +16,7 @@ from typing import TYPE_CHECKING, Any
 
 from queryearth import space as sp
 from queryearth.errors import LoadError, UnknownNameError
-from queryearth.model import Coverage, Product
+from queryearth.objects import Coverage, Product
 from queryearth.rules import Rule, box_of, code_prefix
 from queryearth.time import parse_time
 

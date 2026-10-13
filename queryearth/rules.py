@@ -21,7 +21,7 @@ import numpy as np
 
 from queryearth import space as sp
 from queryearth.dimensions import schema_problem
-from queryearth.model import Finding, Match, Outcome, Query, Scope, Severity
+from queryearth.objects import Finding, Match, Outcome, Query, Scope, Severity
 from queryearth.space import Space
 from queryearth.time import Interval, TimeSpec, overlap, parse_time, time_fraction
 

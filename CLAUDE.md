@@ -34,7 +34,7 @@ It is an engine only: the package ships no curated rules. Rule packs belong to t
 |---|---|
 | `queryearth/space.py` | `Space` (point or polygon) and its helpers `point`, `box`, `polygon`. Antimeridian splitting, closed-set `meets`, `measure` (area fraction and km²), spherical `area_km2`, the points mask for the bulk path |
 | `queryearth/time.py` | `Interval`, `TimeSpec`, `interval()`, `parse_time()` for records, `overlap`, `time_fraction`, month recurrence. One calendar: proleptic Gregorian |
-| `queryearth/model.py` | Frozen dataclasses: `Severity`, `Suggestion`, `Outcome`, `Match`, `Finding`, `Scope`, `Coverage`, `Product`, `Request`, `Query` |
+| `queryearth/objects.py` | Frozen dataclasses: `Severity`, `Suggestion`, `Outcome`, `Match`, `Finding`, `Scope`, `Coverage`, `Product`, `Request`, `Query` |
 | `queryearth/dimensions.py` | The `Dimension` protocol and the built-ins `Axis`, `Labels` and `Versions` |
 | `queryearth/rules.py` | `Rule` (a static record), `ComputedRule`, `match_scope` (one scope against one query part) and building findings |
 | `queryearth/index.py` | `Index`: declarations, `query`, requests, coverage findings, `suitable`, `query_points`, `PointResult` |

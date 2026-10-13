@@ -18,7 +18,7 @@ from typing import Any, ClassVar, Protocol, runtime_checkable
 
 import numpy as np
 
-from queryearth.model import AxisOverlap
+from queryearth.objects import AxisOverlap
 
 __all__ = [
     "Axis",
