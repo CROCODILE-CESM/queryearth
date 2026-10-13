@@ -6,14 +6,14 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Extending queryearth &mdash; queryearth 0.0.2.dev5</title>
+  <title>Extending queryearth &mdash; queryearth 0.0.2.dev6</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
 
   
       <script src="_static/jquery.js?v=5d32c60e"></script>
       <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="_static/documentation_options.js?v=576eb774"></script>
+      <script src="_static/documentation_options.js?v=60963d1e"></script>
       <script src="_static/doctools.js?v=fd6eb6e6"></script>
       <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="_static/versions.js?v=58ec1786"></script>
@@ -102,29 +102,27 @@
 <td><p>Any object with <code class="docutils literal notranslate"><span class="pre">code</span></code>, <code class="docutils literal notranslate"><span class="pre">scope</span></code> and <code class="docutils literal notranslate"><span class="pre">evaluate(query)</span></code> (the <code class="docutils literal notranslate"><span class="pre">RuleKind</span></code> protocol), passed to <code class="docutils literal notranslate"><span class="pre">Registry.add</span></code></p></td>
 </tr>
 <tr class="row-even"><td><p>Rules from another format</p></td>
-<td><p>Build records and pass them to <code class="docutils literal notranslate"><span class="pre">Registry.add</span></code>, or <code class="docutils literal notranslate"><span class="pre">Rule.from_feature</span></code> per feature</p></td>
-</tr>
-<tr class="row-odd"><td><p>Named regions</p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">Registry.add_regions(namespace,</span> <span class="pre">regions)</span></code></p></td>
+<td><p>Convert them to GeoJSON records for <code class="docutils literal notranslate"><span class="pre">Registry.add</span></code>, or build <code class="docutils literal notranslate"><span class="pre">Rule</span></code> objects in Python; <code class="docutils literal notranslate"><span class="pre">Rule.to_feature()</span></code> writes a rule back as a record</p></td>
 </tr>
 </tbody>
 </table>
 <p>Geometry and time semantics are not pluggable. Space and time are dimensions inside the engine, but <code class="docutils literal notranslate"><span class="pre">SpaceDimension</span></code> and <code class="docutils literal notranslate"><span class="pre">TimeDimension</span></code> are built into every Registry and cannot be replaced, so “overlaps” means the same thing for every rule.</p>
 <section id="dimension-plugins">
 <h2>Dimension plugins<a class="headerlink" href="#dimension-plugins" title="Link to this heading"></a></h2>
-<p>A dimension has a <code class="docutils literal notranslate"><span class="pre">name</span></code>, a <code class="docutils literal notranslate"><span class="pre">schema</span></code> (JSON Schema for the value in records), and three methods:</p>
+<p>A dimension has a <code class="docutils literal notranslate"><span class="pre">name</span></code> and three methods:</p>
 <ul class="simple">
-<li><p><code class="docutils literal notranslate"><span class="pre">parse_rule(value)</span></code> checks and parses a rule’s value when the rule is added;</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">parse_rule(value)</span></code> checks and parses a rule’s value when the rule is added, from Python or from a record, and raises <code class="docutils literal notranslate"><span class="pre">ValueError</span></code> for a bad one;</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">parse_query(value)</span></code> does the same for a query’s value;</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">match(rule,</span> <span class="pre">query)</span></code> returns a <code class="docutils literal notranslate"><span class="pre">DimMatch(overlap,</span> <span class="pre">fraction)</span></code> when they meet, or <code class="docutils literal notranslate"><span class="pre">None</span></code> when they do not.</p></li>
 </ul>
 <p>The Registry does everything else: conditional findings, unknown names and sorting. This plugin matches HydroBASINS Pfafstetter basin codes, where basin 1423 lies inside basin 14:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">Pfafstetter</span><span class="p">:</span>
     <span class="n">name</span> <span class="o">=</span> <span class="s2">"basin"</span>
-    <span class="n">schema</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"type"</span><span class="p">:</span> <span class="s2">"array"</span><span class="p">,</span> <span class="s2">"items"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"type"</span><span class="p">:</span> <span class="s2">"string"</span><span class="p">,</span> <span class="s2">"pattern"</span><span class="p">:</span> <span class="s2">"^[1-9]+$"</span><span class="p">}}</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">parse_rule</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
-        <span class="k">return</span> <span class="nb">tuple</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">v</span><span class="p">)</span> <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">value</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"basins are a list of codes, not </span><span class="si">{</span><span class="n">value</span><span class="si">!r}</span><span class="s2">"</span><span class="p">)</span>
+        <span class="k">return</span> <span class="nb">tuple</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">parse_query</span><span class="p">(</span><span class="n">v</span><span class="p">)</span> <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">value</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">parse_query</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
         <span class="n">code</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>

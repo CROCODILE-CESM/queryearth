@@ -1,6 +1,6 @@
 # Writing rules
 
-There are three ways to write a rule: a {class}`~queryearth.Rule` built in Python, a computed rule whose outcome depends on the query, or a record in a GeoJSON **pack**. All three end up on an {class}`~queryearth.Registry`.
+There are three ways to write a rule: a {class}`~queryearth.Rule` built in Python, a computed rule whose outcome depends on the query, or a record in a GeoJSON **rule file**. All three end up on a {class}`~queryearth.Registry`, the object you query.
 
 ## Rules in Python
 
@@ -9,19 +9,18 @@ import queryearth as qe
 from queryearth import space as sp
 
 registry = qe.Registry("mine", axes=[qe.Axis("resolution", "km")])
-registry.add(
-    qe.Rule(
-        code="MINE001",
-        kind="warning",
-        title="Coastal values are interpolated",
-        message="Within this box, values near the coast come from interpolation.",
-        action="use_with_caution",
-        scope=qe.Scope(
-            space=sp.box(-98, 18, -80, 31),
-            facets={"variable": ["thetao", "so"]},
-        ),
-    )
+rule = qe.Rule(
+    code="MINE001",
+    kind="warning",
+    title="Coastal values are interpolated",
+    message="Within this box, values near the coast come from interpolation.",
+    action="use_with_caution",
+    scope=qe.Scope(
+        space=sp.box(-98, 18, -80, 31),
+        facets={"variable": ["thetao", "so"]},
+    ),
 )
+registry.add(rule)
 ```
 
 `kind` is `"warning"` or `"suggestion"`, and a suggestion lists at least one {class}`~queryearth.Suggestion`. `level` defaults to `logging.WARNING` for a warning and `logging.INFO` for a suggestion; give another `logging` level, or its name such as `"error"`, to change it. Adding a code that is already on the Registry raises `DuplicateCodeError`.
@@ -40,17 +39,15 @@ def time_step(query, match):
 
 The function runs only when the scope matches definitely. It returns `True` (one finding with the declared outcome), `False` or `None` (no finding), a mapping of `Finding` fields to override, or several such mappings. For a class-based rule, subclass {class}`~queryearth.ComputedRule` with the same keywords and define `check(self, query, match)`. `requires=["key"]` names `Query.context` keys the rule needs: without them, the finding is conditional. A `mask(lon, lat, query)` method lets the rule take part in {meth}`~queryearth.Registry.query_points`.
 
-## Packs
+## Rule files
 
-A pack is a directory with a `pack.toml` and one or more GeoJSON FeatureCollections, loaded with {meth}`Registry.load_pack() <queryearth.Registry.load_pack>`. Loading never runs code. Every problem is reported at once in a `LoadError` that names the file, the feature's position and its code, and the Registry is left unchanged.
+A rule file is a GeoJSON file holding a FeatureCollection of records, or a single record. {meth}`Registry.load() <queryearth.Registry.load>` adds its rules and returns their codes:
 
-`pack.toml` declares the pack's name, version, the code prefixes it owns and its files. It also declares the axes and facets its records use, and any named regions:
-
-```{literalinclude} ../../examples/toy/pack.toml
-:language: toml
+```python
+codes = registry.load("examples/toy/rules.geojson")
 ```
 
-The axes and facets a pack declares must exist on the Registry it is loaded into. Products are not declared: records name them in the `product` facet. Named regions go under `[regions.<namespace>]`, with a GeoJSON `file` and the `id_property` that names each region. Records then refer to them as `region_ref = "namespace:id"`.
+Loading never runs code. Every problem is reported at once in a `LoadError` that names the file, the feature's position and its code, and the Registry is left unchanged. The axes, facets and plugin dimensions the records use must be declared on the Registry first; products need no declaration, since records name them in the `product` facet. A finding from a loaded rule has the file name as its `source`. A Feature or FeatureCollection mapping can also be added directly with `Registry.add(mapping)`.
 
 ### Records
 
@@ -60,13 +57,13 @@ Each rule is one GeoJSON Feature. Its `geometry` is a Polygon, a MultiPolygon or
 |---|---|
 | Identity and outcome | `code`, `kind` (`warning` or `suggestion`), `title` and `message`, all required; `level` (`info`, `warning` or `error`; by default `warning` for a warning and `info` for a suggestion) |
 | Advice | `instruction`, `confidence`, `action`, and `suggestions` (required for a suggestion) |
-| Scope | `facets`, `axes`, `dimensions` (for plugin dimensions), `region_ref` or `box` (`{west, width, south, north}`; geometry must then be null), `periods` (intervals inside `time`), `recurrence` (`{"months": [12, 1, 2]}`), and the fallback `time_start` and `time_end` |
+| Scope | `facets`, `axes`, `dimensions` (for plugin dimensions), `box` (`{west, width, south, north}`, a shorthand for a polygon; geometry must then be null), `periods` (intervals inside `time`), `recurrence` (`{"months": [12, 1, 2]}`), and the fallback `time_start` and `time_end` |
 | Overlap | `min_overlap`, an area fraction from 0 to 1 below which the finding is too small to count, which you can filter on |
 | Provenance | `evidence`, `references`, `aliases` |
 | Lifecycle | `status` (`draft`, `reviewed` or `deprecated`; a reviewed record cites a reference), `created`, `updated`, `withdrawn` (kept for history, never matched), `supersedes` |
 | Extensions | `x_*` fields, kept and ignored |
 
-A record from the toy pack:
+A record from the toy rule file:
 
 ```json
 {
@@ -91,4 +88,14 @@ A record from the toy pack:
 
 Its ring crosses the antimeridian the way most tools write it, from 165 to -160, and queryearth splits it at ±180.
 
-A single Feature or FeatureCollection can also be added directly with `Registry.add(mapping)`.
+### Writing records
+
+{meth}`Rule.to_feature() <queryearth.Rule.to_feature>` turns a rule back into a record, leaving out the fields at their defaults, so that `Rule.from_feature(rule.to_feature())` gives the same rule. A `box` is written as its polygon, split at ±180, and time as the `time` member plus `periods` and `recurrence` where needed. A rule whose space is a point, or whose level is not info, warning or error, has no record form and raises `ValueError`. A computed rule is code, so it has no record form either. To write rules to a file:
+
+```python
+import json
+
+collection = {"type": "FeatureCollection", "features": [rule.to_feature()]}
+with open("mine.geojson", "w") as f:
+    json.dump(collection, f, indent=2)
+```

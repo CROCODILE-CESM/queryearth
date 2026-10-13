@@ -5,14 +5,14 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>queryearth.objects &mdash; queryearth 0.0.2.dev5</title>
+  <title>queryearth.objects &mdash; queryearth 0.0.2.dev6</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
 
   
       <script src="../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../_static/documentation_options.js?v=576eb774"></script>
+      <script src="../../_static/documentation_options.js?v=60963d1e"></script>
       <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../_static/versions.js?v=58ec1786"></script>
@@ -384,7 +384,7 @@
 <span class="w">    </span><span class="sd">"""The result of one rule matching one query: the outcome plus the match."""</span>
 
     <span class="n">details</span><span class="p">:</span> <span class="n">Mapping</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">dict</span><span class="p">)</span>
-    <span class="n">source</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">""</span>  <span class="c1"># pack name, "computed", "builtin" or "python"</span>
+    <span class="n">source</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">""</span>  <span class="c1"># a loaded record's file name, "computed" or "python"</span>
     <span class="n">query_label</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">""</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">__post_init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
@@ -511,7 +511,7 @@
 <div class="viewcode-block" id="UnknownNameError">
 <a class="viewcode-back" href="../../api.html#queryearth.UnknownNameError">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">UnknownNameError</span><span class="p">(</span><span class="ne">KeyError</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">"""An undeclared axis, facet, dimension or region name.</span>
+<span class="w">    </span><span class="sd">"""An undeclared axis, facet or dimension name.</span>
 
 <span class="sd">    A misspelt name would otherwise look like "no known issues", so the engine</span>
 <span class="sd">    refuses it in rules and queries alike (sections 4.6 and 4.7).</span>
@@ -528,7 +528,7 @@
 <div class="viewcode-block" id="LoadError">
 <a class="viewcode-back" href="../../api.html#queryearth.LoadError">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">LoadError</span><span class="p">(</span><span class="ne">ValueError</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">"""A pack or FeatureCollection failed the loader checks (section 5.3).</span>
+<span class="w">    </span><span class="sd">"""A rule file or FeatureCollection failed the loader checks (section 5.3).</span>
 
 <span class="sd">    .problems lists each, naming its file, the feature's position and its code.</span>
 <span class="sd">    """</span>

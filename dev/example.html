@@ -6,14 +6,14 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>The toy example &mdash; queryearth 0.0.2.dev5</title>
+  <title>The toy example &mdash; queryearth 0.0.2.dev6</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
 
   
       <script src="_static/jquery.js?v=5d32c60e"></script>
       <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="_static/documentation_options.js?v=576eb774"></script>
+      <script src="_static/documentation_options.js?v=60963d1e"></script>
       <script src="_static/doctools.js?v=fd6eb6e6"></script>
       <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="_static/versions.js?v=58ec1786"></script>
@@ -82,14 +82,14 @@
              
   <section id="the-toy-example">
 <h1>The toy example<a class="headerlink" href="#the-toy-example" title="Link to this heading"></a></h1>
-<p>The repository’s <code class="docutils literal notranslate"><span class="pre">examples/toy/</span></code> holds a small, made-up pack (nine rules) and a script that walks through queries, conditional findings, coverage rules, rules written in Python, logging the findings, a query per product and <code class="docutils literal notranslate"><span class="pre">query_points()</span></code>. Everything in it is invented: the products, the rules and the parameter names.</p>
+<p>The repository’s <code class="docutils literal notranslate"><span class="pre">examples/toy/</span></code> holds a small, made-up rule file (nine rules) and a script that walks through queries, conditional findings, coverage rules, rules written in Python, logging the findings, a query per product and <code class="docutils literal notranslate"><span class="pre">query_points()</span></code>. Everything in it is invented: the products, the rules and the parameter names.</p>
 <p>Run it as a script, or cell by cell in an editor that understands <code class="docutils literal notranslate"><span class="pre">#</span> <span class="pre">%%</span></code> cells:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>examples/toy/play.py
 </pre></div>
 </div>
 <section id="play-py">
 <h2>play.py<a class="headerlink" href="#play-py" title="Link to this heading"></a></h2>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="sd">"""Play with queryearth on a made-up pack.</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="sd">"""Play with queryearth on a made-up rule file.</span>
 
 <span class="sd">Run it cell by cell in VS Code (each "# %%" line starts a cell), or as a script</span>
 <span class="sd">from the repository root:</span>
@@ -97,12 +97,14 @@
 <span class="sd">    pip install -e .</span>
 <span class="sd">    python examples/toy/play.py</span>
 
-<span class="sd">Everything in the toy pack is invented: the products the rules name (toy_ocean,</span>
-<span class="sd">toy_atmos, toy_coastal), the rules (TOY...) and the parameter names. Edit</span>
-<span class="sd">pack.toml, rules.geojson or this file and rerun to see what changes.</span>
+<span class="sd">Everything in rules.geojson is invented: the products the rules name (toy_ocean,</span>
+<span class="sd">toy_atmos, toy_coastal), the rules (TOY...) and the parameter names; nothing</span>
+<span class="sd">there describes real data or real model guidance. Edit rules.geojson or this</span>
+<span class="sd">file and rerun to see what changes.</span>
 <span class="sd">"""</span>
 
-<span class="c1"># %% Set up: a Registry with a resolution axis, then load the toy pack.</span>
+<span class="c1"># %% Set up: a Registry with the resolution axis the rules use (the facets they</span>
+<span class="c1"># use, product, variable and model, are declared by default), then load the rules.</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
 
@@ -113,8 +115,10 @@
 
 <span class="n">HERE</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="nb">globals</span><span class="p">()</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"__file__"</span><span class="p">,</span> <span class="s2">"play.py"</span><span class="p">))</span><span class="o">.</span><span class="n">resolve</span><span class="p">()</span><span class="o">.</span><span class="n">parent</span>
 
-<span class="n">registry</span> <span class="o">=</span> <span class="n">qe</span><span class="o">.</span><span class="n">Registry</span><span class="p">(</span><span class="s2">"toy"</span><span class="p">,</span> <span class="n">axes</span><span class="o">=</span><span class="p">[</span><span class="n">qe</span><span class="o">.</span><span class="n">Axis</span><span class="p">(</span><span class="s2">"resolution"</span><span class="p">,</span> <span class="s2">"km"</span><span class="p">)])</span>
-<span class="nb">print</span><span class="p">(</span><span class="s2">"loaded:"</span><span class="p">,</span> <span class="n">registry</span><span class="o">.</span><span class="n">load_pack</span><span class="p">(</span><span class="n">HERE</span><span class="p">))</span>
+<span class="n">registry</span> <span class="o">=</span> <span class="n">qe</span><span class="o">.</span><span class="n">Registry</span><span class="p">(</span>
+    <span class="s2">"toy"</span><span class="p">,</span> <span class="n">axes</span><span class="o">=</span><span class="p">[</span><span class="n">qe</span><span class="o">.</span><span class="n">Axis</span><span class="p">(</span><span class="s2">"resolution"</span><span class="p">,</span> <span class="s2">"km"</span><span class="p">,</span> <span class="s2">"horizontal grid spacing"</span><span class="p">)]</span>
+<span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">"loaded:"</span><span class="p">,</span> <span class="n">registry</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">HERE</span> <span class="o">/</span> <span class="s2">"rules.geojson"</span><span class="p">))</span>
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">show</span><span class="p">(</span><span class="n">findings</span><span class="p">):</span>

@@ -5,14 +5,14 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>queryearth.dimensions &mdash; queryearth 0.0.2.dev5</title>
+  <title>queryearth.dimensions &mdash; queryearth 0.0.2.dev6</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
 
   
       <script src="../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../_static/documentation_options.js?v=576eb774"></script>
+      <script src="../../_static/documentation_options.js?v=60963d1e"></script>
       <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../_static/versions.js?v=58ec1786"></script>
@@ -90,7 +90,7 @@
 <span class="kn">from</span><span class="w"> </span><span class="nn">collections.abc</span><span class="w"> </span><span class="kn">import</span> <span class="n">Callable</span><span class="p">,</span> <span class="n">Iterable</span><span class="p">,</span> <span class="n">Mapping</span><span class="p">,</span> <span class="n">Sequence</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">dataclasses</span><span class="w"> </span><span class="kn">import</span> <span class="n">dataclass</span><span class="p">,</span> <span class="n">field</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">fnmatch</span><span class="w"> </span><span class="kn">import</span> <span class="n">fnmatchcase</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">ClassVar</span><span class="p">,</span> <span class="n">Protocol</span><span class="p">,</span> <span class="n">runtime_checkable</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Protocol</span><span class="p">,</span> <span class="n">runtime_checkable</span>
 
 <span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
 
@@ -149,7 +149,6 @@
 <span class="sd">    """</span>
 
     <span class="n">name</span><span class="p">:</span> <span class="nb">str</span>  <span class="c1"># key in scopes, queries, records and conditional_on</span>
-    <span class="n">schema</span><span class="p">:</span> <span class="n">Mapping</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span>  <span class="c1"># JSON Schema for the rule-side value in records</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">parse_rule</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span> <span class="o">...</span>  <span class="c1"># at load; ValueError if invalid</span>
 
@@ -173,12 +172,10 @@
 <span class="w">    </span><span class="sd">"""Space: closed-set meeting, then the area fraction and overlap in km².</span>
 
 <span class="sd">    It runs late, after the cheaper dimensions, and also measures the query</span>
-<span class="sd">    against a rule that leaves space unconstrained. Records carry space in the</span>
-<span class="sd">    GeoJSON geometry, so it has no properties schema.</span>
+<span class="sd">    against a rule that leaves space unconstrained.</span>
 <span class="sd">    """</span>
 
     <span class="n">name</span> <span class="o">=</span> <span class="s2">"space"</span>
-    <span class="n">schema</span><span class="p">:</span> <span class="n">ClassVar</span><span class="p">[</span><span class="n">Mapping</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="p">{}</span>
     <span class="n">late</span> <span class="o">=</span> <span class="kc">True</span>
     <span class="n">always</span> <span class="o">=</span> <span class="kc">True</span>
 
@@ -198,12 +195,10 @@
 <span class="w">    </span><span class="sd">"""Time: the overlapping periods and the share of the query they cover.</span>
 
 <span class="sd">    It also measures the query against a rule that leaves time unconstrained,</span>
-<span class="sd">    and an undecided rule reports its own periods. Records carry time in the</span>
-<span class="sd">    JSON-FG time member, so it has no properties schema.</span>
+<span class="sd">    and an undecided rule reports its own periods.</span>
 <span class="sd">    """</span>
 
     <span class="n">name</span> <span class="o">=</span> <span class="s2">"time"</span>
-    <span class="n">schema</span><span class="p">:</span> <span class="n">ClassVar</span><span class="p">[</span><span class="n">Mapping</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="p">{}</span>
     <span class="n">always</span> <span class="o">=</span> <span class="kc">True</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">parse_rule</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">TimeSpec</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">TimeSpec</span><span class="p">:</span>
@@ -220,67 +215,6 @@
     <span class="k">def</span><span class="w"> </span><span class="nf">extent</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">rule</span><span class="p">:</span> <span class="n">TimeSpec</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">],</span> <span class="o">...</span><span class="p">]:</span>
 <span class="w">        </span><span class="sd">"""The rule's own periods, reported when the query gives no time."""</span>
         <span class="k">return</span> <span class="p">()</span> <span class="k">if</span> <span class="n">rule</span><span class="o">.</span><span class="n">extent</span> <span class="o">==</span> <span class="p">(</span><span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span> <span class="k">else</span> <span class="n">rule</span><span class="o">.</span><span class="n">to_wire</span><span class="p">()</span>
-
-
-<span class="c1"># ---- plugin schemas -------------------------------------------------------------</span>
-<span class="n">_TYPES</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="nb">object</span><span class="o">=</span><span class="n">Mapping</span><span class="p">,</span> <span class="n">array</span><span class="o">=</span><span class="p">(</span><span class="nb">list</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">),</span> <span class="n">string</span><span class="o">=</span><span class="nb">str</span><span class="p">,</span> <span class="n">boolean</span><span class="o">=</span><span class="nb">bool</span><span class="p">)</span>
-<span class="n">_TYPES</span> <span class="o">|=</span> <span class="p">{</span><span class="s2">"number"</span><span class="p">:</span> <span class="p">(</span><span class="nb">int</span><span class="p">,</span> <span class="nb">float</span><span class="p">),</span> <span class="s2">"integer"</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="s2">"null"</span><span class="p">:</span> <span class="nb">type</span><span class="p">(</span><span class="kc">None</span><span class="p">)}</span>
-<span class="n">_KEYWORDS</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span>
-    <span class="s2">"type enum pattern minLength minimum maximum items minItems maxItems properties "</span>
-    <span class="s2">"required additionalProperties anyOf oneOf not title description $comment"</span><span class="o">.</span><span class="n">split</span><span class="p">()</span>
-<span class="p">)</span>
-
-
-<span class="k">def</span><span class="w"> </span><span class="nf">schema_problem</span><span class="p">(</span><span class="n">value</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">schema</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">"""Why a record's value fails a plugin dimension's schema, or None.</span>
-
-<span class="sd">    Implements the JSON Schema keywords in _KEYWORDS, which plugin schemas are</span>
-<span class="sd">    limited to; any other keyword raises ValueError rather than pass silently.</span>
-<span class="sd">    """</span>
-    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">schema</span><span class="p">,</span> <span class="nb">bool</span><span class="p">):</span>
-        <span class="k">return</span> <span class="kc">None</span> <span class="k">if</span> <span class="n">schema</span> <span class="k">else</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">value</span><span class="si">!r}</span><span class="s2"> is not allowed here"</span>
-    <span class="k">if</span> <span class="nb">set</span><span class="p">(</span><span class="n">schema</span><span class="p">)</span> <span class="o">-</span> <span class="n">_KEYWORDS</span><span class="p">:</span>
-        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"unsupported schema keywords </span><span class="si">{</span><span class="nb">set</span><span class="p">(</span><span class="n">schema</span><span class="p">)</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="n">_KEYWORDS</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
-    <span class="n">kinds</span> <span class="o">=</span> <span class="n">schema</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"type"</span><span class="p">,</span> <span class="nb">list</span><span class="p">(</span><span class="n">_TYPES</span><span class="p">))</span>
-    <span class="n">kinds</span> <span class="o">=</span> <span class="p">[</span><span class="n">kinds</span><span class="p">]</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">kinds</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="k">else</span> <span class="n">kinds</span>
-    <span class="n">number</span> <span class="o">=</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="p">(</span><span class="nb">int</span><span class="p">,</span> <span class="nb">float</span><span class="p">))</span> <span class="ow">and</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">bool</span><span class="p">)</span>
-    <span class="n">numeric</span> <span class="o">=</span> <span class="p">(</span><span class="s2">"number"</span><span class="p">,</span> <span class="s2">"integer"</span><span class="p">)</span>
-    <span class="k">if</span> <span class="ow">not</span> <span class="nb">any</span><span class="p">(</span>
-        <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">_TYPES</span><span class="p">[</span><span class="n">k</span><span class="p">])</span> <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">kinds</span> <span class="k">if</span> <span class="n">number</span> <span class="ow">or</span> <span class="n">k</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">numeric</span>
-    <span class="p">):</span>
-        <span class="k">return</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">value</span><span class="si">!r}</span><span class="s2"> is not of type </span><span class="si">{</span><span class="n">kinds</span><span class="si">}</span><span class="s2">"</span>
-    <span class="k">if</span> <span class="s2">"enum"</span> <span class="ow">in</span> <span class="n">schema</span> <span class="ow">and</span> <span class="n">value</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">schema</span><span class="p">[</span><span class="s2">"enum"</span><span class="p">]:</span>
-        <span class="k">return</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">value</span><span class="si">!r}</span><span class="s2"> is not one of </span><span class="si">{</span><span class="n">schema</span><span class="p">[</span><span class="s1">'enum'</span><span class="p">]</span><span class="si">}</span><span class="s2">"</span>
-    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">and</span> <span class="p">(</span>
-        <span class="nb">len</span><span class="p">(</span><span class="n">value</span><span class="p">)</span> <span class="o">&lt;</span> <span class="n">schema</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"minLength"</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
-        <span class="ow">or</span> <span class="ow">not</span> <span class="n">re</span><span class="o">.</span><span class="n">search</span><span class="p">(</span><span class="n">schema</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"pattern"</span><span class="p">,</span> <span class="s2">""</span><span class="p">),</span> <span class="n">value</span><span class="p">)</span>
-    <span class="p">):</span>
-        <span class="k">return</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">value</span><span class="si">!r}</span><span class="s2"> does not match </span><span class="si">{</span><span class="n">schema</span><span class="si">}</span><span class="s2">"</span>
-    <span class="k">if</span> <span class="n">number</span> <span class="ow">and</span> <span class="ow">not</span> <span class="p">(</span>
-        <span class="n">schema</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"minimum"</span><span class="p">,</span> <span class="o">-</span><span class="n">math</span><span class="o">.</span><span class="n">inf</span><span class="p">)</span> <span class="o">&lt;=</span> <span class="n">value</span> <span class="o">&lt;=</span> <span class="n">schema</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"maximum"</span><span class="p">,</span> <span class="n">math</span><span class="o">.</span><span class="n">inf</span><span class="p">)</span>
-    <span class="p">):</span>
-        <span class="k">return</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">value</span><span class="si">!r}</span><span class="s2"> is out of range"</span>
-    <span class="n">nested</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="p">[]</span>
-    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="p">(</span><span class="nb">list</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">)):</span>
-        <span class="k">if</span> <span class="ow">not</span> <span class="n">schema</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"minItems"</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span> <span class="o">&lt;=</span> <span class="nb">len</span><span class="p">(</span><span class="n">value</span><span class="p">)</span> <span class="o">&lt;=</span> <span class="n">schema</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"maxItems"</span><span class="p">,</span> <span class="mf">1e9</span><span class="p">):</span>
-            <span class="k">return</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">value</span><span class="si">!r}</span><span class="s2"> has the wrong number of items"</span>
-        <span class="n">nested</span> <span class="o">+=</span> <span class="p">[(</span><span class="n">v</span><span class="p">,</span> <span class="n">schema</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"items"</span><span class="p">,</span> <span class="kc">True</span><span class="p">))</span> <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">value</span><span class="p">]</span>
-    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">Mapping</span><span class="p">):</span>
-        <span class="k">if</span> <span class="p">[</span><span class="n">k</span> <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">schema</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"required"</span><span class="p">,</span> <span class="p">())</span> <span class="k">if</span> <span class="n">k</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">value</span><span class="p">]:</span>
-            <span class="k">return</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="nb">dict</span><span class="p">(</span><span class="n">value</span><span class="p">)</span><span class="si">!r}</span><span class="s2"> lacks one of </span><span class="si">{</span><span class="n">schema</span><span class="p">[</span><span class="s1">'required'</span><span class="p">]</span><span class="si">}</span><span class="s2">"</span>
-        <span class="n">props</span> <span class="o">=</span> <span class="n">schema</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"properties"</span><span class="p">,</span> <span class="p">{})</span>
-        <span class="n">extra</span> <span class="o">=</span> <span class="n">schema</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"additionalProperties"</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span>
-        <span class="n">nested</span> <span class="o">+=</span> <span class="p">[(</span><span class="n">v</span><span class="p">,</span> <span class="n">props</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">k</span><span class="p">,</span> <span class="n">extra</span><span class="p">))</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">value</span><span class="o">.</span><span class="n">items</span><span class="p">()]</span>
-    <span class="n">problem</span> <span class="o">=</span> <span class="nb">next</span><span class="p">(</span><span class="nb">filter</span><span class="p">(</span><span class="kc">None</span><span class="p">,</span> <span class="p">(</span><span class="n">schema_problem</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="n">sub</span><span class="p">)</span> <span class="k">for</span> <span class="n">v</span><span class="p">,</span> <span class="n">sub</span> <span class="ow">in</span> <span class="n">nested</span><span class="p">)),</span> <span class="kc">None</span><span class="p">)</span>
-    <span class="k">if</span> <span class="n">problem</span><span class="p">:</span>
-        <span class="k">return</span> <span class="n">problem</span>
-    <span class="k">if</span> <span class="ow">not</span> <span class="nb">any</span><span class="p">(</span><span class="n">schema_problem</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">s</span><span class="p">)</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">schema</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"anyOf"</span><span class="p">,</span> <span class="p">[</span><span class="kc">True</span><span class="p">])):</span>
-        <span class="k">return</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">value</span><span class="si">!r}</span><span class="s2"> matches none of anyOf"</span>
-    <span class="k">if</span> <span class="nb">sum</span><span class="p">(</span><span class="n">schema_problem</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">s</span><span class="p">)</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">schema</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"oneOf"</span><span class="p">,</span> <span class="p">[</span><span class="kc">True</span><span class="p">]))</span> <span class="o">!=</span> <span class="mi">1</span><span class="p">:</span>
-        <span class="k">return</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">value</span><span class="si">!r}</span><span class="s2"> does not match exactly one of oneOf"</span>
-    <span class="k">if</span> <span class="s2">"not"</span> <span class="ow">in</span> <span class="n">schema</span> <span class="ow">and</span> <span class="n">schema_problem</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">schema</span><span class="p">[</span><span class="s2">"not"</span><span class="p">])</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-        <span class="k">return</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">value</span><span class="si">!r}</span><span class="s2"> matches a schema it must not"</span>
-    <span class="k">return</span> <span class="kc">None</span>
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">_number</span><span class="p">(</span><span class="n">value</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">what</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
@@ -304,26 +238,6 @@
 
 
 <span class="c1"># ---- Axis: a named ordered dimension in one unit ----------------------------------</span>
-<span class="n">_AXIS_SCHEMA</span><span class="p">:</span> <span class="n">Mapping</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
-    <span class="s2">"type"</span><span class="p">:</span> <span class="s2">"object"</span><span class="p">,</span>
-    <span class="s2">"properties"</span><span class="p">:</span> <span class="p">{</span>
-        <span class="s2">"gt"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"type"</span><span class="p">:</span> <span class="s2">"number"</span><span class="p">},</span>
-        <span class="s2">"ge"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"type"</span><span class="p">:</span> <span class="s2">"number"</span><span class="p">},</span>
-        <span class="s2">"lt"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"type"</span><span class="p">:</span> <span class="s2">"number"</span><span class="p">},</span>
-        <span class="s2">"le"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"type"</span><span class="p">:</span> <span class="s2">"number"</span><span class="p">},</span>
-        <span class="s2">"unit"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"type"</span><span class="p">:</span> <span class="s2">"string"</span><span class="p">,</span> <span class="s2">"minLength"</span><span class="p">:</span> <span class="mi">1</span><span class="p">},</span>
-    <span class="p">},</span>
-    <span class="s2">"additionalProperties"</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span>
-    <span class="s2">"anyOf"</span><span class="p">:</span> <span class="p">[</span>
-        <span class="p">{</span><span class="s2">"required"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"gt"</span><span class="p">]},</span>
-        <span class="p">{</span><span class="s2">"required"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"ge"</span><span class="p">]},</span>
-        <span class="p">{</span><span class="s2">"required"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"lt"</span><span class="p">]},</span>
-        <span class="p">{</span><span class="s2">"required"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"le"</span><span class="p">]},</span>
-    <span class="p">],</span>
-    <span class="s2">"not"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"anyOf"</span><span class="p">:</span> <span class="p">[{</span><span class="s2">"required"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"gt"</span><span class="p">,</span> <span class="s2">"ge"</span><span class="p">]},</span> <span class="p">{</span><span class="s2">"required"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"lt"</span><span class="p">,</span> <span class="s2">"le"</span><span class="p">]}]},</span>
-<span class="p">}</span>
-
-
 <span class="k">def</span><span class="w"> </span><span class="nf">axis_intersection</span><span class="p">(</span><span class="n">rule</span><span class="p">:</span> <span class="n">AxisOverlap</span><span class="p">,</span> <span class="n">lo</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">hi</span><span class="p">:</span> <span class="nb">float</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">AxisOverlap</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""The intersection of a rule interval with the closed range [lo, hi]."""</span>
     <span class="n">start</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">rule</span><span class="o">.</span><span class="n">lo</span><span class="p">,</span> <span class="n">lo</span><span class="p">)</span>
@@ -348,7 +262,6 @@
     <span class="n">name</span><span class="p">:</span> <span class="nb">str</span>
     <span class="n">unit</span><span class="p">:</span> <span class="nb">str</span>
     <span class="n">description</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">""</span>
-    <span class="n">schema</span><span class="p">:</span> <span class="n">ClassVar</span><span class="p">[</span><span class="n">Mapping</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="n">_AXIS_SCHEMA</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">__post_init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">unit</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">or</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">unit</span><span class="p">:</span>
@@ -413,24 +326,6 @@
 
 
 <span class="c1"># ---- Labels: a facet matched by case-sensitive fnmatch globs ----------------------</span>
-<span class="n">_PATTERNS</span> <span class="o">=</span> <span class="p">{</span>
-    <span class="s2">"type"</span><span class="p">:</span> <span class="s2">"array"</span><span class="p">,</span>
-    <span class="s2">"minItems"</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span>
-    <span class="s2">"items"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"type"</span><span class="p">:</span> <span class="s2">"string"</span><span class="p">,</span> <span class="s2">"minLength"</span><span class="p">:</span> <span class="mi">1</span><span class="p">},</span>
-<span class="p">}</span>
-<span class="n">_LABELS_SCHEMA</span><span class="p">:</span> <span class="n">Mapping</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
-    <span class="s2">"oneOf"</span><span class="p">:</span> <span class="p">[</span>
-        <span class="n">_PATTERNS</span><span class="p">,</span>
-        <span class="p">{</span>
-            <span class="s2">"type"</span><span class="p">:</span> <span class="s2">"object"</span><span class="p">,</span>
-            <span class="s2">"properties"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"any_of"</span><span class="p">:</span> <span class="n">_PATTERNS</span><span class="p">,</span> <span class="s2">"none_of"</span><span class="p">:</span> <span class="n">_PATTERNS</span><span class="p">},</span>
-            <span class="s2">"additionalProperties"</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span>
-            <span class="s2">"minProperties"</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span>
-        <span class="p">},</span>
-    <span class="p">]</span>
-<span class="p">}</span>
-
-
 <span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">Patterns</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""A parsed facet rule: values must match some any_of and no none_of."""</span>
@@ -452,7 +347,6 @@
 
     <span class="n">name</span><span class="p">:</span> <span class="nb">str</span>
     <span class="n">description</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">""</span>
-    <span class="n">schema</span><span class="p">:</span> <span class="n">ClassVar</span><span class="p">[</span><span class="n">Mapping</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="n">_LABELS_SCHEMA</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">parse_rule</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Patterns</span><span class="p">:</span>
         <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">Patterns</span><span class="p">):</span>
@@ -486,25 +380,6 @@
 
 <span class="c1"># ---- Versions: OSV-style ranges ----------------------------------------------------</span>
 <span class="n">_DOTTED</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="sa">r</span><span class="s2">"[0-9]+(?:\.[0-9]+)*"</span><span class="p">)</span>
-<span class="n">_RANGE</span> <span class="o">=</span> <span class="p">{</span>
-    <span class="s2">"type"</span><span class="p">:</span> <span class="s2">"object"</span><span class="p">,</span>
-    <span class="s2">"properties"</span><span class="p">:</span> <span class="p">{</span>
-        <span class="s2">"introduced"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"type"</span><span class="p">:</span> <span class="s2">"string"</span><span class="p">,</span> <span class="s2">"minLength"</span><span class="p">:</span> <span class="mi">1</span><span class="p">},</span>
-        <span class="s2">"fixed"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"type"</span><span class="p">:</span> <span class="s2">"string"</span><span class="p">,</span> <span class="s2">"minLength"</span><span class="p">:</span> <span class="mi">1</span><span class="p">},</span>
-        <span class="s2">"last_affected"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"type"</span><span class="p">:</span> <span class="s2">"string"</span><span class="p">,</span> <span class="s2">"minLength"</span><span class="p">:</span> <span class="mi">1</span><span class="p">},</span>
-        <span class="s2">"versions"</span><span class="p">:</span> <span class="p">{</span>
-            <span class="s2">"type"</span><span class="p">:</span> <span class="s2">"array"</span><span class="p">,</span>
-            <span class="s2">"minItems"</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span>
-            <span class="s2">"items"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"type"</span><span class="p">:</span> <span class="s2">"string"</span><span class="p">,</span> <span class="s2">"minLength"</span><span class="p">:</span> <span class="mi">1</span><span class="p">},</span>
-        <span class="p">},</span>
-    <span class="p">},</span>
-    <span class="s2">"additionalProperties"</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span>
-    <span class="s2">"minProperties"</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span>
-    <span class="s2">"not"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"required"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"fixed"</span><span class="p">,</span> <span class="s2">"last_affected"</span><span class="p">]},</span>
-<span class="p">}</span>
-<span class="n">_VERSIONS_SCHEMA</span><span class="p">:</span> <span class="n">Mapping</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
-    <span class="s2">"oneOf"</span><span class="p">:</span> <span class="p">[</span><span class="n">_RANGE</span><span class="p">,</span> <span class="p">{</span><span class="s2">"type"</span><span class="p">:</span> <span class="s2">"array"</span><span class="p">,</span> <span class="s2">"minItems"</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span> <span class="s2">"items"</span><span class="p">:</span> <span class="n">_RANGE</span><span class="p">}]</span>
-<span class="p">}</span>
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">dotted</span><span class="p">(</span><span class="n">version</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
@@ -584,7 +459,6 @@
 <span class="w">    </span><span class="sd">"""The version facet: a union of OSV-style ranges (section 4.8)."""</span>
 
     <span class="n">name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">"version"</span>
-    <span class="n">schema</span><span class="p">:</span> <span class="n">ClassVar</span><span class="p">[</span><span class="n">Mapping</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="n">_VERSIONS_SCHEMA</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">parse_rule</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">VersionRange</span><span class="p">,</span> <span class="o">...</span><span class="p">]:</span>
         <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">Mapping</span><span class="p">):</span>
