@@ -1,0 +1,37 @@
+# A made-up pack to play with. The products, rules and parameter names are
+# invented; nothing here describes real data or real model guidance.
+[pack]
+name = "toy"
+version = "0.1.0"
+code_prefix = ["TOY"]
+license = "CC0-1.0"
+files = ["rules.geojson"]
+
+# The dimensions the records use. They must exist on the Index the pack is
+# loaded into (play.py declares the resolution axis; the facets are defaults).
+[axes.resolution]
+unit = "km"
+description = "horizontal grid spacing"
+
+[facets]
+names = ["product", "variable", "model"]
+
+# A global ocean reanalysis, from 1993 onwards.
+[products.toy_ocean]
+aliases = ["TOYO"]
+variables = ["thetao", "so", "zos"]
+resolution = [0.25, "deg"]
+coverage = { time = ["1993-01-01", ".."] }
+
+# A global atmosphere reanalysis, from 1950 onwards.
+[products.toy_atmos]
+variables = ["t2m", "tp"]
+resolution = [0.5, "deg"]
+coverage = { time = ["1950-01-01", ".."] }
+
+# A regional ocean product that covers one box (roughly the Gulf of Mexico)
+# for 2010 to 2023 only.
+[products.toy_coastal]
+variables = ["thetao", "so"]
+resolution = [2.0, "km"]
+coverage = { time = ["2010-01-01", "2023-12-31"], box = { west = -98, width = 18, south = 18, north = 31 } }

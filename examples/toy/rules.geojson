@@ -1,0 +1,210 @@
+{
+  "type": "FeatureCollection",
+  "conformsTo": [
+    "http://www.opengis.net/spec/json-fg-1/1.0/conf/core"
+  ],
+  "features": [
+    {
+      "type": "Feature",
+      "id": "TOY001",
+      "geometry": null,
+      "time": {
+        "interval": [
+          "1993-01-01",
+          "2003-12-31"
+        ]
+      },
+      "properties": {
+        "code": "TOY001",
+        "kind": "caveat",
+        "title": "toy_ocean salinity is poorly constrained before 2004",
+        "message": "Few salinity profiles went into toy_ocean before 2004, so its salinity drifts in that period.",
+        "severity": "warning",
+        "instruction": "Start after 2004 if you can.",
+        "action": "use_with_caution",
+        "facets": {
+          "product": [
+            "toy_ocean"
+          ],
+          "variable": [
+            "so"
+          ]
+        },
+        "status": "draft"
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "TOY002",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              165,
+              52
+            ],
+            [
+              -160,
+              52
+            ],
+            [
+              -160,
+              66
+            ],
+            [
+              165,
+              66
+            ],
+            [
+              165,
+              52
+            ]
+          ]
+        ]
+      },
+      "time": null,
+      "properties": {
+        "code": "TOY002",
+        "kind": "caveat",
+        "title": "toy_ocean is too warm in the Bering Sea in winter",
+        "message": "From December to March, toy_ocean sea temperature in the Bering Sea runs about 1 K too warm.",
+        "severity": "warning",
+        "facets": {
+          "product": [
+            "toy_ocean"
+          ],
+          "variable": [
+            "thetao"
+          ]
+        },
+        "recurrence": {
+          "months": [
+            12,
+            1,
+            2,
+            3
+          ]
+        },
+        "status": "draft"
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "TOY003",
+      "geometry": null,
+      "time": {
+        "interval": [
+          "2015-06-01",
+          "2015-08-31"
+        ]
+      },
+      "properties": {
+        "code": "TOY003",
+        "kind": "caveat",
+        "title": "toy_atmos precipitation is broken in summer 2015",
+        "message": "toy_atmos precipitation from June to August 2015 was produced with a faulty input file.",
+        "severity": "severe",
+        "action": "do_not_use",
+        "facets": {
+          "product": [
+            "toy_atmos"
+          ],
+          "variable": [
+            "tp"
+          ]
+        },
+        "status": "draft"
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "TOY101",
+      "geometry": null,
+      "time": null,
+      "properties": {
+        "code": "TOY101",
+        "kind": "recommendation",
+        "title": "Arctic domain: consider active sea ice",
+        "message": "Part of this domain lies north of the Arctic Circle, where sea ice matters.",
+        "severity": "info",
+        "box": {
+          "west": -180,
+          "width": 360,
+          "south": 66.5,
+          "north": 90
+        },
+        "facets": {
+          "model": [
+            "mom6"
+          ]
+        },
+        "suggestions": [
+          {
+            "target": "compset",
+            "key": "ice_component",
+            "value": "CICE",
+            "rationale": "Made-up key: swap the stub ice component for an active one."
+          }
+        ],
+        "status": "draft"
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "TOY102",
+      "geometry": null,
+      "time": null,
+      "properties": {
+        "code": "TOY102",
+        "kind": "recommendation",
+        "title": "Fine grid: turn off the coarse-grid eddy scheme",
+        "message": "Below 10 km the model starts to resolve eddies itself.",
+        "severity": "info",
+        "axes": {
+          "resolution": {
+            "lt": 10,
+            "unit": "km"
+          }
+        },
+        "suggestions": [
+          {
+            "target": "MOM_input",
+            "key": "TOY_EDDY_SCHEME",
+            "value": false,
+            "rationale": "Made-up parameter name."
+          }
+        ],
+        "status": "draft"
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "TOY103",
+      "geometry": null,
+      "time": null,
+      "properties": {
+        "code": "TOY103",
+        "kind": "recommendation",
+        "title": "Coarse grid: raise the toy viscosity",
+        "message": "At 50 km or coarser, the toy model needs more viscosity to stay stable.",
+        "severity": "info",
+        "axes": {
+          "resolution": {
+            "ge": 50,
+            "unit": "km"
+          }
+        },
+        "suggestions": [
+          {
+            "target": "MOM_input",
+            "key": "TOY_VISCOSITY",
+            "value": 10000.0,
+            "rationale": "Made-up parameter name and value."
+          }
+        ],
+        "status": "draft"
+      }
+    }
+  ]
+}

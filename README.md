@@ -4,7 +4,7 @@ queryearth answers one question: given where (a point, a polygon or a model grid
 
 Rules are GeoJSON features or short Python classes. A query returns findings of three kinds: caveats ("these values are climatology, not observations"), coverage gaps ("this product does not reach part of your request") and recommendations ("set this model parameter"). queryearth ships no rules of its own; you bring yours.
 
-**Status:** pre-alpha. The design is in [docs/design.md](docs/design.md); the engine is not implemented yet.
+**Status:** pre-alpha. The design is in [docs/design.md](docs/design.md). To try it, run [examples/toy/play.py](examples/toy/play.py), which loads a small made-up pack and walks through queries, coverage gaps, Python rules, `emit()`, `suitable()` and `query_points()`.
 
 ## Install
 
