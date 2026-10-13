@@ -262,3 +262,23 @@ def test_finding_to_dict_is_json_ready():
 def test_rule_from_feature_needs_properties_and_a_geometry():
     with pytest.raises(ValueError, match="properties and a geometry"):
         qe.Rule.from_feature({"type": "Feature"}, qe.Index())
+
+
+def test_space_and_time_are_built_in_dimensions():
+    from queryearth.dimensions import SpaceDimension, TimeDimension
+
+    assert [name for name, _, _ in qe.Index("x")._groups] == ["space", "time"] + list(
+        qe.Index.FACETS
+    )
+    space, time = SpaceDimension(), TimeDimension()
+    square = sp.box(0, 0, 2, 2)
+    assert space.match(None, square).fraction == 1.0  # unconstrained: measured only
+    assert space.match(sp.box(10, 10, 12, 12), square) is None
+    half = space.match(sp.box(0, 0, 1, 2), square)
+    assert half.fraction == pytest.approx(0.5) and half.overlap > 0
+    year = qe.interval("2000-01-01", "2000-12-31")
+    january = qe.interval("2000-01-01", "2000-01-31")
+    assert time.match(january, year).overlap == (("2000-01-01", "2000-01-31"),)
+    assert time.match(january, year).fraction == pytest.approx(31 / 366)
+    assert time.match(qe.interval("2001-01-01", ".."), year) is None
+    assert time.extent(january) == (("2000-01-01", "2000-01-31"),)

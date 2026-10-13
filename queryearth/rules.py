@@ -20,7 +20,7 @@ from typing import TYPE_CHECKING, Any, ClassVar, Protocol
 import numpy as np
 
 from queryearth import space as sp
-from queryearth.dimensions import schema_problem
+from queryearth.dimensions import DimMatch, schema_problem
 from queryearth.objects import Finding, Match, Outcome, Query, Scope, Severity
 from queryearth.space import Space
 from queryearth.time import Interval, TimeSpec, overlap, parse_time, time_fraction
@@ -71,16 +71,12 @@ class RuleKind(Protocol):
 
 @dataclass(frozen=True, eq=False)
 class CompiledScope:
-    """A scope with its names checked and its values parsed by their plugins."""
+    """A scope with its names checked and its values parsed by their dimensions."""
 
-    space: Space | None
-    time: TimeSpec | None
-    values: Mapping[str, Any]  # dimension name -> parsed rule value
+    values: Mapping[str, Any]  # dimension name -> parsed rule value, space and time too
     requires: tuple[str, ...] = ()
 
     def constrains(self, name: str) -> bool:
-        if name in ("space", "time"):
-            return getattr(self, name) is not None
         return name in self.values
 
 
@@ -100,76 +96,59 @@ def binding_of(rule: Any) -> Binding:
     return found
 
 
+_GROUP_NAMES = ("space", "time", "axes", "facets", "dims")
+
+
 def match_scope(
     index: Index, scope: CompiledScope, query: Query, parsed: Mapping | None = None
 ) -> tuple[Match, dict[str, Any]] | None:
     """Match one scope against one query part, dimension by dimension (section 4.3).
 
     Returns None when some dimension fails; otherwise the Match, whose
-    conditional_on names the undecided dimensions in the fixed order (space,
-    time, axes, facets, other plugins, context keys), and details that hold
-    recurrence_months when time is undecided.
+    conditional_on names the undecided dimensions in the Index's order (space,
+    time, axes, facets, other plugins, then context keys), and details that
+    hold recurrence_months when time is undecided. Dimensions marked late run
+    after the others, so the costly spatial test runs last.
     """
     if parsed is None:
         parsed = index._parse_query(query)
     undecided: set[str] = set()
-    found: dict[str, Any] = {}
-
-    def plugins(late: bool) -> bool:
+    found: dict[str, DimMatch] = {}
+    for late in (False, True):
         for name, dimension, _ in index._groups:
-            if name not in scope.values or getattr(dimension, "late", False) != late:
+            if getattr(dimension, "late", False) != late:
                 continue
-            rule = scope.values[name]
-            comparable = getattr(dimension, "comparable", None)
-            if name not in parsed or (
-                comparable and not comparable(rule, parsed[name])
+            rule, value = scope.values.get(name), parsed.get(name)
+            if rule is None and (
+                value is None or not getattr(dimension, "always", False)
             ):
+                continue  # unconstrained, and nothing to measure
+            comparable = getattr(dimension, "comparable", None)
+            if value is None or (comparable and not comparable(rule, value)):
                 undecided.add(name)
                 continue
-            found[name] = dimension.match(rule, parsed[name])
+            found[name] = dimension.match(rule, value)
             if found[name] is None:
-                return False
-        return True
-
-    if not plugins(late=False):
-        return None
-    details: dict[str, Any] = {}
-    time_overlap, fraction = (), None
-    if scope.time is not None and query.time is None:
-        undecided.add("time")
-        if scope.time.extent != (None, None):
-            time_overlap = scope.time.to_wire()  # the rule's own periods
-        if scope.time.months is not None:
-            details["recurrence_months"] = sorted(scope.time.months)
-    elif query.time is not None:
-        both = query.time if scope.time is None else overlap(scope.time, query.time)
-        if both is None:
-            return None
-        time_overlap, fraction = both.to_wire(), time_fraction(both, query.time)
-    area_fraction = overlap_km2 = None
-    if scope.space is not None and query.space is None:
-        undecided.add("space")
-    elif query.space is not None:
-        if scope.space is not None and not sp.meets(scope.space, query.space):
-            return None
-        area_fraction, overlap_km2 = sp.measure(scope.space, query.space)
-    if not plugins(late=True):
-        return None
-    groups = {"axes": {}, "facets": {}, "dims": {}}
+                return None
+    groups: dict[str, dict[str, Any]] = {g: {} for g in _GROUP_NAMES}
     for name, dimension, group in index._groups:
         if name in found:
             hit = found[name]
             groups[group][name] = hit if group == "dims" else hit.overlap
-        elif name in undecided and group == "axes" and hasattr(dimension, "extent"):
-            groups["axes"][name] = dimension.extent(scope.values[name])
-    order = ["space", "time"] + [name for name, _, _ in index._groups]
-    conditional = [name for name in order if name in undecided]
+        elif name in undecided and group in ("time", "axes"):  # the rule's own extent
+            if hasattr(dimension, "extent"):
+                groups[group][name] = dimension.extent(scope.values[name])
+    details: dict[str, Any] = {}
+    if "time" in undecided and scope.values["time"].months is not None:
+        details["recurrence_months"] = sorted(scope.values["time"].months)
+    space, time = found.get("space"), found.get("time")
+    conditional = [name for name, _, _ in index._groups if name in undecided]
     conditional += [f"context:{k}" for k in scope.requires if k not in query.context]
     match = Match(
-        area_fraction=area_fraction,
-        overlap_km2=overlap_km2,
-        time_overlap=time_overlap,
-        time_fraction=fraction,
+        area_fraction=None if space is None else space.fraction,
+        overlap_km2=None if space is None else space.overlap,
+        time_overlap=groups["time"].get("time", ()),
+        time_fraction=None if time is None else time.fraction,
         axes=groups["axes"],
         matched_facets=groups["facets"],
         dims=groups["dims"],

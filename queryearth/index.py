@@ -26,7 +26,15 @@ import shapely
 
 from queryearth import packs
 from queryearth import space as sp
-from queryearth.dimensions import Axis, Labels, Patterns, Versions, is_glob
+from queryearth.dimensions import (
+    Axis,
+    Labels,
+    Patterns,
+    SpaceDimension,
+    TimeDimension,
+    Versions,
+    is_glob,
+)
 from queryearth.errors import DuplicateCodeError, UnknownNameError
 from queryearth.objects import (
     Coverage,
@@ -59,7 +67,7 @@ __all__ = ["Index", "PointResult", "ScoreFn", "Suitability", "default_score"]
 
 _SLUG = re.compile(r"[a-z][a-z0-9_]*")
 _REGION = re.compile(r"[a-z][a-z0-9_.-]*:[A-Za-z0-9_.+-]+")
-_GROUPS = {"axes": 0, "facets": 1, "dims": 2}
+_GROUPS = {"space": -2, "time": -1, "axes": 0, "facets": 1, "dims": 2}
 _KINDS = {"coverage": 0, "caveat": 1, "recommendation": 2}
 _PER_REQUEST = ("product", "variable", "version")
 
@@ -108,7 +116,10 @@ class Index:
         dimensions: Iterable[Any] = (),  # any other plugin dimensions
     ) -> None:
         self.name = name
-        self._groups: list[tuple[str, Any, str]] = []  # axes, facets, then others
+        self._groups: list[tuple[str, Any, str]] = [  # then axes, facets, others
+            ("space", SpaceDimension(), "space"),
+            ("time", TimeDimension(), "time"),
+        ]
         self._products: dict[str, Product] = {}
         self._aliases: dict[str, str] = {}  # case-folded name or alias -> name
         self._regions: dict[str, Space] = {}  # "namespace:id" -> polygon
@@ -148,7 +159,7 @@ class Index:
         name = getattr(dimension, "name", None)
         if not isinstance(name, str) or not _SLUG.fullmatch(name):
             raise ValueError(f"a dimension name is a lowercase slug, not {name!r}")
-        if name in ("space", "time") or any(n == name for n, _, _ in self._groups):
+        if any(n == name for n, _, _ in self._groups):
             raise ValueError(f"dimension name {name!r} is reserved or already declared")
         for member in ("parse_rule", "parse_query", "match"):
             if not callable(getattr(dimension, member, None)):
@@ -341,7 +352,9 @@ class Index:
         space = self._region(refs, code) if refs else scope.space
         if space is not None and space.kind != "polygon":
             raise ValueError(f"{code}: a rule space is a polygon, not a point")
-        values = {}
+        values = {
+            k: v for k, v in (("space", space), ("time", scope.time)) if v is not None
+        }
         for group in ("axes", "facets", "dims"):
             for name, value in getattr(scope, group).items():
                 dimension, _ = self._dimension(name, group)
@@ -351,13 +364,17 @@ class Index:
                     raise ValueError(f"{code}: {name}: {err}") from err
                 if name == "product":
                     values[name] = self._product_patterns(values[name])
-        return CompiledScope(space, scope.time, values, requires)
+        return CompiledScope(values, requires)
 
     def _parse_query(self, query: Query) -> dict[str, Any]:
         """The query's values, parsed by their plugins; product aliases resolved."""
         if self._last[0] is query:
             return self._last[1]
-        parsed = {}
+        parsed = {
+            k: v
+            for k, v in (("space", query.space), ("time", query.time))
+            if v is not None
+        }
         for group in ("axes", "facets", "dims"):
             for name, value in getattr(query, group).items():
                 dimension, _ = self._dimension(name, group)
@@ -705,14 +722,15 @@ class Index:
             product = q.facets["product"][0] if q.request is not None else None
             for entry in self._candidates(part):
                 rule, key = entry.rule, (product, entry.rule.code)
-                scope = dataclasses.replace(entry.scope, space=None, requires=())
+                values = {k: v for k, v in entry.scope.values.items() if k != "space"}
+                scope = CompiledScope(values)  # the points stand in for space
                 matched = match_scope(self, scope, q)
                 if matched is None:
                     continue
                 match, details = matched
                 if match.conditional_on and not conditional:
                     continue
-                space = entry.scope.space
+                space = entry.scope.values.get("space")
                 mask = valid.copy() if space is None else sp.points_mask(space, x, y)
                 if not mask.any():
                     continue

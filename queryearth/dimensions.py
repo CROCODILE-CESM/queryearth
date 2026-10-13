@@ -1,7 +1,8 @@
-"""Dimension plugins: every kind of scope other than space and time (section 4.13).
+"""Dimensions: every kind of scope, through one interface (section 4.13).
 
-A plugin decides only whether one rule value meets one query value; the Index
-does everything else (conditional findings, unknown names, requests, sorting).
+A dimension decides only whether one rule value meets one query value; the
+Index does everything else (conditional findings, unknown names, requests,
+sorting). Space and time are built in on every Index and cannot be replaced.
 Axis (numeric ranges), Labels (facets matched by glob patterns) and Versions
 (OSV-style version ranges) are the built-in plugins, and a user plugin
 implements the same four members.
@@ -18,7 +19,9 @@ from typing import Any, ClassVar, Protocol, runtime_checkable
 
 import numpy as np
 
+from queryearth import space as sp
 from queryearth.objects import AxisOverlap
+from queryearth.time import TimeSpec, overlap, time_fraction
 
 __all__ = [
     "Axis",
@@ -27,6 +30,8 @@ __all__ = [
     "Labels",
     "Patterns",
     "Prefilter",
+    "SpaceDimension",
+    "TimeDimension",
     "VersionRange",
     "Versions",
 ]
@@ -48,7 +53,8 @@ class Dimension(Protocol):
     (False makes the finding conditional on the dimension); build(pairs) ->
     Prefilter over the (position, rule value) pairs of the rules that constrain
     it; to_json(overlap) for Finding.to_dict(); late = True to run after the
-    exact spatial test.
+    exact spatial test; extent(rule) for what an undecided finding reports;
+    always = True to call match(None, query) when a rule leaves it unconstrained.
     """
 
     name: str  # key in scopes, queries, records and conditional_on
@@ -65,6 +71,60 @@ class Prefilter(Protocol):
     """Narrows the rules before match() runs; may return extra positions."""
 
     def candidates(self, query: Any) -> set[int]: ...
+
+
+# ---- space and time: built in on every Index --------------------------------------
+class SpaceDimension:
+    """Space: closed-set meeting, then the area fraction and overlap in km².
+
+    It runs late, after the cheaper dimensions, and also measures the query
+    against a rule that leaves space unconstrained. Records carry space in the
+    GeoJSON geometry, so it has no properties schema.
+    """
+
+    name = "space"
+    schema: ClassVar[Mapping[str, Any]] = {}
+    late = True
+    always = True
+
+    def parse_rule(self, value: sp.Space) -> sp.Space:
+        return value
+
+    parse_query = parse_rule
+
+    def match(self, rule: sp.Space | None, query: sp.Space) -> DimMatch | None:
+        if rule is not None and not sp.meets(rule, query):
+            return None
+        fraction, km2 = sp.measure(rule, query)
+        return DimMatch(km2, fraction)
+
+
+class TimeDimension:
+    """Time: the overlapping periods and the share of the query they cover.
+
+    It also measures the query against a rule that leaves time unconstrained,
+    and an undecided rule reports its own periods. Records carry time in the
+    JSON-FG time member, so it has no properties schema.
+    """
+
+    name = "time"
+    schema: ClassVar[Mapping[str, Any]] = {}
+    always = True
+
+    def parse_rule(self, value: TimeSpec) -> TimeSpec:
+        return value
+
+    parse_query = parse_rule
+
+    def match(self, rule: TimeSpec | None, query: TimeSpec) -> DimMatch | None:
+        both = query if rule is None else overlap(rule, query)
+        if both is None:
+            return None
+        return DimMatch(both.to_wire(), time_fraction(both, query))
+
+    def extent(self, rule: TimeSpec) -> tuple[tuple[str, str], ...]:
+        """The rule's own periods, reported when the query gives no time."""
+        return () if rule.extent == (None, None) else rule.to_wire()
 
 
 # ---- plugin schemas -------------------------------------------------------------
