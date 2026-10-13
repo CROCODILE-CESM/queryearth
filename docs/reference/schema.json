@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:queryearth:schema:rule:1",
   "title": "queryearth rule record or pack",
-  "description": "A rule record is a GeoJSON Feature (RFC 7946) with the OGC JSON-FG 1.0 'time' member and queryearth properties. A pack file is a FeatureCollection of rule records with an optional collection header. Checks that JSON Schema cannot express are done by the loader (design section 5.3): codes unique in the Index; a code's prefix, the part before the optional hyphen and the final digits, equal to a prefix the pack owns exactly (a pack owning CRU does not own CRUX001); no two packs claiming one prefix; 'periods' inside 'time'; dates valid in the stated calendar; a box's south below its north; axis, facet, product and region names declared on the Index.",
+  "description": "A rule record is a GeoJSON Feature (RFC 7946) with the OGC JSON-FG 1.0 'time' member and queryearth properties. A pack file is a FeatureCollection of rule records with an optional collection header. Checks that JSON Schema cannot express are done by the loader (design section 5.3): codes unique in the Index; a code's prefix, the part before the optional hyphen and the final digits, equal to a prefix the pack owns exactly (a pack owning CRU does not own CRUX001); no two packs claiming one prefix; 'periods' inside 'time'; dates valid in the proleptic Gregorian calendar, from year 1 to 9999; a box's south below its north; axis, facet, product and region names declared on the Index.",
   "oneOf": [{"$ref": "#/$defs/rule"}, {"$ref": "#/$defs/pack"}],
   "$defs": {
     "code": {
@@ -23,14 +23,14 @@
       "const": "http://www.opengis.net/def/crs/OGC/0/CRS84"
     },
     "date": {
-      "description": "Civil date at day precision. Years outside 0000-9999 (sign or 5+ digits) are a documented extension beyond RFC 3339 and JSON-FG 1.0, so records that use them are not valid JSON-FG for paleo products. Day 30 of February is allowed by the pattern because 360_day calendars use it; the loader checks the date against the calendar.",
+      "description": "Date at day precision in the proleptic Gregorian calendar, from year 1 to 9999. The loader rejects dates the pattern allows but the calendar lacks, such as 30 February.",
       "type": "string",
-      "pattern": "^-?[0-9]{4,}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$"
+      "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$"
     },
     "timestamp": {
       "description": "Civil date-time at second precision, UTC, written with a trailing Z.",
       "type": "string",
-      "pattern": "^-?[0-9]{4,}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]Z$"
+      "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]Z$"
     },
     "instant": {"oneOf": [{"$ref": "#/$defs/date"}, {"$ref": "#/$defs/timestamp"}]},
     "bound": {
@@ -217,19 +217,6 @@
       },
       "additionalProperties": false
     },
-    "calendar": {
-      "enum": [
-        "standard",
-        "gregorian",
-        "proleptic_gregorian",
-        "julian",
-        "noleap",
-        "365_day",
-        "all_leap",
-        "366_day",
-        "360_day"
-      ]
-    },
     "properties": {
       "type": "object",
       "required": ["code", "kind", "title", "message", "severity"],
@@ -289,7 +276,6 @@
           },
           "additionalProperties": false
         },
-        "calendar": {"$ref": "#/$defs/calendar"},
         "time_start": {"$ref": "#/$defs/bound"},
         "time_end": {"$ref": "#/$defs/bound"},
         "min_overlap": {"type": "number", "minimum": 0, "maximum": 1},
@@ -396,7 +382,6 @@
             "description": {"type": "string"},
             "license": {"type": "string"},
             "issued": {"$ref": "#/$defs/timestamp"},
-            "calendar": {"$ref": "#/$defs/calendar"},
             "technical_limitations": {"type": "array", "items": {"type": "string"}},
             "references": {"type": "array", "items": {"$ref": "#/$defs/reference"}}
           },

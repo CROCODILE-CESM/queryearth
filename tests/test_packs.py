@@ -1,5 +1,5 @@
 """Packs and records: the example pack and its five queries, loader checks, the
-record parts of fixtures 3, 15, 17 and 27 of docs/reference/fixtures.md, and the
+record parts of fixtures 17 and 27 of docs/reference/fixtures.md, and the
 agreement between the loader and docs/reference/schema.json.
 """
 
@@ -78,7 +78,7 @@ def example_index(tmp_path):
             aliases=("NWM", "NWM v3.0"),
             variables=("inflow", "outflow", "water_sfc_elev"),
             coverage=qe.Coverage(
-                space=sp.features([101, 102, 103], "hydrolakes"),
+                space=sp.box(-125, 24, -66, 50),  # the conterminous United States
                 time=qe.interval("1979-02-01", "2023-01-31"),
             ),
             resolution=(1.0, "km"),
@@ -90,7 +90,7 @@ def example_index(tmp_path):
         "CROC104",
         kind="recommendation",
         severity=qe.Severity.INFO,
-        space=sp.lat_band(66.5, 90.0),
+        space=sp.box(-180, 66.5, 180, 90),
         facets={"model": "mom6"},
         axes={"resolution": {"gt": 0.0}},
     )
@@ -143,8 +143,7 @@ def test_example_pack_loads(tmp_path):
     assert codes == [f["properties"]["code"] for f in RULES["features"]]
     assert len(codes) == 14 and index._packs["examples"][0] == "BIO"
     cru = index.products["cru_ts"]
-    assert cru.resolution == (0.5, "deg") and cru.calendar == "standard"
-    assert len(cru.grid[0]) == 721 and len(cru.grid[1]) == 361
+    assert cru.resolution == (0.5, "deg")
     assert cru.coverage.time.to_wire() == (("1901-01-01", "2022-12-31"),)
     assert index.products["era5"].coverage.time.to_wire() == (("1940-01-01", ".."),)
     ili = index.products["demo_ili"].coverage.space  # a box across the antimeridian
@@ -179,7 +178,7 @@ def test_example_query_1_lake_kariba(tmp_path):
     }
     cru002, cru001 = found[:2]
     assert cru002.severity is qe.Severity.SEVERE and cru002.details["stn0_fraction"]
-    assert cru001.assumed == ("space", "version") and cru001.source == "examples"
+    assert cru001.assumed == ("version",) and cru001.source == "examples"
     assert cru001.area_fraction == 1.0 and cru001.time_fraction == 1.0
     assert cru001.time_overlap == (("2013-01-01", "2022-12-31"),)
     assert all(f.product == "cru_ts" and f.request == 0 for f in found)
@@ -193,19 +192,11 @@ def test_example_query_1_lake_kariba(tmp_path):
     assert croc102.conditional_on == ("resolution",) and croc102.request is None
 
 
-def polar_square(half_km=1500.0, n=41):
-    """Cell corners of a square in a spherical Arctic polar stereographic grid."""
-    k0 = (1.0 + np.sin(np.radians(71.0))) / 2.0  # true scale at 71N
-    x, y = np.meshgrid(*[np.linspace(-half_km, half_km, n)] * 2)
-    rho = np.hypot(x, y) / (2.0 * sp.R_KM * k0)
-    return np.degrees(np.arctan2(x, -y)), 90.0 - 2.0 * np.degrees(np.arctan(rho))
-
-
 def test_example_query_2_arctic_mom6_domain(tmp_path):
     index, _ = example_index(tmp_path)
-    ring = sp.from_grid(*polar_square())
+    domain = sp.box(-180, 70.6, 180, 90)  # an Arctic cap, closed along the pole
     found = index.query(
-        space=ring,
+        space=domain,
         time=qe.interval("2020-01-01", "2020-12-31"),
         axes={"resolution": (8.0, 12.0)},
         facets={"model": "mom6"},
@@ -410,44 +401,20 @@ def test_time_start_and_time_end_are_the_fallback_time():
         )
 
 
-def test_record_polygons_are_built_on_first_use():  # section 9.2
-    ring = [[0, 0], [10, 0], [10, 10], [0, 10], [0, 0]]
-    fiji = [[170, -20], [-170, -20], [-170, -10], [170, -10], [170, -20]]
-    index = qe.Index("x")
-    for code, coords in (("TST001", ring), ("TST002", fiji)):
-        geometry = {"type": "Polygon", "coordinates": [coords]}
-        index.add({**record(code), "geometry": geometry})
-    square, seam = (e.scope.space for e in index._entries)
-    assert square.envelope == (0, 0, 10, 10) and "built" not in vars(square)
-    assert not hasattr(seam, "envelope")  # crosses the seam: normalised at load
-    assert [f.code for f in index.query(space=sp.point(-175, -15))] == ["TST002"]
-    assert [f.code for f in index.query(space=sp.point(10, 5))] == ["TST001"]
-    assert square.area_km2 == pytest.approx(sp.box(0, 0, 10, 10).area_km2, rel=1e-12)
-
-
-# ---- fixtures 3, 15, 17 and 27 as records ---------------------------------------------
-def test_fixture_3_seam_listed_twice_is_a_load_error():
-    ring = [[-180 + i, 70] for i in range(361)] + [[-180, 70]]
+# ---- records: rings, and fixtures 17 and 27 ---------------------------------------------
+def test_a_ring_around_a_pole_is_a_load_error():
+    ring = [[-180 + i, 70] for i in range(360)] + [[-180, 70]]
     feature = {**record(), "geometry": {"type": "Polygon", "coordinates": [ring]}}
-    with pytest.raises(ValueError, match="TST001: the ring encloses no area"):
+    with pytest.raises(ValueError, match="TST001: .* close it along latitude 90"):
         qe.Index("x").add(feature)
-    feature["geometry"]["coordinates"] = [ring[:-2] + [ring[0]]]  # seam listed once
+    feature["geometry"]["coordinates"] = [ring[:-1] + [[180, 70], [-180, 70]]]
+    with pytest.raises(ValueError, match="TST001: the ring encloses no area"):
+        qe.Index("x").add(feature)  # -180 and 180 both listed: no turn, no area
+    cap = [[-180, 70], [180, 70], [180, 90], [-180, 90], [-180, 70]]
+    feature["geometry"]["coordinates"] = [cap]
     index = qe.Index("x")
     index.add(feature)
     assert [f.code for f in index.query(space=sp.point(123, 90))] == ["TST001"]
-
-
-def test_fixture_15_dates_in_records_follow_their_calendar():
-    index = qe.Index("x")
-    with pytest.raises(ValueError, match="noleap"):
-        index.add(
-            {**record("TST001", calendar="noleap"), "time": {"date": "2004-02-29"}}
-        )
-    index.add({**record("TST002", calendar="360_day"), "time": {"date": "2001-02-30"}})
-    with pytest.raises(ValueError, match="360_day"):
-        index.add(
-            {**record("TST003", calendar="360_day"), "time": {"date": "2001-01-31"}}
-        )
 
 
 def test_fixture_17_axis_unit_in_a_record():
@@ -506,6 +473,7 @@ BAD = {
     "axis with lt and le": {"axes": {"resolution": {"lt": 1, "le": 2}}},
     "periods without time": {"periods": [["2000-01-01", "2000-12-31"]]},
     "supersedes a bad code": {"supersedes": ["cru001"]},
+    "a calendar": {"calendar": "noleap"},
 }
 BAD_FEATURES = {
     "reserved prefix QE": record("QE001"),

@@ -96,7 +96,9 @@ index.add(
         title="toy_atmos 2 m temperature is too cold over sea ice",
         message="Over sea ice, toy_atmos t2m runs a few kelvin too cold.",
         severity=qe.Severity.WARNING,
-        scope=qe.Scope(space=sp.lat_band(60, 90), facets={"product": ["toy_atmos"]}),
+        scope=qe.Scope(
+            space=sp.box(-180, 60, 180, 90), facets={"product": ["toy_atmos"]}
+        ),
     )
 )
 

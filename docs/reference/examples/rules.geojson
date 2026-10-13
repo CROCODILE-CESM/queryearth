@@ -34,7 +34,6 @@
           "version": {"versions": ["4.07"]}
         },
         "region_ref": ["ar6:SAH", "ar6:WAF", "ar6:CAF", "ar6:NEAF", "ar6:SEAF", "ar6:WSAF", "ar6:ESAF", "ar6:MDG"],
-        "calendar": "standard",
         "min_overlap": 0.1,
         "evidence": [
           {
@@ -75,7 +74,6 @@
           "version": {"versions": ["4.07"]}
         },
         "box": {"west": 16.5, "width": 16.5, "south": -35, "north": -22},
-        "calendar": "standard",
         "status": "deprecated",
         "created": "2026-10-02T00:00:00Z",
         "updated": "2026-10-09T00:00:00Z",
@@ -103,7 +101,6 @@
           "version": {"versions": ["4.07"]}
         },
         "box": {"west": 16.5, "width": 16.5, "south": -35, "north": -22},
-        "calendar": "standard",
         "evidence": [
           {
             "method": "derived",

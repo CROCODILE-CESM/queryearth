@@ -1,7 +1,7 @@
 """queryearth: match rules scoped by area, time and other dimensions to a request.
 
-queryearth.time holds civil-date keys, intervals and calendars, and
-queryearth.space normalised shapes, cells and closed-set measures (imported as
+queryearth.time holds time keys, intervals and their measures, and
+queryearth.space points, polygons and closed-set measures (imported as
 ``from queryearth import space as sp``). The rule engine is at the top level:
 an Index of dimensions, products, regions and rules answers queries with
 Finding objects, and emit() reports findings under a policy. See docs/design.md
@@ -54,14 +54,7 @@ from queryearth.model import (
 )
 from queryearth.rules import CheckResult, ComputedRule, Rule, RuleFunc, RuleKind
 from queryearth.space import Space
-from queryearth.time import (
-    Interval,
-    TimeSpec,
-    civil_key,
-    from_bounds,
-    interval,
-    parse_time,
-)
+from queryearth.time import Interval, TimeSpec, interval, parse_time
 
 __all__ = [
     "Action",
@@ -108,10 +101,8 @@ __all__ = [
     "Versions",
     "WarningAdvisory",
     "__version__",
-    "civil_key",
     "default_score",
     "emit",
-    "from_bounds",
     "interval",
     "parse_time",
     "policy",

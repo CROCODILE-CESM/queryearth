@@ -339,8 +339,8 @@ class Index:
         self, scope: Scope, refs: tuple[str, ...], requires: tuple[str, ...], code: str
     ) -> CompiledScope:
         space = self._region(refs, code) if refs else scope.space
-        if space is not None and space.kind not in ("polygon", "features"):
-            raise ValueError(f"{code}: a rule space is an area or object ids")
+        if space is not None and space.kind != "polygon":
+            raise ValueError(f"{code}: a rule space is a polygon, not a point")
         values = {}
         for group in ("axes", "facets", "dims"):
             for name, value in getattr(scope, group).items():
@@ -410,17 +410,7 @@ class Index:
         name = self._product(request.product)
         product = self._products[name]
         assumed = set()
-        space = request.support
-        if space is None:
-            space = base.space
-            if (
-                product.grid is not None
-                and space is not None
-                and space.kind in ("point", "polygon")
-            ):
-                grid = product.grid
-                space = grid(space) if callable(grid) else sp.cells(grid, space)
-                assumed.add("space")
+        space = base.space if request.support is None else request.support
         version = request.version
         has_version = any(n == "version" for n, _, _ in self._groups)
         if version is None and product.version is not None and has_version:
@@ -448,9 +438,9 @@ class Index:
         if time is None:  # open at both ends when the coverage has no time
             time = coverage.time
             if time is None:
-                time = TimeSpec((Interval(None, None),), calendar=product.calendar)
+                time = TimeSpec((Interval(None, None),))
             assumed.add("time")
-        order = tuple(d for d in ("space", "time", "version") if d in assumed)
+        order = tuple(d for d in ("time", "version") if d in assumed)
         sub = dataclasses.replace(sub, time=time, assumed=order)
         return _Part(sub, "request", product, coverage)
 
@@ -537,8 +527,13 @@ class Index:
         found += self._coverage(part)
         return [f for f in found if conditional or not f.conditional_on]
 
-    def _coverage(self, part: _Part) -> list[Finding]:
-        """QE001 and QE002 for a request's product: what lies outside its coverage."""
+    def _coverage(
+        self, part: _Part, share: Callable[[Space], float] | None = None
+    ) -> list[Finding]:
+        """QE001 and QE002 for a request's product: what lies outside its coverage.
+
+        share(space) is the bulk path's weighted share of the points inside a space.
+        """
         if part.product is None:
             return []
         query, coverage, name = part.query, part.coverage, part.product.name
@@ -557,8 +552,10 @@ class Index:
         inside = inside_km2 = None
         if coverage.space is None:
             pass
-        elif coverage.space.kind == "empty":  # a callable's "not served" (Q7)
+        elif coverage.space.geometry.is_empty:  # a callable's "not served" (Q7)
             inside = inside_km2 = 0.0
+        elif share is not None:
+            inside = share(coverage.space)
         elif query.space is None:
             message = f"The request gives no space to check against {name}."
             undecided = ("space",)
@@ -567,13 +564,7 @@ class Index:
                     code="QE001", title=title, message=message, conditional_on=undecided
                 )
             )
-        elif query.space.kind != "empty":
-            if not sp.comparable(coverage.space, query.space):
-                raise ValueError(  # Q6: never a silent conditional
-                    f"cannot compare the {coverage.space.kind} coverage of {name} "
-                    f"with the {query.space.kind} space of request {query.request}: "
-                    "object ids compare only with ids of the same namespace"
-                )
+        else:
             inside, inside_km2 = sp.measure(coverage.space, query.space)
         if inside is not None and inside < 1.0:
             area = None if query.space is None else query.space.area_km2
@@ -585,7 +576,6 @@ class Index:
                     action="do_not_use" if inside == 0.0 else "use_with_caution",
                     area_fraction=1.0 - inside,
                     overlap_km2=None if area is None else area - (inside_km2 or 0.0),
-                    assumed=("space",) if "space" in query.assumed else (),
                 )
             )
         if coverage.time is None or query.time is None:
@@ -675,21 +665,28 @@ class Index:
         """Masks and weighted fractions over many points (section 9.3).
 
         fields are those of query() but space, context and Request.support: the
-        points are every request's support. NaN points are inside no rule. A
-        computed rule takes part through its mask(lon, lat, query) hook, called
-        with the flat arrays, and is otherwise listed in skipped.
+        points are every request's support. Weights default to equal, and zero
+        weights leave points out of every fraction. NaN points are inside no
+        rule. A computed rule takes part through its mask(lon, lat, query) hook,
+        called with the flat arrays, and is otherwise listed in skipped.
         """
         conditional = fields.pop("include_conditional", False)
         if "space" in fields or "context" in fields:
             raise TypeError("the points are the space, and there is no context")
         shape = np.shape(lon)
-        points = sp.weighted_points(lon, lat, weights)
-        x, y, w = points.points
-        valid = np.isfinite(x) & np.isfinite(y)
-        query = self._make_query(None, dict(fields, space=points))
+        x = sp.wrap_lon(np.asarray(lon, dtype=float).ravel())
+        y = np.asarray(lat, dtype=float).ravel()
+        valid = sp.points_mask(None, x, y)  # finite; raises for latitudes past 90
+        w = np.ones_like(x) if weights is None else np.array(weights, dtype=float)
+        w = w.ravel()
+        if w.shape != x.shape:
+            raise ValueError(f"{w.size} weights for {x.size} points")
+        if not (np.all(np.isfinite(w)) and np.all(w >= 0.0) and w.sum() > 0.0):
+            raise ValueError("weights must be finite, non-negative and not all zero")
+        query = self._make_query(None, fields)
         if any(r.support is not None for r in query.requests):
             raise ValueError("the points are the support of every request; give none")
-        inside, total = _point_tester(x, y, valid), w[valid].sum()
+        total = w[valid].sum()
         found: list[Finding] = []
         masks: dict[tuple[str | None, str], np.ndarray] = {}
         fractions: dict[tuple[str | None, str], float] = {}
@@ -700,24 +697,23 @@ class Index:
             fractions[key] = float(w[mask].sum() / total)
             return fractions[key]
 
+        def share(space: Space) -> float:
+            return float(w[sp.points_mask(space, x, y)].sum() / total)
+
         for part in self._expand(query):
             q = part.query
             product = q.facets["product"][0] if q.request is not None else None
-            flat = dataclasses.replace(q, space=None)
             for entry in self._candidates(part):
                 rule, key = entry.rule, (product, entry.rule.code)
-                scope = dataclasses.replace(entry.scope, requires=())
-                ids = scope.space is not None and scope.space.kind == "features"
-                if not ids:  # ids against points stay conditional on space
-                    scope = dataclasses.replace(scope, space=None)
-                matched = match_scope(self, scope, q if ids else flat)
+                scope = dataclasses.replace(entry.scope, space=None, requires=())
+                matched = match_scope(self, scope, q)
                 if matched is None:
                     continue
                 match, details = matched
                 if match.conditional_on and not conditional:
                     continue
                 space = entry.scope.space
-                mask = valid.copy() if space is None or ids else inside(space.geometry)
+                mask = valid.copy() if space is None else sp.points_mask(space, x, y)
                 if not mask.any():
                     continue
                 if entry.form in ("hooked", "foreign"):  # no outcome to mask
@@ -740,14 +736,13 @@ class Index:
                 found += make_findings(
                     outcome, match, q, source=source, details=details
                 )
-            for f in self._coverage(part):
+            for f in self._coverage(part, share):
                 found.append(f)
-                if not f.conditional_on:
-                    cover = part.coverage.space
-                    if f.code == "QE001" and cover.kind != "empty":
-                        keep((f.product, f.code), valid & ~inside(cover.geometry))
-                    else:
-                        keep((f.product, f.code), valid.copy())
+                cover = part.coverage.space
+                if f.code == "QE001" and not cover.geometry.is_empty:
+                    keep((f.product, f.code), valid & ~sp.points_mask(cover, x, y))
+                else:
+                    keep((f.product, f.code), valid.copy())
         self._last = (None, None)
         found = _sorted(f for f in found if conditional or not f.conditional_on)
         return PointResult(tuple(found), masks, fractions, tuple(skipped), shape)
@@ -759,54 +754,6 @@ def _sorted(findings: Iterable[Finding]) -> list[Finding]:
     return sorted(
         findings, key=lambda f: (-f.severity, _KINDS[f.kind], f.code, part(f))
     )
-
-
-def _point_tester(
-    x: np.ndarray, y: np.ndarray, valid: np.ndarray
-) -> Callable[[shapely.Geometry], np.ndarray]:
-    """inside(geometry): closed-set membership of the points (section 9.3).
-
-    Points in 64 x 64 tiles a shape covers need no test; those in tiles it only
-    touches are tested with intersects_xy. Seam and pole points go through
-    sp.points_mask, so the bulk path agrees with Index.query there too.
-    """
-    edge = valid & ((np.abs(x) == 180.0) | (np.abs(y) == 90.0))
-    rest = np.flatnonzero(valid & ~edge)
-    edge = np.flatnonzero(edge)
-    tree = None
-    if rest.size:
-        bins = [
-            np.minimum((v - v.min()) * (64 / max(np.ptp(v), 1e-300)), 63).astype(int)
-            for v in (x[rest], y[rest])
-        ]
-        tile = bins[0] * 64 + bins[1]
-        order = np.argsort(tile, kind="stable")
-        tile, rest = tile[order], rest[order]
-        first = np.flatnonzero(np.r_[True, tile[1:] != tile[:-1]])  # non-empty tiles
-        count = np.diff(np.r_[first, tile.size])
-        px, py = x[rest], y[rest]
-        low = [np.minimum.reduceat(v, first) - 1e-9 for v in (px, py)]
-        high = [np.maximum.reduceat(v, first) + 1e-9 for v in (px, py)]
-        tree = shapely.STRtree(shapely.box(low[0], low[1], high[0], high[1]))
-
-    def points_of(tiles: np.ndarray) -> np.ndarray:
-        n = count[tiles]
-        return rest[np.repeat(first[tiles] - np.cumsum(n) + n, n) + np.arange(n.sum())]
-
-    def inside(geometry: shapely.Geometry) -> np.ndarray:
-        if not shapely.is_prepared(geometry):
-            shapely.prepare(geometry)
-        out = np.zeros(x.shape, bool)
-        if tree is not None:
-            covered = tree.query(geometry, predicate="covers")
-            touched = tree.query(geometry, predicate="intersects")
-            out[points_of(covered)] = True
-            near = points_of(np.setdiff1d(touched, covered, assume_unique=True))
-            out[near] = shapely.intersects_xy(geometry, x[near], y[near])
-        out[edge] = sp.points_mask(geometry, x[edge], y[edge])
-        return out
-
-    return inside
 
 
 # ---- results of the bulk path and the inverse query -------------------------------

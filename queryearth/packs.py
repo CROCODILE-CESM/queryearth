@@ -9,18 +9,15 @@ from __future__ import annotations
 import contextlib
 import copy
 import json
-import math
 import tomllib
 from collections.abc import Iterator, Mapping
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-import numpy as np
-
 from queryearth import space as sp
 from queryearth.errors import LoadError, UnknownNameError
 from queryearth.model import Coverage, Product
-from queryearth.rules import Rule, code_prefix
+from queryearth.rules import Rule, box_of, code_prefix
 from queryearth.time import parse_time
 
 if TYPE_CHECKING:
@@ -29,7 +26,7 @@ if TYPE_CHECKING:
 _ERRORS = (ValueError, TypeError, KeyError)
 _TABLES = set("pack axes facets dimensions products regions".split())
 _PACK = set("name version code_prefix license files".split())
-_PRODUCT = set("aliases variables resolution calendar version coverage grid".split())
+_PRODUCT = set("aliases variables resolution version coverage".split())
 
 
 @contextlib.contextmanager
@@ -189,36 +186,23 @@ def _regions(index: Index, root: Path, namespace: str, table: Any) -> list[str]:
     return problems
 
 
-def _edges(spec: Any) -> np.ndarray:
-    """Cell edges from [first, last, step] in degrees."""
-    first, last, step = (float(v) for v in spec)
-    count = round((last - first) / step)
-    if count < 1 or not math.isclose(first + count * step, last, abs_tol=1e-9):
-        raise ValueError(f"grid {list(spec)} is not [first, last, step]")
-    return np.linspace(first, last, count + 1)
-
-
 def _product(index: Index, slug: str, table: Any) -> None:
     """Declare one [products.<slug>]; product names are global in an Index."""
     if set(table) - _PRODUCT:
         raise ValueError(f"unknown keys {sorted(set(table) - _PRODUCT)}")
-    calendar = table.get("calendar", "proleptic_gregorian")
     coverage = table.get("coverage", {})
     keys = set(coverage)
     if keys - {"time", "box", "region_ref"} or {"box", "region_ref"} <= keys:
         raise ValueError("a coverage holds time, and a box or a region_ref")
     space = None
     if "box" in coverage:
-        space = sp.box_arc(**coverage["box"])
+        space = box_of(coverage["box"])
     elif "region_ref" in coverage:
         refs = coverage["region_ref"]
         space = index._region((refs,) if isinstance(refs, str) else tuple(refs), slug)
     time = None
     if "time" in coverage:
-        time = parse_time({"interval": list(coverage["time"])}, calendar=calendar)
-    grid = None
-    if "grid" in table:
-        grid = (_edges(table["grid"]["lon"]), _edges(table["grid"]["lat"]))
+        time = parse_time({"interval": list(coverage["time"])})
     resolution = table.get("resolution")
     index.add_product(
         Product(
@@ -227,8 +211,6 @@ def _product(index: Index, slug: str, table: Any) -> None:
             variables=tuple(table.get("variables", ())),
             coverage=Coverage(space, time),
             resolution=None if resolution is None else tuple(resolution),
-            calendar=calendar,
             version=table.get("version"),
-            grid=grid,
         )
     )

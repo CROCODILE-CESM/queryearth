@@ -1,6 +1,6 @@
-"""The bulk path and the inverse query: fixtures 5 and 6 on query_points, a
-property test of query_points against Index.query point by point, and
-suitable() on the worked example of design.md section 10.3.
+"""The bulk path and the inverse query: fixture 6 on query_points, a property
+test of query_points against Index.query point by point, and suitable() on the
+worked example of design.md section 10.3.
 """
 
 import math
@@ -24,21 +24,7 @@ def caveat(code, severity="warning", **scope):
     )
 
 
-# ---- fixtures 5 and 6 on the bulk path ----------------------------------------------
-def test_fixture_5_pole_points_on_the_bulk_path():
-    index = qe.Index("geo")
-    index.add(caveat("POL001", space=sp.box_arc(0, 90, 80, 90)))
-    assert [f.code for f in index.query(space=sp.point(123, 90))] == ["POL001"]
-    lon, lat = np.meshgrid(np.arange(-180, 180, 0.25), np.arange(-90, 90.25, 0.25))
-    assert lon.size == 1_038_240
-    result = index.query_points(lon, lat)
-    mask = result.masks[(None, "POL001")]
-    assert mask.shape == lon.shape and mask.sum() == 15_880
-    assert mask[lat == 90].all() and (lat == 90).sum() == 1_440
-    (found,) = result.findings
-    assert found.area_fraction == pytest.approx(15_880 / lon.size)
-
-
+# ---- fixture 6 on the bulk path --------------------------------------------------
 def test_fixture_6_closed_edges_on_the_bulk_path():
     index = qe.Index("geo")
     index.add(caveat("SQR001", space=sp.box(0, 0, 10, 10)))
@@ -65,7 +51,6 @@ def bulk_index():
     index.add(caveat("BOX001", "severe", space=sp.box(0, 0, 10, 10)))
     index.add(caveat("RES001", axes={"resolution": {"lt": 10}}))
     index.add(caveat("ERA001", facets={"product": ["era5"]}))
-    index.add(caveat("IDS001", space=sp.features(["1"], "lakes")))
 
     class Wet(qe.ComputedRule, code="WET001", index=index, requires=["stn"]):
         """Points east of 5E, by a mask hook"""
@@ -114,7 +99,6 @@ def test_query_points_keys_masks_and_skipped_rules_by_product_and_code():
     assert {f.code: f.conditional_on for f in conditional} == {
         "RES001": ("resolution",),
         "ERA001": ("product",),
-        "IDS001": ("space",),
     }
     assert all((None, f.code) not in with_conditional.masks for f in conditional)
     with pytest.raises(ValueError, match="support"):
@@ -131,13 +115,10 @@ def random_space(rng):
     south = rng.choice([-90, -60, -10, 0, 30, 66.5])
     north = rng.choice([n for n in (-30, 0, 10, 45, 80, 90) if n > south] or [90])
     if pick < 0.2:
-        return sp.lat_band(south, north)
-    if pick < 0.6:  # integer edges, so grid points fall on them; some cross +-180
+        return sp.box(-180, south, 180, north)
+    if pick < 0.7:  # integer edges, so grid points fall on them; some cross +-180
         west = rng.choice([-180, -170, -10, 0, 5, 150, 170])
-        return sp.box_arc(west, rng.choice([10, 20, 45, 90, 200]), south, north)
-    if pick < 0.75:  # a ring around a pole, closed along it
-        lat = rng.choice([60.0, -70.0, 75.5])
-        return sp.polygon([(lon, lat) for lon in range(-180, 180, 15)])
+        return sp.box(west, south, west + rng.choice([10, 20, 45, 90, 200]), north)
     ring = [(rng.uniform(-200, 200), rng.uniform(-80, 80))]
     for _ in range(5):
         x, y = ring[-1]

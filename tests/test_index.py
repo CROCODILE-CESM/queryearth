@@ -1,5 +1,5 @@
-"""Index: fixtures 12 (Index-level), 17, 19 to 21, 23 to 25 and 27 of
-docs/reference/fixtures.md; fixtures 2, 6, 9, 10 and 13 as queries; coverage,
+"""Index: fixtures 12 (Index-level), 17, 19 to 21, 23, 24 and 27 of
+docs/reference/fixtures.md; fixtures 2, 6, 9 and 13 as queries; coverage,
 computed rules, codes and lifecycle; and the fast path against the reference.
 """
 
@@ -13,12 +13,11 @@ import pytest
 import queryearth as qe
 from queryearth import space as sp
 
-GRID = (np.arange(-180.0, 180.1, 0.5), np.arange(-90.0, 90.1, 0.5))  # 0.5 degree
 LAKE = sp.box(0.30, 0.30, 0.45, 0.45)
 
 
 def make_index(**kw):
-    """Products cru_ts (with its grid), era5_land and era5, and a resolution axis."""
+    """Products cru_ts, era5_land and era5, and a resolution axis."""
     index = qe.Index("test", axes=[qe.Axis("resolution", "km")], **kw)
     index.add_product(
         qe.Product(
@@ -26,11 +25,7 @@ def make_index(**kw):
             aliases=("CRUTS", "CRU TS"),
             variables=("pre", "tmp"),
             version="4.07",
-            calendar="standard",
-            coverage=qe.Coverage(
-                time=qe.interval("1901-01-01", "2022-12-31", calendar="standard")
-            ),
-            grid=GRID,
+            coverage=qe.Coverage(time=qe.interval("1901-01-01", "2022-12-31")),
         )
     )
     index.add_product(
@@ -88,7 +83,7 @@ def croc_index():
             severity=qe.Severity.INFO,
             title="Arctic domain: consider active sea ice",
             message="m",
-            scope=qe.Scope(space=sp.lat_band(66.5, 90.0), facets={"model": "mom6"}),
+            scope=qe.Scope(space=sp.box(-180, 66.5, 180, 90), facets={"model": "mom6"}),
             suggestions=(qe.Suggestion("compset", "ice_component", "CICE"),),
         )
     )
@@ -213,13 +208,13 @@ def test_computed_rule_check_runs_for_definite_matches_only():
     assert "CRU002" not in codes(found)  # check() returned False
 
 
-def test_glhe_lake_query_assumes_space_time_and_version():
+def test_glhe_lake_query_assumes_time_and_version():
     index = cru_index()
     (cru001,) = index.query(
         space=sp.box(20, 0, 20.1, 0.1), requests=[qe.Request("CRUTS", "pre")]
     )
     assert cru001.product == "cru_ts" and cru001.request == 0
-    assert cru001.assumed == ("space", "time", "version")
+    assert cru001.assumed == ("time", "version")
     assert cru001.area_fraction == 1.0
     assert cru001.time_overlap == (("2000-01-01", "2022-12-31"),)
     assert round(cru001.time_fraction, 3) == 0.189  # section 7.3
@@ -342,24 +337,6 @@ def test_fixture_24_per_product_default_time():
     assert untimed.time_overlap == (("1940-01-01", "1960-12-31"),)
 
 
-# ---- fixture 25: per-product support from Product.grid ------------------------------
-def test_fixture_25_support_from_the_product_grid():
-    index = make_index()
-    index.add(
-        caveat(
-            "TSF001",
-            space=sp.box(0, 0, 0.2, 0.5),
-            facets={"product": ["cru_ts", "era5_land"]},
-        )
-    )
-    (found,) = index.query(space=LAKE, requests=["cru_ts", "era5_land"])
-    assert (found.product, found.assumed) == ("cru_ts", ("space",))
-    assert found.area_fraction == pytest.approx(0.4)
-    assert index.query(space=LAKE, requests=[qe.Request("cru_ts", support=LAKE)]) == []
-    (cells,) = index.expand(qe.Query(space=LAKE, requests=["cru_ts"]))[1:]
-    assert cells.space.geometry.bounds == (0.0, 0.0, 0.5, 0.5)
-
-
 # ---- fixture 27: a plugin dimension --------------------------------------------------
 @dataclass(frozen=True)
 class Pfafstetter:
@@ -433,10 +410,10 @@ def test_dimensions_are_declared_before_rules_with_unique_names():
         qe.Index("x", axes=[qe.Axis("time", "s")])
 
 
-# ---- fixtures 2, 6, 9, 10 and 13 as queries --------------------------------------------
+# ---- fixtures 2, 6, 9 and 13 as queries ------------------------------------------------
 def test_fixture_2_antimeridian_box_in_three_forms():
     index = qe.Index("geo")
-    index.add(caveat("FIJ001", space=sp.box_arc(170, 20, -20, -10)))
+    index.add(caveat("FIJ001", space=sp.box(170, -20, -170, -10)))
     index.add(
         caveat(
             "FIJ002",
@@ -478,14 +455,6 @@ def test_fixture_9_overlap_fraction_and_area():
     assert half.overlap_km2 == pytest.approx(query.area_km2 / 2)
 
 
-def test_fixture_10_small_lake_and_its_support():
-    index = qe.Index("geo")
-    index.add(caveat("WST001", space=sp.box(0, 0, 0.2, 0.5)))
-    assert index.query(space=LAKE) == []
-    (found,) = index.query(space=sp.cells(GRID, LAKE))
-    assert found.area_fraction == pytest.approx(0.4)
-
-
 def test_fixture_13_open_and_inclusive_ends():
     index = qe.Index("time")
     index.add(caveat("OPN001", time=qe.interval("2000-01-01", "..")))
@@ -524,17 +493,8 @@ def coverage_index():
         qe.Product(
             "demo",
             coverage=qe.Coverage(
-                space=sp.box_arc(170, 20, -25, -10),
+                space=sp.box(170, -25, -170, -10),
                 time=qe.interval("2015-01-01", ".."),
-            ),
-        )
-    )
-    index.add_product(
-        qe.Product(
-            "nwm",
-            coverage=qe.Coverage(
-                space=sp.features(["1", "2"], "hydrolakes"),
-                time=qe.interval("1979-02-01", "2023-01-31"),
             ),
         )
     )
@@ -575,21 +535,6 @@ def test_coverage_entirely_outside_is_do_not_use():
     assert index.query(requests=["demo"]) == []  # time filled from the coverage
 
 
-def test_coverage_by_object_ids():
-    index = coverage_index()
-    inside = sp.features(["1"], "hydrolakes")
-    assert (
-        index.query(space=inside, time=("2000-01-01", "2000-12-31"), requests=["nwm"])
-        == []
-    )
-    (qe001,) = index.query(
-        space=sp.features(["7", "1"], "hydrolakes"), requests=["nwm"]
-    )
-    assert qe001.area_fraction == 0.5 and qe001.action == "use_with_caution"
-    with pytest.raises(ValueError, match="ids"):  # Q6: an error, not a conditional
-        index.query(space=sp.point(0, 0), requests=["nwm"])
-
-
 def test_coverage_nowhere_and_undecided():
     index = coverage_index()
     (gone,) = index.query(requests=["gone"])  # Q7
@@ -621,7 +566,7 @@ def test_function_rule_croc104_suggests_a_time_step():
     @index.rule(
         "CROC104",
         kind="recommendation",
-        space=sp.lat_band(66.5, 90.0),
+        space=sp.box(-180, 66.5, 180, 90),
         facets={"model": "mom6"},
         axes={"resolution": {"gt": 0.0}},
     )
@@ -631,7 +576,7 @@ def test_function_rule_croc104_suggests_a_time_step():
         return {"suggestions": (qe.Suggestion("MOM_input", "DT", seconds, "why"),)}
 
     found = index.query(
-        space=sp.lat_band(70.6, 90.0),
+        space=sp.box(-180, 70.6, 180, 90),
         time=("2020-01-01", "2020-12-31"),
         axes={"resolution": (8.0, 12.0)},
         facets={"model": "mom6"},
@@ -645,7 +590,7 @@ def test_function_rule_croc104_suggests_a_time_step():
     assert croc104.axes["resolution"] == qe.AxisOverlap(8.0, 12.0, True, True)
     assert found[1].axes["resolution"] == qe.AxisOverlap(8.0, 10.0, True, False)
     without = index.query(
-        space=sp.lat_band(70.6, 90.0),
+        space=sp.box(-180, 70.6, 180, 90),
         facets={"model": "mom6"},
         include_conditional=True,
     )
@@ -675,8 +620,11 @@ def test_gen001_runs_once_per_request():
         ("GEN001", 0, ("context:request_km2",)),
         ("GEN001", 1, ("context:request_km2",)),
     ]
+    cell = sp.box(0, 0, 0.5, 0.5)  # the product cell the lake lies in
     (found,) = index.query(
-        space=LAKE, requests=["cru_ts"], context={"request_km2": LAKE.area_km2}
+        space=LAKE,
+        requests=[qe.Request("cru_ts", support=cell)],
+        context={"request_km2": LAKE.area_km2},
     )
     assert found.details["request_to_support"] == pytest.approx(0.09, rel=0.01)
 
@@ -943,11 +891,13 @@ def random_box(rng):
     south = rng.uniform(-90, 80)
     north = rng.choice([90.0, min(90.0, south + rng.uniform(1, 40))])
     if choice < 0.2:
-        return sp.lat_band(south, north)
+        return sp.box(-180, south, 180, north)
     if choice < 0.35:  # an edge on the seam
         width = rng.uniform(1, 60)
-        return sp.box_arc(rng.choice([-180.0, 180.0 - width]), width, south, north)
-    return sp.box_arc(rng.uniform(-180, 180), rng.uniform(0.5, 120), south, north)
+        west = rng.choice([-180.0, 180.0 - width])
+    else:
+        west, width = rng.uniform(-180, 180), rng.uniform(0.5, 120)
+    return sp.box(west, south, west + width, north)
 
 
 def random_time(rng):
@@ -964,9 +914,7 @@ def random_rule_scope(rng):
     pick = rng.random()
     if pick < 0.45:
         space = random_box(rng)
-    elif pick < 0.55:
-        space = sp.features(rng.sample("123456", rng.randint(1, 3)), "lakes")
-    elif pick < 0.62:
+    elif pick < 0.52:
         region_ref = tuple(rng.sample(["reg:A", "reg:B", "reg:C"], rng.randint(1, 2)))
     pick = rng.random()
     if pick < 0.4:
@@ -1018,7 +966,7 @@ def random_index(rng):
         {
             "A": sp.box(-10, -10, 10, 10),
             "B": sp.box(170, 50, -170, 70),
-            "C": sp.lat_band(80, 90),
+            "C": sp.box(-180, 80, 180, 90),
         },
     )
     index.add_product(
@@ -1027,7 +975,6 @@ def random_index(rng):
             aliases=("CRUTS",),
             version="4.07",
             coverage=qe.Coverage(time=qe.interval("1901-01-01", "2022-12-31")),
-            grid=(np.arange(-180.0, 181.0, 10.0), np.arange(-90.0, 91.0, 10.0)),
         )
     )
     index.add_product(
@@ -1041,7 +988,9 @@ def random_index(rng):
         )
     )
     index.add_product(
-        qe.Product("glorys", coverage=lambda q: qe.Coverage(space=sp.lat_band(-80, 80)))
+        qe.Product(
+            "glorys", coverage=lambda q: qe.Coverage(space=sp.box(-180, -80, 180, 80))
+        )
     )
     for k in range(120):
         scope, region_ref = random_rule_scope(rng)
@@ -1088,16 +1037,10 @@ def random_query(rng):
     if pick < 0.25:
         lon = rng.choice([rng.uniform(-180, 180), 180.0, -180.0])
         space = sp.point(lon, rng.choice([rng.uniform(-90, 90), 90.0, -90.0]))
-    elif pick < 0.55:
+    elif pick < 0.6:
         space = random_box(rng)
-    elif pick < 0.62:
-        lon = np.array([rng.uniform(-180, 180) for _ in range(5)] + [180.0])
-        lat = np.array([rng.uniform(-90, 90) for _ in range(5)] + [90.0])
-        space = sp.weighted_points(lon, lat)
-    elif pick < 0.67:
+    elif pick < 0.65:
         space = sp.nowhere()
-    elif pick < 0.75:
-        space = sp.features(rng.sample("123456789", 2), rng.choice(["lakes", "rivers"]))
     fields = {"space": space}
     if rng.random() < 0.6:
         fields["time"] = random_time(rng)
@@ -1109,15 +1052,14 @@ def random_query(rng):
     if rng.random() < 0.5:
         facets["model"] = rng.choice(["mom6", "cesm", ("mom6", "x")])
     pick = rng.random()
-    if space is None or space.kind != "features":  # ids never meet a coverage area
-        if pick < 0.35:
-            fields["requests"] = [
-                qe.Request(p, rng.choice([(), ("pre",), ("tp", "tas")]))
-                for p in rng.sample(PRODUCTS, rng.randint(1, 3))
-            ]
-        elif pick < 0.55:
-            facets["product"] = rng.sample(PRODUCTS, rng.randint(1, 2))
-            facets["variable"] = rng.choice(["pre", ("tp", "t2m")])
+    if pick < 0.35:
+        fields["requests"] = [
+            qe.Request(p, rng.choice([(), ("pre",), ("tp", "tas")]))
+            for p in rng.sample(PRODUCTS, rng.randint(1, 3))
+        ]
+    elif pick < 0.55:
+        facets["product"] = rng.sample(PRODUCTS, rng.randint(1, 2))
+        facets["variable"] = rng.choice(["pre", ("tp", "t2m")])
     if "requests" not in fields and "product" not in facets and rng.random() < 0.3:
         facets["version"] = rng.choice(["4.07", "ERA5", "4.10"])
     fields["facets"] = facets

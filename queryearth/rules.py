@@ -147,9 +147,7 @@ def match_scope(
             return None
         time_overlap, fraction = both.to_wire(), time_fraction(both, query.time)
     area_fraction = overlap_km2 = None
-    if scope.space is not None and (
-        query.space is None or not sp.comparable(scope.space, query.space)
-    ):
+    if scope.space is not None and query.space is None:
         undecided.add("space")
     elif query.space is not None:
         if scope.space is not None and not sp.meets(scope.space, query.space):
@@ -191,14 +189,13 @@ _LOCKED = frozenset(
 
 def _time_override(value: Any, query: TimeSpec | None) -> tuple:
     """A time_overlap set by check(), and time_fraction recomputed from it."""
-    calendar = "proleptic_gregorian" if query is None else query.calendar
     parts: list[Interval] = []
     for pair in value:
-        read = parse_time({"interval": list(pair)}, calendar=calendar)
+        read = parse_time({"interval": list(pair)})
         parts.extend(read.intervals if read is not None else (Interval(None, None),))
     if not parts:
         return (), time_fraction(None, query)
-    spec = TimeSpec(tuple(parts), calendar=calendar)
+    spec = TimeSpec(tuple(parts))
     inside = None if query is None else overlap(spec, query)
     return spec.to_wire(), (None if query is None else time_fraction(inside, query))
 
@@ -263,9 +260,22 @@ _RULE_KEYS = tuple(f.name for f in dataclasses.fields(Outcome)) + tuple(
     "region_ref created updated withdrawn supersedes aliases".split()
 )
 _RECORD_KEYS = set(_RULE_KEYS) | set(
-    "facets axes dimensions box periods recurrence calendar time_start time_end".split()
+    "facets axes dimensions box periods recurrence time_start time_end".split()
 )
 _EXTENSION = re.compile(r"x_[a-z0-9_]+")
+
+
+def box_of(box: Any) -> Space:
+    """The box() of a record's or a pack's {west, width, south, north}."""
+    if (
+        not isinstance(box, Mapping)
+        or set(box) != {"west", "width", "south", "north"}
+        or not all(type(v) in (int, float) for v in box.values())
+        or not -180.0 <= box["west"] < 180.0
+        or not 0.0 < box["width"] <= 360.0
+    ):
+        raise ValueError(f"a box is {{west, width, south, north}}, not {box!r}")
+    return sp.box(box["west"], box["south"], box["west"] + box["width"], box["north"])
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -354,16 +364,9 @@ class Rule(Outcome):
             raise ValueError("a record with a box or a region_ref has a null geometry")
         if box is not None and "region_ref" in props:
             raise ValueError("give a box or a region_ref, not both")
-        space = None if geometry is None else sp.deferred(geometry)
+        space = None if geometry is None else sp.polygon(geometry)
         if box is not None:
-            if (
-                not isinstance(box, Mapping)
-                or set(box) != {"west", "width", "south", "north"}
-                or not all(type(v) in (int, float) for v in box.values())
-                or not -180.0 <= box["west"] < 180.0
-            ):
-                raise ValueError(f"a box is {{west, width, south, north}}, not {box!r}")
-            space = sp.box_arc(**box)
+            space = box_of(box)
         for key in ("facets", "axes", "dimensions"):
             if not isinstance(props.get(key, {}), Mapping):
                 raise ValueError(f"{key} is an object")

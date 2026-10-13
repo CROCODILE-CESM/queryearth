@@ -19,9 +19,8 @@ from typing import TYPE_CHECKING, Any, Literal
 
 import numpy as np
 
-from queryearth import space as sp
 from queryearth.space import Space
-from queryearth.time import CALENDARS, Interval, TimeSpec, interval, parse_time
+from queryearth.time import Interval, TimeSpec, interval, parse_time
 
 if TYPE_CHECKING:
     from queryearth.dimensions import DimMatch
@@ -368,21 +367,20 @@ class Scope:
 
 @dataclass(frozen=True)
 class Coverage:
-    """Where and when a product has data; None means global or all time."""
+    """Where and when a product has data; None means global or all time.
+
+    A callable coverage gives space=sp.nowhere(), an empty polygon, for a
+    request its product does not serve.
+    """
 
     space: Space | None = None
     time: TimeSpec | None = None
 
     def __post_init__(self) -> None:
         _space_of(self.space, "a coverage space")
-        if self.space is not None and self.space.kind not in (
-            "polygon",
-            "features",
-            "empty",
-        ):
+        if self.space is not None and self.space.kind != "polygon":
             raise ValueError(
-                f"a coverage space is an area, object ids or nowhere(), "
-                f"not a {self.space.kind!r} space"
+                f"a coverage space is a polygon or nowhere(), not a {self.space.kind!r}"
             )
         if self.time is not None:
             if not isinstance(self.time, TimeSpec):
@@ -391,30 +389,16 @@ class Coverage:
                 raise ValueError("a coverage time cannot carry a month recurrence")
 
 
-def _grid_of(grid: Any) -> Any:
-    if grid is None or callable(grid):
-        return grid
-    if isinstance(grid, (str, Mapping)) or len(grid) != 2:
-        raise ValueError("a product grid is (lon_edges, lat_edges) or a callable")
-    edges = tuple(
-        tuple(float(x) for x in np.asarray(e, dtype=float).ravel()) for e in grid
-    )
-    sp.cell_mask(edges, sp.nowhere())  # validates the edges
-    return edges
-
-
 @dataclass(frozen=True)
 class Product:
-    """A dataset that queries can name, with its coverage, grid and version."""
+    """A dataset that queries can name, with its coverage and version."""
 
     name: str  # canonical lowercase slug, e.g. "cru_ts"
     aliases: tuple[str, ...] = ()  # e.g. ("CRUTS", "CRU TS")
     variables: tuple[str, ...] = ()
     coverage: Coverage | Callable[[Query], Coverage] = Coverage()
     resolution: tuple[float, Literal["deg", "km"]] | None = None
-    calendar: str = "proleptic_gregorian"
     version: str | None = None  # version in use; fills an omitted version facet
-    grid: tuple[Any, Any] | Callable[[Space], Space] | None = None  # edges or cells
 
     def __post_init__(self) -> None:
         if not isinstance(self.name, str) or not _SLUG.fullmatch(self.name):
@@ -434,14 +418,10 @@ class Product:
             if size <= 0.0:
                 raise ValueError("a resolution must be positive")
             _set(self, "resolution", (size, unit))
-        if not isinstance(self.calendar, str) or self.calendar.lower() not in CALENDARS:
-            raise ValueError(f"unknown calendar {self.calendar!r}")
-        _set(self, "calendar", self.calendar.lower())
         if self.version is not None and (
             not isinstance(self.version, str) or not self.version
         ):
             raise TypeError("a product version is a non-empty string or None")
-        _set(self, "grid", _grid_of(self.grid))
 
 
 @dataclass(frozen=True)
@@ -452,7 +432,7 @@ class Request:
     variables: tuple[str, ...] = ()  # a plain string means one variable
     version: str | None = None  # default: Product.version, listed in assumed
     time: TimeSpec | None = None  # default: the query's time, else the coverage
-    support: Space | None = None  # default: from Product.grid, else query.space
+    support: Space | None = None  # a point or polygon; default: query.space
 
     def __post_init__(self) -> None:
         if not isinstance(self.product, str) or not self.product:

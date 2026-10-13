@@ -202,8 +202,6 @@ def test_objects_with_mappings_compare_by_value_but_do_not_hash():
     [
         lambda: qe.Product("CRU TS"),  # not a slug
         lambda: qe.Product("x", resolution=(0.5, "miles")),
-        lambda: qe.Product("x", calendar="lunar"),
-        lambda: qe.Product("x", grid=([0, 1], [5])),
         lambda: qe.Coverage(space=sp.point(0, 0)),
         lambda: qe.Coverage(time=qe.parse_time(None, recurrence={"months": [1]})),
         lambda: qe.Outcome(code="X001", kind="warning", title="t", message="m"),

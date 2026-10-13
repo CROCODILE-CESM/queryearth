@@ -27,10 +27,8 @@ names = []  # plugin dimensions, such as "basin"; their code is registered in Py
 aliases = ["CRUTS", "CRU TS"]
 variables = ["pre", "tmp"]
 resolution = [0.5, "deg"]
-calendar = "standard"
 version = "4.07"
 coverage = { time = ["1901-01-01", "2022-12-31"] }
-grid = { lon = [-180.0, 180.0, 0.5], lat = [-90.0, 90.0, 0.5] }  # cell edges
 
 [products.era5]
 variables = ["pre", "t2m", "skt", "siconc"]  # pack names; ERA5 itself calls precipitation "tp"
