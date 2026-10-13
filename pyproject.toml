@@ -23,9 +23,11 @@ classifiers = [
 
 [project.optional-dependencies]
 test = ["pytest", "jsonschema", "cftime", "pandas", "pyproj"]
+docs = ["sphinx", "sphinx-rtd-theme", "myst-parser"]
 
 [project.urls]
 Repository = "https://github.com/CROCODILE-CESM/queryearth"
+Documentation = "https://crocodile-cesm.github.io/queryearth/"
 
 [tool.setuptools.packages.find]
 include = ["queryearth*"]

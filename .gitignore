@@ -6,3 +6,4 @@ dist/
 .pytest_cache/
 .ipynb_checkpoints/
 queryearth/_version.py
+docs/_build/

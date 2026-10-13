@@ -26,7 +26,7 @@ It is an engine only: the package ships no curated rules. Rule packs belong to t
   Geometry and time semantics are deliberately not pluggable.
 - **Codes.** A code is a prefix plus three or four digits (`CRU001`, `ERA5-014`). A hyphen is required after a prefix that ends in a digit. The prefix `QE` is reserved for built-in findings.
 - **Git.** Ask before committing or pushing. Never add a `Co-Authored-By` line. Never @-mention people on GitHub. Branch names are plain and descriptive, with no personal names. The author does releases.
-- **Privacy.** The repository is private. Parts of `docs/` paraphrase a private knowledge base of expert interviews, so do not make the repository or the docs public without the author's agreement. `MANIFEST.in` prunes `docs/` from the source distribution; keep it that way.
+- **Privacy.** The repository is private, but the user docs site and the PyPI package are public. Parts of `docs/` paraphrase a private knowledge base of expert interviews, so do not make the repository or the docs public without the author's agreement. `MANIFEST.in` prunes `docs/` from the source distribution; keep it that way.
 
 ## Layout
 
@@ -42,6 +42,7 @@ It is an engine only: the package ships no curated rules. Rule packs belong to t
 | `queryearth/emit.py` | `emit()`, `Policy`, `policy()`, the warning classes and `AdvisoryError` |
 | `tests/` | One file per module, plus `test_queries.py` (bulk path, `suitable`) and `test_packs.py` |
 | `examples/toy/` | A made-up pack and `play.py`, a walkthrough to run cell by cell |
+| `docs/source/` | The public user docs (Sphinx with MyST Markdown), built and deployed to GitHub Pages by `.github/workflows/docs.yml`. Nothing derived from the private interviews goes here |
 | `docs/design.md` | The design and the spec. "As built" notes mark where the code differs from it |
 | `docs/reference/` | `fixtures.md` (correctness fixtures, each with a test unless marked dropped), `schema.json` (record schema), `decisions.md` (the Q-numbered decisions and detailed contracts), the example pack, `usage.py` (a usage example), and background, consumer and glossary notes |
 
@@ -62,6 +63,7 @@ pip install -e ".[test]"
 pytest
 black .            # target py311, configured in pyproject.toml
 python examples/toy/play.py
+pip install -e ".[docs]" && sphinx-build -W -b html docs/source docs/_build
 ```
 
 - **CI.** It runs pytest on Python 3.11 to 3.14 on every push to every branch and on pull requests. Black is checked on pull requests.
