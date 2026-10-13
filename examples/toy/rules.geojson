@@ -16,10 +16,9 @@
       },
       "properties": {
         "code": "TOY001",
-        "kind": "caveat",
+        "kind": "warning",
         "title": "toy_ocean salinity is poorly constrained before 2004",
         "message": "Few salinity profiles went into toy_ocean before 2004, so its salinity drifts in that period.",
-        "severity": "warning",
         "instruction": "Start after 2004 if you can.",
         "action": "use_with_caution",
         "facets": {
@@ -66,10 +65,9 @@
       "time": null,
       "properties": {
         "code": "TOY002",
-        "kind": "caveat",
+        "kind": "warning",
         "title": "toy_ocean is too warm in the Bering Sea in winter",
         "message": "From December to March, toy_ocean sea temperature in the Bering Sea runs about 1 K too warm.",
-        "severity": "warning",
         "facets": {
           "product": [
             "toy_ocean"
@@ -101,10 +99,10 @@
       },
       "properties": {
         "code": "TOY003",
-        "kind": "caveat",
+        "kind": "warning",
         "title": "toy_atmos precipitation is broken in summer 2015",
         "message": "toy_atmos precipitation from June to August 2015 was produced with a faulty input file.",
-        "severity": "severe",
+        "level": "error",
         "action": "do_not_use",
         "facets": {
           "product": [
@@ -124,10 +122,9 @@
       "time": null,
       "properties": {
         "code": "TOY101",
-        "kind": "recommendation",
+        "kind": "suggestion",
         "title": "Arctic domain: consider active sea ice",
         "message": "Part of this domain lies north of the Arctic Circle, where sea ice matters.",
-        "severity": "info",
         "box": {
           "west": -180,
           "width": 360,
@@ -157,10 +154,9 @@
       "time": null,
       "properties": {
         "code": "TOY102",
-        "kind": "recommendation",
+        "kind": "suggestion",
         "title": "Fine grid: turn off the coarse-grid eddy scheme",
         "message": "Below 10 km the model starts to resolve eddies itself.",
-        "severity": "info",
         "axes": {
           "resolution": {
             "lt": 10,
@@ -185,10 +181,9 @@
       "time": null,
       "properties": {
         "code": "TOY103",
-        "kind": "recommendation",
+        "kind": "suggestion",
         "title": "Coarse grid: raise the toy viscosity",
         "message": "At 50 km or coarser, the toy model needs more viscosity to stay stable.",
-        "severity": "info",
         "axes": {
           "resolution": {
             "ge": 50,

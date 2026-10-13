@@ -3,6 +3,7 @@ test of query_points against Registry.query point by point, and suitable() on th
 worked example of design.md section 10.3.
 """
 
+import logging
 import math
 import random
 
@@ -13,13 +14,13 @@ import queryearth as qe
 from queryearth import space as sp
 
 
-def caveat(code, severity="warning", **scope):
+def warning_rule(code, level="warning", **scope):
     return qe.Rule(
         code=code,
-        kind="caveat",
+        kind="warning",
         title=code,
         message=code,
-        severity=severity,
+        level=level,
         scope=qe.Scope(**scope),
     )
 
@@ -27,7 +28,7 @@ def caveat(code, severity="warning", **scope):
 # ---- fixture 6 on the bulk path --------------------------------------------------
 def test_fixture_6_closed_edges_on_the_bulk_path():
     registry = qe.Registry("geo")
-    registry.add(caveat("SQR001", space=sp.box(0, 0, 10, 10)))
+    registry.add(warning_rule("SQR001", space=sp.box(0, 0, 10, 10)))
     lon, lat = np.meshgrid(np.arange(-1, 11.25, 0.25), np.arange(-1, 11.25, 0.25))
     assert lon.size == 2_401
     assert registry.query_points(lon, lat).masks[(None, "SQR001")].sum() == 1_681
@@ -47,10 +48,10 @@ def bulk_registry():
     registry.add_product(
         qe.Product("glorys", coverage=qe.Coverage(time=qe.interval("1993-01-01", "..")))
     )
-    registry.add(caveat("ALL001"))
-    registry.add(caveat("BOX001", "severe", space=sp.box(0, 0, 10, 10)))
-    registry.add(caveat("RES001", axes={"resolution": {"lt": 10}}))
-    registry.add(caveat("ERA001", facets={"product": ["era5"]}))
+    registry.add(warning_rule("ALL001"))
+    registry.add(warning_rule("BOX001", "error", space=sp.box(0, 0, 10, 10)))
+    registry.add(warning_rule("RES001", axes={"resolution": {"lt": 10}}))
+    registry.add(warning_rule("ERA001", facets={"product": ["era5"]}))
 
     class Wet(qe.ComputedRule, code="WET001", registry=registry, requires=["stn"]):
         """Points east of 5E, by a mask hook"""
@@ -92,7 +93,7 @@ def test_query_points_keys_masks_and_skipped_rules_by_product_and_code():
     found = {(f.product, f.code): f for f in result.findings}
     assert found[(None, "BOX001")].area_fraction == 0.5
     assert found[("glorys", "QE002")].time_overlap == (("1990-01-01", "1992-12-31"),)
-    assert result.any(qe.Severity.SEVERE).tolist() == [[True, True], [True, False]]
+    assert result.any(logging.ERROR).tolist() == [[True, True], [True, False]]
     assert result.any("warning").sum() == 3
     with_conditional = registry.query_points(lon, lat, include_conditional=True)
     conditional = [f for f in with_conditional.findings if f.conditional_on]
@@ -155,14 +156,14 @@ def random_bulk_registry(rng):
             scope["axes"] = {"resolution": rng.choice([{"lt": 10}, {"ge": 25}])}
         if rng.random() < 0.4:
             scope["facets"] = {"product": rng.choice([["cru_ts"], ["era5", "glorys"]])}
-        severity = rng.choice(["info", "warning", "severe"])
+        level = rng.choice(["info", "warning", "error"])
         registry.add(
             qe.Rule(
                 code=f"RND{k:03d}",
-                kind="caveat",
+                kind="warning",
                 title="t",
                 message="m",
-                severity=severity,
+                level=level,
                 region_ref=refs,
                 scope=qe.Scope(**scope),
             )
@@ -226,7 +227,7 @@ def lake_registry():
     registry.add(
         qe.Rule(
             code="CRU001",
-            kind="caveat",
+            kind="warning",
             title="t",
             message="m",
             min_overlap=0.1,

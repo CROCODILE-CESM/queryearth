@@ -1,4 +1,5 @@
-"""Core objects: outcomes, matches, findings, scopes, products, requests, queries.
+"""Core objects: outcomes, matches, findings, scopes, products, requests, queries,
+and the error classes.
 
 All are frozen dataclasses (design.md section 4.11). Constructors accept the
 Python shorthands the design allows (a bare string for a one-item tuple, a
@@ -10,7 +11,7 @@ hashable; Request hashes, with its support by identity.
 from __future__ import annotations
 
 import dataclasses
-import enum
+import logging
 import math
 import re
 from collections.abc import Callable, Iterable, Mapping, Sequence
@@ -30,25 +31,32 @@ __all__ = [
     "AxisOverlap",
     "Confidence",
     "Coverage",
+    "DuplicateCodeError",
     "Finding",
     "Kind",
+    "LoadError",
     "Match",
     "Outcome",
     "Product",
     "Query",
     "Request",
     "Scope",
-    "Severity",
     "Status",
     "Suggestion",
+    "UnknownNameError",
 ]
 
-Kind = Literal["caveat", "coverage", "recommendation"]
+Kind = Literal["coverage", "warning", "suggestion"]
 Confidence = Literal["observed", "likely", "possible", "unknown"]  # CAP certainty
 Action = Literal["can_be_used", "use_with_caution", "do_not_use", "replaced"]
 Status = Literal["draft", "reviewed", "deprecated"]
 
-KINDS = ("caveat", "coverage", "recommendation")
+KINDS = ("coverage", "warning", "suggestion")  # in the order findings sort
+LEVELS = {
+    "coverage": logging.ERROR,
+    "warning": logging.WARNING,
+    "suggestion": logging.INFO,
+}
 CONFIDENCES = ("observed", "likely", "possible", "unknown")
 ACTIONS = ("can_be_used", "use_with_caution", "do_not_use", "replaced")
 STATUSES = ("draft", "reviewed", "deprecated")
@@ -56,34 +64,18 @@ STATUSES = ("draft", "reviewed", "deprecated")
 _SLUG = re.compile(r"[a-z][a-z0-9_]*")
 
 
-class Severity(enum.IntEnum):
-    """How bad a finding is; the values equal the logging levels."""
-
-    INFO = 20
-    WARNING = 30
-    SEVERE = 40  # the number of logging.ERROR
-
-
 def _set(obj: Any, name: str, value: Any) -> None:
     object.__setattr__(obj, name, value)
 
 
-def severity_of(value: Any) -> Severity:
-    """A Severity from itself, its value (20, 30, 40) or its name, any case."""
-    if isinstance(value, Severity):
-        return value
+def level_of(value: Any) -> int:
+    """A logging level from an int, such as logging.INFO, or a level name, any case."""
     if isinstance(value, str):
-        try:
-            return Severity[value.upper()]
-        except KeyError:
-            pass
-    elif isinstance(value, (int, np.integer)) and not isinstance(value, bool):
-        try:
-            return Severity(int(value))
-        except ValueError:
-            pass
+        value = logging.getLevelNamesMapping().get(value.upper(), value)
+    if isinstance(value, (int, np.integer)) and not isinstance(value, bool):
+        return int(value)
     raise ValueError(
-        f"severity must be info, warning or severe (20, 30 or 40), not {value!r}"
+        f"a level is a logging level such as logging.INFO or 'info', not {value!r}"
     )
 
 
@@ -149,8 +141,6 @@ def _jsonable(value: Any) -> Any:
     """A JSON-ready copy: tuples become lists, infinities None, numpy plain."""
     if value is None or isinstance(value, (bool, str)):
         return value
-    if isinstance(value, Severity):
-        return value.name.lower()
     if isinstance(value, (int, np.integer)):
         return int(value)
     if isinstance(value, (float, np.floating)):
@@ -233,9 +223,7 @@ def _outcome_post_init(o: Any) -> None:
     for name in ("title", "message", "instruction"):
         if not isinstance(getattr(o, name), str):
             raise TypeError(f"{name} must be a string")
-    _set(o, "severity", severity_of(o.severity))
-    if o.source_severity is not None and not isinstance(o.source_severity, str):
-        raise TypeError("source_severity must be a string or None")
+    _set(o, "level", LEVELS[o.kind] if o.level is None else level_of(o.level))
     _choice(o.confidence, CONFIDENCES, "confidence")
     if o.action is not None:
         _choice(o.action, ACTIONS, "action")
@@ -262,13 +250,12 @@ class Outcome:
     kind: Kind
     title: str
     message: str
-    severity: Severity = Severity.WARNING
-    source_severity: str | None = None  # the source's own wording, verbatim
+    level: int | str | None = None  # a logging level; None takes the kind's default
     confidence: Confidence = "unknown"
     action: Action | None = None
     instruction: str = ""
     suggestions: tuple[Suggestion, ...] = ()
-    min_overlap: float = 0.0  # emit() threshold on area_fraction
+    min_overlap: float = 0.0  # a smaller area_fraction is too small to count
     status: Status = "draft"
     references: tuple[Mapping[str, str], ...] = ()
     evidence: tuple[Mapping[str, Any], ...] = ()
@@ -331,9 +318,22 @@ class Finding(Outcome, Match):
         _set(self, "details", dict(self.details))
 
     def to_dict(self) -> dict[str, Any]:
-        """A JSON-ready dict: severity as its lowercase name, intervals as lists."""
+        """A JSON-ready dict: the level as its number, intervals as lists."""
         names = _OUTCOME_FIELDS + _MATCH_FIELDS + ("details", "source", "query_label")
         return {name: _jsonable(getattr(self, name)) for name in names}
+
+    def __str__(self) -> str:
+        """The text to log: "[CODE] title (label; area 40%; periods; draft)"."""
+        notes = [self.query_label] if self.query_label else []
+        if self.area_fraction is not None:
+            notes.append(f"area {self.area_fraction:.0%}")
+        if self.time_overlap:
+            notes.append(", ".join(f"{a}..{b}" for a, b in self.time_overlap))
+        if self.status == "draft":
+            notes.append("draft")
+        return f"[{self.code}] {self.title}" + (
+            f" ({'; '.join(notes)})" if notes else ""
+        )
 
 
 # ---- scopes, products, requests, queries -----------------------------------------
@@ -514,3 +514,36 @@ class Query:
         ):
             raise TypeError("request is the position of a request, an int")
         _set(self, "assumed", tuple(self.assumed))
+
+
+# ---- errors ---------------------------------------------------------------------
+# The error classes the design names (reference/decisions.md, "Error classes").
+# Where the design only says that something "is an error", the engine raises a
+# plain ValueError or TypeError with a message that names the problem.
+class DuplicateCodeError(ValueError):
+    """A code the Registry already holds was registered again (section 12.3)."""
+
+
+class UnknownNameError(KeyError):
+    """An undeclared axis, facet, dimension, product or region name.
+
+    A misspelt name would otherwise look like "no known issues", so the engine
+    refuses it in rules and queries alike (sections 4.6 and 4.7).
+    """
+
+    def __str__(self) -> str:
+        # KeyError quotes its argument, which would wrap the message in quotes
+        if len(self.args) == 1:
+            return str(self.args[0])
+        return super().__str__()
+
+
+class LoadError(ValueError):
+    """A pack or FeatureCollection failed the loader checks (section 5.3).
+
+    .problems lists each, naming its file, the feature's position and its code.
+    """
+
+    def __init__(self, problems: list[str]) -> None:
+        self.problems = tuple(problems)
+        super().__init__("\n".join(self.problems))

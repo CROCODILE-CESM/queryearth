@@ -3,6 +3,7 @@ docs/reference/fixtures.md; fixtures 2, 6, 9 and 13 as queries; coverage,
 computed rules, codes and lifecycle; and the fast path against the reference.
 """
 
+import logging
 import random
 from dataclasses import dataclass
 from typing import Any
@@ -37,9 +38,9 @@ def make_registry(**kw):
     return registry
 
 
-def caveat(code, **scope):
+def warning_rule(code, **scope):
     return qe.Rule(
-        code=code, kind="caveat", title=code, message=code, scope=qe.Scope(**scope)
+        code=code, kind="warning", title=code, message=code, scope=qe.Scope(**scope)
     )
 
 
@@ -50,10 +51,10 @@ def codes(findings):
 # ---- fixture 12: untimed rules and queries -----------------------------------------
 def test_fixture_12_untimed_rules_and_queries():
     registry = make_registry()
-    registry.add(caveat("TST001"))
-    registry.add(caveat("TST002", time=qe.interval("2000-01-01", "2006-12-31")))
+    registry.add(warning_rule("TST001"))
+    registry.add(warning_rule("TST002", time=qe.interval("2000-01-01", "2006-12-31")))
     registry.add(
-        caveat(
+        warning_rule(
             "TST003",
             time=qe.interval("2000-01-01", "2006-12-31"),
             facets={"product": "cru_ts"},
@@ -79,8 +80,7 @@ def croc_registry():
     registry.add(
         qe.Rule(
             code="CROC101",
-            kind="recommendation",
-            severity=qe.Severity.INFO,
+            kind="suggestion",
             title="Arctic domain: consider active sea ice",
             message="m",
             scope=qe.Scope(space=sp.box(-180, 66.5, 180, 90), facets={"model": "mom6"}),
@@ -90,8 +90,7 @@ def croc_registry():
     registry.add(
         qe.Rule(
             code="CROC102",
-            kind="recommendation",
-            severity=qe.Severity.INFO,
+            kind="suggestion",
             title="Eddy-resolving grid",
             message="m",
             scope=qe.Scope(axes={"resolution": {"lt": 10.0}}),
@@ -117,7 +116,9 @@ def test_fixture_17_resolution_only():
     with pytest.raises(qe.UnknownNameError):
         registry.query(axes={"resolutoin": 8.0})
     with pytest.raises(ValueError, match="unit"):
-        registry.add(caveat("CROC109", axes={"resolution": {"lt": 10, "unit": "deg"}}))
+        registry.add(
+            warning_rule("CROC109", axes={"resolution": {"lt": 10, "unit": "deg"}})
+        )
 
 
 def test_undecided_axis_reports_the_rule_interval():
@@ -137,7 +138,7 @@ def cru_registry():
     registry.add(
         qe.Rule(
             code="CRU001",
-            kind="caveat",
+            kind="warning",
             title="CRU TS precipitation falls back to climatology",
             message="m",
             region_ref=("ar6:CAF", "ar6:WAF"),
@@ -166,10 +167,7 @@ def cru_registry():
             stn = query.context["cru_ts.stn"]
             zero = float((stn == 0).mean())
             if zero > 0:
-                return {
-                    "severity": qe.Severity.SEVERE,
-                    "details": {"stn0_fraction": zero},
-                }
+                return {"level": logging.ERROR, "details": {"stn0_fraction": zero}}
             return float(stn.mean()) <= 2
 
     return registry
@@ -203,7 +201,7 @@ def test_computed_rule_check_runs_for_definite_matches_only():
         requests=[qe.Request("CRUTS", "pre")], context={"cru_ts.stn": stn}
     )
     (cru002,) = [f for f in found if f.code == "CRU002"]
-    assert cru002.severity is qe.Severity.SEVERE and cru002.source == "computed"
+    assert cru002.level == logging.ERROR and cru002.source == "computed"
     assert cru002.details == {"stn0_fraction": pytest.approx(1 / 3)}
     thick = {"cru_ts.stn": np.array([5, 6])}
     found = registry.query(requests=[qe.Request("cru_ts", "pre")], context=thick)
@@ -226,7 +224,7 @@ def test_glhe_lake_query_assumes_time_and_version():
 def test_fixture_20_aliases():
     registry = make_registry()
     registry.add(
-        caveat("TST010", facets={"product": "CRUTS"})
+        warning_rule("TST010", facets={"product": "CRUTS"})
     )  # rule side resolves too
     (found,) = registry.query(facets={"product": "cru ts"})
     assert (
@@ -235,14 +233,14 @@ def test_fixture_20_aliases():
     with pytest.raises(qe.UnknownNameError):
         registry.query(facets={"product": "CRU-TS"})
     with pytest.raises(qe.UnknownNameError):
-        registry.add(caveat("TST011", facets={"product": "cruts4"}))
+        registry.add(warning_rule("TST011", facets={"product": "cruts4"}))
     with pytest.raises(ValueError, match="matches no declared product"):
-        registry.add(caveat("TST012", facets={"product": ["merra*"]}))  # Q3
+        registry.add(warning_rule("TST012", facets={"product": ["merra*"]}))  # Q3
 
 
 def test_fixture_20_wildcard_is_not_an_omitted_facet():
     registry = make_registry()
-    registry.add(caveat("TST020", facets={"product": ["*"]}))
+    registry.add(warning_rule("TST020", facets={"product": ["*"]}))
     (found,) = registry.query(include_conditional=True)
     assert found.conditional_on == ("product",)
     (found,) = registry.query(facets={"product": "era5"})
@@ -251,8 +249,8 @@ def test_fixture_20_wildcard_is_not_an_omitted_facet():
 
 def test_fixture_20_none_of_and_case():
     registry = make_registry()
-    registry.add(caveat("TST030", facets={"variable": {"none_of": ["tp"]}}))
-    registry.add(caveat("TST031", facets={"variable": ["Pre"]}))
+    registry.add(warning_rule("TST030", facets={"variable": {"none_of": ["tp"]}}))
+    registry.add(warning_rule("TST031", facets={"variable": ["Pre"]}))
     assert registry.query(facets={"variable": "tp"}) == []
     (found,) = registry.query(facets={"variable": ("tp", "t2m")})
     assert found.code == "TST030" and found.matched_facets == {"variable": ("t2m",)}
@@ -263,9 +261,13 @@ def test_fixture_20_none_of_and_case():
 def test_fixture_21_versions_filled_from_products():
     registry = make_registry()
     with pytest.raises(ValueError):
-        registry.add(caveat("TST040", facets={"version": {"introduced": "4.07a"}}))
+        registry.add(
+            warning_rule("TST040", facets={"version": {"introduced": "4.07a"}})
+        )
     registry.add(
-        caveat("TST041", facets={"version": {"introduced": "4.00", "fixed": "4.09"}})
+        warning_rule(
+            "TST041", facets={"version": {"introduced": "4.00", "fixed": "4.09"}}
+        )
     )
     (found,) = registry.query(facets={"product": "cru_ts"})
     assert found.assumed == ("version",) and found.matched_facets == {
@@ -283,9 +285,13 @@ def test_fixture_21_versions_filled_from_products():
 # ---- fixture 23: requests do not cross --------------------------------------------------
 def test_fixture_23_requests_do_not_cross():
     registry = make_registry()
-    registry.add(caveat("TSA001", facets={"product": "cru_ts", "variable": "pre"}))
-    registry.add(caveat("TSB001", facets={"product": "era5_land", "variable": "pre"}))
-    registry.add(caveat("TSC001", axes={"resolution": {"lt": 10}}))
+    registry.add(
+        warning_rule("TSA001", facets={"product": "cru_ts", "variable": "pre"})
+    )
+    registry.add(
+        warning_rule("TSB001", facets={"product": "era5_land", "variable": "pre"})
+    )
+    registry.add(warning_rule("TSC001", axes={"resolution": {"lt": 10}}))
     query = qe.Query(
         axes={"resolution": 8},
         requests=[qe.Request("cru_ts", ("pre",)), qe.Request("era5_land", ("tas",))],
@@ -323,9 +329,9 @@ def test_fixture_24_per_product_default_time():
     registry = make_registry()
     period = qe.interval("1940-01-01", "1960-12-31")
     registry.add(
-        caveat("TSD001", time=period, facets={"product": ["cru_ts", "era5_land"]})
+        warning_rule("TSD001", time=period, facets={"product": ["cru_ts", "era5_land"]})
     )
-    registry.add(caveat("TSE001", time=period))
+    registry.add(warning_rule("TSE001", time=period))
     found = registry.query(requests=["cru_ts", "era5_land"], include_conditional=True)
     cru, era, untimed = found
     assert (cru.code, cru.product, cru.assumed) == ("TSD001", "cru_ts", ("time",))
@@ -385,7 +391,7 @@ class IndexedPfafstetter(Pfafstetter):
 @pytest.mark.parametrize("plugin", [Pfafstetter(), IndexedPfafstetter()])
 def test_fixture_27_plugin_dimension(plugin):
     registry = qe.Registry("glhe", dimensions=[plugin])
-    registry.add(caveat("BAS001", dims={"basin": ["14", "62"]}))
+    registry.add(warning_rule("BAS001", dims={"basin": ["14", "62"]}))
     (nested,) = registry.query(dims={"basin": "1423"})
     assert nested.dims == {"basin": qe.DimMatch(("14",), 1.0)}
     (partial,) = registry.query(dims={"basin": "1"})
@@ -397,7 +403,7 @@ def test_fixture_27_plugin_dimension(plugin):
     with pytest.raises(ValueError, match="Pfafstetter"):
         registry.query(dims={"basin": "1203"})
     with pytest.raises(qe.UnknownNameError):
-        registry.add(caveat("BAS002", dims={"basins": ["14"]}))
+        registry.add(warning_rule("BAS002", dims={"basins": ["14"]}))
     with pytest.raises(qe.UnknownNameError):
         registry.query(facets={"basin": "14"})  # declared as a dimension, not a facet
     assert nested.to_dict()["dims"] == {"basin": {"overlap": ["14"], "fraction": 1.0}}
@@ -415,7 +421,7 @@ class DescribedPfafstetter(Pfafstetter):
 
 def test_plugin_to_json_and_extent():
     registry = qe.Registry("glhe", dimensions=[DescribedPfafstetter()])
-    registry.add(caveat("BAS001", dims={"basin": ["14", "62"]}))
+    registry.add(warning_rule("BAS001", dims={"basin": ["14", "62"]}))
     (nested,) = registry.query(dims={"basin": "1423"})
     assert nested.dims == {"basin": qe.DimMatch(("14",), 1.0)}
     assert nested.to_dict()["dims"] == {"basin": {"overlap": "14", "fraction": 1.0}}
@@ -425,7 +431,7 @@ def test_plugin_to_json_and_extent():
 
 def test_dimensions_are_declared_before_rules_with_unique_names():
     registry = qe.Registry("x")
-    registry.add(caveat("TST050"))
+    registry.add(warning_rule("TST050"))
     with pytest.raises(ValueError):
         registry.add_dimension(Pfafstetter())
     with pytest.raises(ValueError):
@@ -437,15 +443,15 @@ def test_dimensions_are_declared_before_rules_with_unique_names():
 # ---- fixtures 2, 6, 9 and 13 as queries ------------------------------------------------
 def test_fixture_2_antimeridian_box_in_three_forms():
     registry = qe.Registry("geo")
-    registry.add(caveat("FIJ001", space=sp.box(170, -20, -170, -10)))
+    registry.add(warning_rule("FIJ001", space=sp.box(170, -20, -170, -10)))
     registry.add(
-        caveat(
+        warning_rule(
             "FIJ002",
             space=sp.polygon([(170, -20), (-170, -20), (-170, -10), (170, -10)]),
         )
     )
     registry.add(
-        caveat(
+        warning_rule(
             "FIJ003", space=sp.polygon([(170, -20), (190, -20), (190, -10), (170, -10)])
         )
     )
@@ -460,7 +466,7 @@ def test_fixture_2_antimeridian_box_in_three_forms():
 
 def test_fixture_6_closed_edges():
     registry = qe.Registry("geo")
-    registry.add(caveat("SQR001", space=sp.box(0, 0, 10, 10)))
+    registry.add(warning_rule("SQR001", space=sp.box(0, 0, 10, 10)))
     for point in [(0, 5), (10, 5), (5, 0), (5, 10), (10, 10), (0, 10)]:
         assert codes(registry.query(space=sp.point(*point))) == ["SQR001"]
     (touching,) = registry.query(space=sp.box(10, 0, 20, 10))
@@ -469,8 +475,8 @@ def test_fixture_6_closed_edges():
 
 def test_fixture_9_overlap_fraction_and_area():
     registry = qe.Registry("geo")
-    registry.add(caveat("HLF001", space=sp.box(0, 40, 5, 50)))
-    registry.add(caveat("HLF002", space=sp.box(0, 40, 10, 45)))
+    registry.add(warning_rule("HLF001", space=sp.box(0, 40, 5, 50)))
+    registry.add(warning_rule("HLF002", space=sp.box(0, 40, 10, 45)))
     query = sp.box(0, 40, 10, 50)
     assert round(query.area_km2, 3) == 873182.018
     half, south = registry.query(space=query)
@@ -481,8 +487,8 @@ def test_fixture_9_overlap_fraction_and_area():
 
 def test_fixture_13_open_and_inclusive_ends():
     registry = qe.Registry("time")
-    registry.add(caveat("OPN001", time=qe.interval("2000-01-01", "..")))
-    registry.add(caveat("YRS001", time=qe.interval("2000-01-01", "2006-12-31")))
+    registry.add(warning_rule("OPN001", time=qe.interval("2000-01-01", "..")))
+    registry.add(warning_rule("YRS001", time=qe.interval("2000-01-01", "2006-12-31")))
     found = {f.code: f for f in registry.query(time=("1991-01-01", "2020-12-31"))}
     assert found["OPN001"].time_fraction == pytest.approx(7671 / 10958)
     (future,) = registry.query(time=("2030-01-01", ".."))
@@ -500,7 +506,9 @@ def test_fixture_13_open_and_inclusive_ends():
 def test_month_recurrence_counts_as_time():
     registry = qe.Registry("time")
     registry.add(
-        caveat("SEA001", time=qe.parse_time(None, recurrence={"months": [12, 1, 2]}))
+        warning_rule(
+            "SEA001", time=qe.parse_time(None, recurrence={"months": [12, 1, 2]})
+        )
     )
     (undecided,) = registry.query(include_conditional=True)
     assert undecided.conditional_on == ("time",) and undecided.time_overlap == ()
@@ -536,11 +544,7 @@ def test_coverage_partly_outside_in_space_and_time():
         requests=["demo"],
     )
     qe001, qe002 = found
-    assert (qe001.code, qe001.kind, qe001.severity) == (
-        "QE001",
-        "coverage",
-        qe.Severity.SEVERE,
-    )
+    assert (qe001.code, qe001.kind, qe001.level) == ("QE001", "coverage", logging.ERROR)
     assert qe001.action == "use_with_caution" and qe001.product == "demo"
     assert qe001.area_fraction == pytest.approx(2 / 3) and qe001.source == "builtin"
     assert qe002.time_overlap == (("2010-01-01", "2014-12-31"),)
@@ -577,7 +581,7 @@ def test_coverage_callable_is_evaluated_once_per_request_with_its_sub_query():
 
     registry = qe.Registry("cov")
     registry.add_product(qe.Product("live", coverage=coverage))
-    registry.add(caveat("LIV001", facets={"product": "live"}))
+    registry.add(warning_rule("LIV001", facets={"product": "live"}))
     (found,) = registry.query(requests=["live"])
     assert found.assumed == () and found.time_overlap == (("2000-01-01", "2000-12-31"),)
     assert seen == [(0, ("live",))]
@@ -589,7 +593,7 @@ def test_function_rule_croc104_suggests_a_time_step():
 
     @registry.rule(
         "CROC104",
-        kind="recommendation",
+        kind="suggestion",
         space=sp.box(-180, 66.5, 180, 90),
         facets={"model": "mom6"},
         axes={"resolution": {"gt": 0.0}},
@@ -607,9 +611,7 @@ def test_function_rule_croc104_suggests_a_time_step():
     )
     assert codes(found) == ["CROC101", "CROC102", "CROC104"]
     croc104 = found[-1]
-    assert croc104.severity is qe.Severity.INFO and croc104.title.startswith(
-        "High-latitude"
-    )
+    assert croc104.level == logging.INFO and croc104.title.startswith("High-latitude")
     assert croc104.suggestions == (qe.Suggestion("MOM_input", "DT", 240.0, "why"),)
     assert croc104.axes["resolution"] == qe.AxisOverlap(8.0, 12.0, True, True)
     assert found[1].axes["resolution"] == qe.AxisOverlap(8.0, 10.0, True, False)
@@ -628,7 +630,7 @@ def test_gen001_runs_once_per_request():
 
     @registry.rule(
         "GEN001",
-        severity=qe.Severity.INFO,
+        level="info",
         facets={"product": ["*"]},
         requires=["request_km2"],
     )
@@ -665,16 +667,13 @@ def test_check_may_return_several_findings_and_override_time():
         """Several findings"""
 
         def check(self, query, match):
-            first = {
-                "time_overlap": [("2001-01-01", "2002-12-31")],
-                "severity": "severe",
-            }
+            first = {"time_overlap": [("2001-01-01", "2002-12-31")], "level": "error"}
             return [first, {"message": "second"}]
 
-    severe, second = registry.query(time=("2000-01-01", "2009-12-31"))
-    assert severe.severity is qe.Severity.SEVERE
-    assert severe.time_overlap == (("2001-01-01", "2002-12-31"),)
-    assert severe.time_fraction == pytest.approx(730 / 3653)
+    error, second = registry.query(time=("2000-01-01", "2009-12-31"))
+    assert error.level == logging.ERROR and second.level == logging.WARNING
+    assert error.time_overlap == (("2001-01-01", "2002-12-31"),)
+    assert error.time_fraction == pytest.approx(730 / 3653)
     assert second.message == "second" and second.time_fraction == 1.0
 
     class Locked(qe.ComputedRule, code="MUL002", registry=registry):
@@ -695,7 +694,7 @@ def test_computed_rule_keywords_inherit_from_an_abstract_base():  # Q9
         abstract=True,
         registry=registry,
         facets={"model": "mom6"},
-        kind="recommendation",
+        kind="suggestion",
     ):
         pass
 
@@ -706,11 +705,7 @@ def test_computed_rule_keywords_inherit_from_an_abstract_base():  # Q9
         """Its own facets win"""
 
     (child,) = registry.query(facets={"model": "mom6"})
-    assert (child.code, child.kind, child.severity) == (
-        "FAM001",
-        "recommendation",
-        qe.Severity.INFO,
-    )
+    assert (child.code, child.kind, child.level) == ("FAM001", "suggestion", 20)
     assert codes(registry.query(facets={"model": "cesm"})) == ["FAM002"]
     with pytest.raises(TypeError):
 
@@ -727,9 +722,9 @@ def test_computed_rule_keywords_inherit_from_an_abstract_base():  # Q9
 
 def test_duplicate_codes_and_the_q10_replacement():
     registry = qe.Registry("dup", facets=("model",))
-    registry.add(caveat("DUP001"))
+    registry.add(warning_rule("DUP001"))
     with pytest.raises(qe.DuplicateCodeError):
-        registry.add(caveat("DUP001"))
+        registry.add(warning_rule("DUP001"))
 
     def define(title):
         class Redefined(qe.ComputedRule, code="DUP002", registry=registry, title=title):
@@ -775,10 +770,10 @@ def test_duplicate_codes_and_the_q10_replacement():
 def test_code_pattern(code, valid):
     registry = qe.Registry("codes")
     if valid:
-        registry.add(caveat(code))
+        registry.add(warning_rule(code))
     else:
         with pytest.raises(ValueError):
-            registry.add(caveat(code))
+            registry.add(warning_rule(code))
 
 
 def test_withdrawn_and_superseded_rules_never_match():
@@ -786,47 +781,51 @@ def test_withdrawn_and_superseded_rules_never_match():
     registry.add(
         qe.Rule(
             code="CRU003",
-            kind="caveat",
+            kind="warning",
             title="t",
             message="m",
             withdrawn="2026-01-01T00:00:00Z",
         )
     )
-    registry.add(qe.Rule(code="CRU005", kind="caveat", title="t", message="m"))
+    registry.add(qe.Rule(code="CRU005", kind="warning", title="t", message="m"))
     registry.add(
         qe.Rule(
-            code="CRU004", kind="caveat", title="t", message="m", supersedes=("CRU005",)
+            code="CRU004",
+            kind="warning",
+            title="t",
+            message="m",
+            supersedes=("CRU005",),
         )
     )
     assert codes(registry.query(include_conditional=True)) == ["CRU004"]
     with pytest.raises(qe.DuplicateCodeError):  # a retired code is never reused
-        registry.add(caveat("CRU003"))
+        registry.add(warning_rule("CRU003"))
 
 
-def test_findings_are_sorted_by_severity_kind_code_and_part():
+def test_findings_are_sorted_by_level_kind_code_and_part():
     registry = make_registry()
     registry.add(
         qe.Rule(
             code="SRT001",
-            kind="caveat",
+            kind="warning",
             title="t",
             message="m",
-            severity="info",
+            level="info",
             scope=qe.Scope(facets={"product": ["*"]}),
         )
     )
     registry.add(
         qe.Rule(
             code="SRT002",
-            kind="recommendation",
+            kind="suggestion",
             title="t",
             message="m",
-            severity="severe",
+            level="error",
             suggestions=({"target": "a", "key": "b", "value": 1},),
         )
     )
     registry.add(
-        qe.Rule(code="SRT003", kind="caveat", title="t", message="m", severity="severe")
+        qe.Rule(code="SRT003", kind="warning", title="t", message="m", level="error")
     )
     found = registry.query(
         space=sp.point(0, 0),
@@ -844,9 +843,9 @@ def test_findings_are_sorted_by_severity_kind_code_and_part():
 
 def test_rule_counts_products_and_the_default_registry():
     registry = make_registry()
-    registry.add(caveat("CNT001", facets={"product": ["era5*"]}))
-    registry.add(caveat("CNT002", facets={"product": {"none_of": ["era5"]}}))
-    registry.add(caveat("CNT003"))
+    registry.add(warning_rule("CNT001", facets={"product": ["era5*"]}))
+    registry.add(warning_rule("CNT002", facets={"product": {"none_of": ["era5"]}}))
+    registry.add(warning_rule("CNT003"))
     assert registry.rule_counts() == {"cru_ts": 1, "era5_land": 2, "era5": 1, None: 1}
     with pytest.raises(TypeError):
         registry.products["x"] = None
@@ -857,14 +856,14 @@ def test_rule_counts_products_and_the_default_registry():
 
 
 def test_rule_added_to_a_second_registry_is_bound_as_a_copy():
-    rule = caveat("CPY001", facets={"model": "a"})
+    rule = warning_rule("CPY001", facets={"model": "a"})
     first, second = qe.Registry("one"), qe.Registry("two")
     first.add(rule)
     second.add(rule)
     assert rule.evaluate(qe.Query(facets={"model": "a"}))[0].code == "CPY001"
     assert codes(second.query(facets={"model": "a"})) == ["CPY001"]
     with pytest.raises(TypeError):
-        caveat("CPY002").evaluate(qe.Query())  # not on a Registry
+        warning_rule("CPY002").evaluate(qe.Query())  # not on a Registry
 
 
 def test_third_party_rule_kinds():
@@ -873,12 +872,12 @@ def test_third_party_rule_kinds():
         scope = qe.Scope(facets={"model": "mom6"})
 
         def evaluate(self, query):
-            return [qe.Finding(code=self.code, kind="caveat", title="f", message="f")]
+            return [qe.Finding(code=self.code, kind="warning", title="f", message="f")]
 
     class Hooked:  # outcomes() runs after the Registry matches the scope (Q5)
         code = "HOK001"
         scope = qe.Scope(axes={"resolution": {"le": 5}})
-        outcome = qe.Outcome(code="HOK001", kind="caveat", title="h", message="h")
+        outcome = qe.Outcome(code="HOK001", kind="warning", title="h", message="h")
 
         def outcomes(self, query, match):
             return {"details": {"lo": match.axes["resolution"].lo}}
@@ -1023,7 +1022,7 @@ def random_registry(rng):
         registry.add(
             qe.Rule(
                 code=f"RND{k:03d}",
-                kind="caveat",
+                kind="warning",
                 title="t",
                 message="m",
                 scope=scope,

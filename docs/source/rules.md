@@ -12,10 +12,9 @@ registry = qe.Registry("mine", axes=[qe.Axis("resolution", "km")])
 registry.add(
     qe.Rule(
         code="MINE001",
-        kind="caveat",
+        kind="warning",
         title="Coastal values are interpolated",
         message="Within this box, values near the coast come from interpolation.",
-        severity=qe.Severity.WARNING,
         action="use_with_caution",
         scope=qe.Scope(
             space=sp.box(-98, 18, -80, 31),
@@ -25,14 +24,14 @@ registry.add(
 )
 ```
 
-`kind` is `"caveat"` or `"recommendation"`; a recommendation needs at least one {class}`~queryearth.Suggestion`. Adding a code that is already on the Registry raises `DuplicateCodeError`.
+`kind` is `"warning"` or `"suggestion"`, and a suggestion lists at least one {class}`~queryearth.Suggestion`. `level` defaults to `logging.WARNING` for a warning and `logging.INFO` for a suggestion; give another `logging` level, or its name such as `"error"`, to change it. Adding a code that is already on the Registry raises `DuplicateCodeError`.
 
 ## Computed rules
 
 A computed rule decides its outcome from the request, or from data the caller passes in `Query.context`. Register a function with `@registry.rule`; its docstring is the title:
 
 ```python
-@registry.rule("MINE102", kind="recommendation", axes={"resolution": {"gt": 0}})
+@registry.rule("MINE102", kind="suggestion", axes={"resolution": {"gt": 0}})
 def time_step(query, match):
     """Set the time step from the finest cells"""
     finest_km = match.axes["resolution"].lo
@@ -59,10 +58,10 @@ Each rule is one GeoJSON Feature. Its `geometry` is a Polygon, a MultiPolygon or
 
 | Group | Properties |
 |---|---|
-| Identity and outcome (required) | `code`, `kind` (`caveat` or `recommendation`), `title`, `message`, `severity` (`info`, `warning` or `severe`) |
-| Advice | `instruction`, `confidence`, `action`, `source_severity`, and `suggestions` (required for a recommendation) |
+| Identity and outcome | `code`, `kind` (`warning` or `suggestion`), `title` and `message`, all required; `level` (`info`, `warning` or `error`; by default `warning` for a warning and `info` for a suggestion) |
+| Advice | `instruction`, `confidence`, `action`, and `suggestions` (required for a suggestion) |
 | Scope | `facets`, `axes`, `dimensions` (for plugin dimensions), `region_ref` or `box` (`{west, width, south, north}`; geometry must then be null), `periods` (intervals inside `time`), `recurrence` (`{"months": [12, 1, 2]}`), and the fallback `time_start` and `time_end` |
-| Emission | `min_overlap`, a threshold on the area fraction from 0 to 1 below which `emit()` stays quiet |
+| Overlap | `min_overlap`, an area fraction from 0 to 1 below which the finding is too small to count when ranking products, and which you can filter on |
 | Provenance | `evidence`, `references`, `aliases` |
 | Lifecycle | `status` (`draft`, `reviewed` or `deprecated`; a reviewed record cites a reference), `created`, `updated`, `withdrawn` (kept for history, never matched), `supersedes` |
 | Extensions | `x_*` fields, kept and ignored |
@@ -80,10 +79,9 @@ A record from the toy pack:
   "time": null,
   "properties": {
     "code": "TOY002",
-    "kind": "caveat",
+    "kind": "warning",
     "title": "toy_ocean is too warm in the Bering Sea in winter",
     "message": "From December to March, toy_ocean sea temperature in the Bering Sea runs about 1 K too warm.",
-    "severity": "warning",
     "facets": {"product": ["toy_ocean"], "variable": ["thetao"]},
     "recurrence": {"months": [12, 1, 2, 3]},
     "status": "draft"

@@ -4,7 +4,7 @@ Guidance for Claude Code (and anyone else) working in this repository.
 
 ## What queryearth is
 
-A small engine that matches rules to a request. A rule is scoped by any mix of space, time, numeric axes (such as grid resolution), labels (product, variable, model) and plugin dimensions. A query gives any subset of those and gets back findings of three kinds: caveats, coverage gaps (built-in codes QE001 for space and QE002 for time) and recommendations with structured suggestions. It is general-purpose, not tied to earth system modelling. Its first consumers are CrocoDash (one query per case, in `Case.configure_forcings`) and GLHE (lake polygons against data products).
+A small engine that matches rules to a request. A rule is scoped by any mix of space, time, numeric axes (such as grid resolution), labels (product, variable, model) and plugin dimensions. A query gives any subset of those and gets back findings of three kinds: warnings, coverage gaps (built-in codes QE001 for space and QE002 for time) and suggestions, which carry structured actions. Each finding has a standard `logging` level, and callers log findings with `logging` themselves. It is general-purpose, not tied to earth system modelling. Its first consumers are CrocoDash (one query per case, in `Case.configure_forcings`) and GLHE (lake polygons against data products).
 
 It is an engine only: the package ships no curated rules. Rule packs belong to their users. The examples in `examples/` and `docs/reference/examples/` are illustrations, marked as made up or illustrative.
 
@@ -13,14 +13,13 @@ It is an engine only: the package ships no curated rules. Rule packs belong to t
 - **Clean room: geostructures.** Never read, copy, paraphrase or search for code from the `geostructures` project, and do not depend on it or contribute to it. More generally, avoid dependencies on projects run by military contractors.
 - **Dependencies.** Runtime imports are the standard library, numpy and shapely (2.1 or later) only. Anything else goes in an optional extra, and test-only packages go in the `test` extra.
 - **Python.** 3.11 or later with no upper cap. Write nothing newer than the 3.11 grammar. Add each new Python release to the CI matrix in `.github/workflows/tests.yml`.
-- **Keep it small.** The author cares about code size. Prefer the simplest implementation that passes the fixtures: no speculative options, no extra layers, no single-use helpers. Features cut to keep v0.0.1 small are listed in `docs/design.md` section 17, each with its upgrade path. Re-add one only when its trigger happens, and update that row when you do.
+- **Keep it small.** The author cares about code size. Prefer the simplest implementation that passes the fixtures: no speculative options, no extra layers, no single-use helpers. Features cut to keep v0.0.1 and v0.1.0 small are listed in `docs/design.md` section 17, each with its upgrade path. Re-add one only when its trigger happens, and update that row when you do.
 - **Keep the extension hooks.** Everything that varies between users plugs in through a small interface (design.md section 12.5), and these hooks stay even where nothing uses them yet:
   - plugin `Dimension`s, with their optional `build`, `comparable`, `late`, `to_json` and `extent`;
   - third-party rule kinds (`RuleKind`, `outcomes()`);
   - `ComputedRule` and `@registry.rule`, with `mask()` for the bulk path;
   - a callable `Product.coverage`;
   - a `ScoreFn` for `suitable()`;
-  - `emit()` sinks;
   - named regions.
 
   Geometry and time semantics are deliberately not pluggable.
@@ -34,12 +33,11 @@ It is an engine only: the package ships no curated rules. Rule packs belong to t
 |---|---|
 | `queryearth/space.py` | `Space` (point or polygon) and its helpers `point`, `box`, `polygon`. Antimeridian splitting, closed-set `meets`, `measure` (area fraction and km²), spherical `area_km2`, the points mask for the bulk path |
 | `queryearth/time.py` | `Interval`, `TimeSpec`, `interval()`, `parse_time()` for records, `overlap`, `time_fraction`, month recurrence. One calendar: proleptic Gregorian |
-| `queryearth/objects.py` | Frozen dataclasses: `Severity`, `Suggestion`, `Outcome`, `Match`, `Finding`, `Scope`, `Coverage`, `Product`, `Request`, `Query` |
+| `queryearth/objects.py` | Frozen dataclasses: `Suggestion`, `Outcome`, `Match`, `Finding` (whose `str()` is the message to log), `Scope`, `Coverage`, `Product`, `Request`, `Query`; and the error classes `DuplicateCodeError`, `UnknownNameError` and `LoadError` |
 | `queryearth/dimensions.py` | The `Dimension` protocol; `SpaceDimension` and `TimeDimension`, built into every Registry and not replaceable; the built-in plugins `Axis`, `Labels` and `Versions` |
 | `queryearth/rules.py` | `Rule` (a static record), `ComputedRule`, `match_scope` (one scope against one query part) and building findings |
 | `queryearth/registry.py` | `Registry`: declarations, `query`, requests, coverage findings, `suitable`, `query_points`, `PointResult` |
 | `queryearth/packs.py` | Loading a pack (`pack.toml` plus GeoJSON FeatureCollections), with the loader checks done by hand |
-| `queryearth/emit.py` | `emit()`, `Policy`, `policy()`, the warning classes and `AdvisoryError` |
 | `tests/` | One file per module, plus `test_queries.py` (bulk path, `suitable`) and `test_packs.py` |
 | `examples/toy/` | A made-up pack and `play.py`, a walkthrough to run cell by cell |
 | `docs/source/` | The public user docs (Sphinx with MyST Markdown), built and deployed to GitHub Pages by `.github/workflows/docs.yml`: one folder per release (`vX.Y.Z/`) plus `dev/` for `main`, with a version menu; `.github/docs_versions.py` keeps the version list and the root redirect. Nothing derived from the private interviews goes here |

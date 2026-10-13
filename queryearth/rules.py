@@ -21,7 +21,7 @@ import numpy as np
 
 from queryearth import space as sp
 from queryearth.dimensions import DimMatch, schema_problem
-from queryearth.objects import Finding, Match, Outcome, Query, Scope, Severity
+from queryearth.objects import Finding, Match, Outcome, Query, Scope
 from queryearth.space import Space
 from queryearth.time import Interval, TimeSpec, overlap, parse_time, time_fraction
 
@@ -281,10 +281,10 @@ class Rule(Outcome):
 
     def __post_init__(self) -> None:
         Outcome.__post_init__(self)
-        if self.kind not in ("caveat", "recommendation"):
+        if self.kind not in ("warning", "suggestion"):
             raise ValueError(f"{self.code}: coverage is declared on products")
-        if self.kind == "recommendation" and not self.suggestions:
-            raise ValueError(f"{self.code}: a recommendation needs suggestions")
+        if self.kind == "suggestion" and not self.suggestions:
+            raise ValueError(f"{self.code}: a suggestion lists one or more suggestions")
         if not isinstance(self.scope, Scope):
             raise TypeError(f"{self.code}: scope is a Scope")
         for name in ("region_ref", "supersedes", "aliases"):
@@ -321,11 +321,7 @@ class Rule(Outcome):
         unknown = sorted(set(feature) - _FEATURE_KEYS) + sorted(
             k for k in props if k not in _RECORD_KEYS and not _EXTENSION.fullmatch(k)
         )
-        missing = [
-            k
-            for k in ("code", "kind", "title", "message", "severity")
-            if k not in props
-        ]
+        missing = [k for k in ("code", "kind", "title", "message") if k not in props]
         if unknown or missing:
             raise ValueError(
                 f"unknown members {unknown}" if unknown else f"missing {missing}"
@@ -337,10 +333,8 @@ class Rule(Outcome):
             raise ValueError(f"place must be null, and coordRefSys {_CRS84}")
         for code in (props["code"], *props.get("supersedes", ())):
             check_code(code)
-        if props["severity"] not in ("info", "warning", "severe"):
-            raise ValueError(
-                f"severity is info, warning or severe, not {props['severity']!r}"
-            )
+        if props.get("level", "info") not in ("info", "warning", "error"):
+            raise ValueError(f"level is info, warning or error, not {props['level']!r}")
         if props.get("status") == "reviewed" and not props.get("references"):
             raise ValueError("a reviewed record cites at least one reference (Q54)")
         box, geometry = props.get("box"), feature["geometry"]
@@ -401,11 +395,11 @@ class ComputedRule:
     """A rule computed from the request or from data the caller holds.
 
     Class keywords give its identity and scope: code, registry (default
-    Registry.default()), abstract, the Outcome fields (kind defaults to caveat,
-    severity to WARNING or INFO for a recommendation, title and message to the
-    docstring), facets, axes, dims, space (a Space), time and requires (keys
-    of Query.context). Defining a subclass registers one instance; a subclass
-    inherits its bases' keywords, merged, with its own winning (Q9).
+    Registry.default()), abstract, the Outcome fields (kind defaults to warning,
+    level to the kind's default, title and message to the docstring), facets,
+    axes, dims, space (a Space), time and requires (keys of Query.context).
+    Defining a subclass registers one instance; a subclass inherits its bases'
+    keywords, merged, with its own winning (Q9).
 
     check(query, match) runs only for a definite match and returns True (one
     finding with the declared outcome), False or None (none), a mapping of
@@ -450,13 +444,10 @@ class ComputedRule:
     def outcome(self) -> Outcome:
         """The declared outcome, before check() overrides it."""
         fields = {k: self.meta[k] for k in OUTCOME_KEYS if k in self.meta}
-        kind = fields.setdefault("kind", "caveat")
-        if kind not in ("caveat", "recommendation"):
+        if fields.setdefault("kind", "warning") not in ("warning", "suggestion"):
             raise ValueError(
-                f"{self.code}: a computed rule is a caveat or a recommendation"
+                f"{self.code}: a computed rule is a warning or a suggestion"
             )
-        default = Severity.INFO if kind == "recommendation" else Severity.WARNING
-        fields.setdefault("severity", default)
         lines = inspect.cleandoc(self._doc() or "").splitlines()
         fields.setdefault("title", lines[0] if lines else "")
         if not fields["title"]:

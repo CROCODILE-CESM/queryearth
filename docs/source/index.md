@@ -4,9 +4,9 @@ queryearth answers one question: given where (a point or a polygon), when (a tim
 
 Rules are short Python objects or GeoJSON records. A query returns **findings** of three kinds:
 
-- **caveats**, such as "these values are climatology, not observations";
+- **warnings**, such as "these values are climatology, not observations";
 - **coverage gaps**, such as "this product does not reach part of your request";
-- **recommendations** with structured suggestions, such as "set this model parameter".
+- **suggestions** of structured actions, such as "set this model parameter".
 
 queryearth is an engine only: it ships no rules of its own. You bring yours.
 
@@ -28,10 +28,9 @@ registry = qe.Registry("demo", axes=[qe.Axis("resolution", "km")])
 registry.add(
     qe.Rule(
         code="DEMO001",
-        kind="caveat",
+        kind="warning",
         title="Sparse observations south of 50S before 2004",
         message="Few observations constrain this period, so values drift.",
-        severity=qe.Severity.WARNING,
         scope=qe.Scope(
             space=sp.box(-180, -90, 180, -50),
             time=qe.interval("1993-01-01", "2003-12-31"),
@@ -41,10 +40,9 @@ registry.add(
 registry.add(
     qe.Rule(
         code="DEMO101",
-        kind="recommendation",
+        kind="suggestion",
         title="Fine grid: turn off the coarse-grid scheme",
         message="Below 10 km the model resolves this process itself.",
-        severity=qe.Severity.INFO,
         scope=qe.Scope(axes={"resolution": {"lt": 10}}),
         suggestions=[qe.Suggestion("settings", "coarse_scheme", False)],
     )
@@ -58,7 +56,7 @@ for f in registry.query(
     print(f.code, f.kind, f"area {f.area_fraction:.0%}", f"time {f.time_fraction:.0%}")
 ```
 
-This prints DEMO001 first, because it is more severe: it covers 58% of the box's area and 67% of its period. Then it prints DEMO101, which applies to the whole request at 8 km.
+This prints DEMO001 first, because a warning's level, WARNING, is above a suggestion's, INFO. DEMO001 covers 58% of the box's area and 67% of its period. Then it prints DEMO101, which applies to the whole request at 8 km.
 
 ```{toctree}
 :maxdepth: 2

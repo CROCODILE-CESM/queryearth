@@ -7,17 +7,17 @@ This file holds what [design.md](../design.md) condenses: the choices made while
 **Taken while assembling and reviewing this draft.** The section drafts and the two reviews disagreed in places. These were settled as follows and are listed so they can be reviewed:
 
 - Within the requests design: rules that constrain `product`, `variable` or `version` are evaluated once per request, and all other rules once on the base query, so model-level rules such as CROC101 appear once; GEN001 declares `product = ["*"]` so that it runs per request; a derived support is listed in `assumed` as `"space"` (dropped in v0.0.1; see [design.md section 17](../design.md#17-non-goals-for-v1-and-upgrade-paths)); `Registry.expand()` shows the expansion; the shorthand gives every listed variable to every listed product.
-- `emit()` logs recommendations at `INFO` in every mode except `"ignore"`, whatever `min_severity` says, with `Policy.show_recommendations` to turn this off. This follows the approved plan; the first draft had dropped them at the default floor.
+- Dropped in v0.1.0; see [design.md section 17](../design.md#17-non-goals-for-v1-and-upgrade-paths). `emit()` logs recommendations at `INFO` in every mode except `"ignore"`, whatever `min_severity` says, with `Policy.show_recommendations` to turn this off. This follows the approved plan; the first draft had dropped them at the default floor.
 - Dropped in v0.0.1; see [design.md section 17](../design.md#17-non-goals-for-v1-and-upgrade-paths). The calendar name is used for durations and for naming the last day of a month, not only for validation as the plan said (section [4.5](../design.md#45-time)).
 - A full-turn edge of exactly 360 degrees keeps its direction, so planar caps and bands written as RFC 7946 polygons work, and edges longer than 180 degrees are otherwise read the short way, a deliberate departure from RFC 7946 (section [6.2](../design.md#62-canonical-representation-and-normalisation)).
-- Findings carry `product`, `request` and `source_severity`, and axis overlaps are `AxisOverlap` values that keep open ends.
+- Findings carry `product` and `request`, and axis overlaps are `AxisOverlap` values that keep open ends.
 - Datetime-like values are second precision and dates are day precision; CrocoDash passes its exclusive end through `from_bounds` (sections [7.1](../design.md#71-the-time-key-and-its-wire-format) and [8.3](../design.md#83-time-axes-and-facets); `from_bounds` was dropped in v0.0.1; see [design.md section 17](../design.md#17-non-goals-for-v1-and-upgrade-paths)).
 - `check()` runs only for definite matches; the bulk path applies the pole-edge test (dropped in v0.0.1; see [design.md section 17](../design.md#17-non-goals-for-v1-and-upgrade-paths)) and never applies `min_overlap`.
 - `Finding.assumed` lists only the product-filled dimensions that the rule constrains, in the order of `conditional_on`, so a time-only rule gets `("time",)`.
-- `emit()` de-duplicates by code, query label and product, not by code and label alone, so two products partly outside coverage give two QE001 messages.
+- Dropped in v0.1.0; see [design.md section 17](../design.md#17-non-goals-for-v1-and-upgrade-paths). `emit()` de-duplicates by code, query label and product, not by code and label alone, so two products partly outside coverage give two QE001 messages.
 - Rules added from Python may use a code prefix that a loaded pack owns; prefixes are exclusive only between packs, and a duplicate code is always an error.
-- `Policy.skip_packages` and `default_score` were added to the API sketch, because sections [10](../design.md#10-inverse-query-which-products-suit-this-request) and [15](../design.md#15-consumer-integration) use them.
-- In Python, a bare string is shorthand for a one-item facet pattern list (the usage sketch relies on it); computed rules default to kind `caveat` and severity `WARNING`; `@registry.rule` takes its title from the docstring.
+- `Policy.skip_packages` (dropped in v0.1.0; see [design.md section 17](../design.md#17-non-goals-for-v1-and-upgrade-paths)) and `default_score` were added to the API sketch, because sections [10](../design.md#10-inverse-query-which-products-suit-this-request) and [15](../design.md#15-consumer-integration) use them.
+- In Python, a bare string is shorthand for a one-item facet pattern list (the usage sketch relies on it); computed rules default to kind `warning`, and so to level `WARNING`; `@registry.rule` takes its title from the docstring.
 - Dropped in v0.0.1; see [design.md section 17](../design.md#17-non-goals-for-v1-and-upgrade-paths). `cells(mode="overlap")` selects cells whose intersection with the region has positive area, so a grid-aligned region does not pull in its neighbours.
 - Normalisation runs wrap, unwrap and count turns, close pole rings (dropped in v0.0.1; see [design.md section 17](../design.md#17-non-goals-for-v1-and-upgrade-paths)), repair, split, orient (section [6.2](../design.md#62-canonical-representation-and-normalisation)), the same steps as first proposed in a different order.
 - Versions compare as dotted integers padded with zeros, in ranges and in `versions` lists, and a query version that is not a dotted integer never falls inside a range.
@@ -41,7 +41,7 @@ Decisions that change a contract are written into design.md, the code and [schem
 - **Q9.** Should a `ComputedRule` subclass inherit class keywords (`registry`, `facets`) from an `abstract=True` base? *Decided:* yes, merged, with the subclass's keywords winning. *Why:* a family of rules then states its shared index and scope once.
 - **Q10.** Re-running a notebook cell that defines a rule raises `DuplicateCodeError`. *Decided:* allow replacement when the code and the qualified name (module plus class or function) both match; any other reuse stays an error. *Why:* re-running a cell is not a conflict, but any other reuse of a code is.
 - **Q11.** `min_overlap` applies only to area. Add a time threshold? *Decided:* not in v1; `time_fraction` is always reported. Revisit after the warning-fatigue trial (section [15.3](../design.md#153-warning-fatigue-trial)). *Why:* there is no evidence yet that time overlap needs a threshold, and the trial will show whether it does.
-- **Q12.** A polygon that only touches a rule matches with `area_fraction` 0.0 and is emitted under the default `min_overlap` of 0, so a grid-aligned domain next to a regional rule warns. *Decided:* keep this deliberate over-warning in v1 and revisit with the warning-fatigue trial (section [15.3](../design.md#153-warning-fatigue-trial)). *Why:* missing a boundary is worse than over-warning at it, and the trial will measure the cost.
+- **Q12.** A polygon that only touches a rule matches with `area_fraction` 0.0 and counts under the default `min_overlap` of 0, so a grid-aligned domain next to a regional rule gets a warning. *Decided:* keep this deliberate over-warning in v1 and revisit with the warning-fatigue trial (section [15.3](../design.md#153-warning-fatigue-trial)). *Why:* missing a boundary is worse than over-warning at it, and the trial will measure the cost.
 
 ### Geometry and time
 
@@ -60,12 +60,12 @@ Decisions that change a contract are written into design.md, the code and [schem
 
 ### Outcomes, emission and the inverse query
 
-- **Q27.** Should a product be able to declare a softer coverage severity? *Decided:* no; consumers adjust through `Policy` (ignore `QE002`, or set `raise_at=None`). *Why:* "outside coverage" should mean the same for every product, and tolerance belongs to the consumer.
-- **Q28.** Should draft rules count by default, in emission and in `suitable()`? *Decided:* yes; v1 packs are written by their own users, and every finding shows its `status`. *Why:* in v1 the people who write a pack are the people who use it.
-- **Q29.** Is `"warn"` the right default mode? *Decided:* yes, for scripts and notebooks; consumer libraries set `mode="log"` in their adapters. *Why:* a person running a script or notebook sees warnings without configuring logging, while libraries control their own output.
-- **Q30.** Should `emit()` de-duplicate across calls within one context? *Decided:* not in v1. *Why:* cross-call de-duplication needs state that outlives a call, and query labels already keep messages for different requests apart.
-- **Q31.** `check()` may return several findings, which `emit()` then collapses by key. *Decided:* document one finding per rule per request, as CRU002 does, rather than widen the key. *Why:* one finding per rule per request keeps the de-duplication key simple.
-- **Q32.** Keep `Policy.skip_packages` (section [11.2](../design.md#112-message-text))? *Decided:* yes; Python 3.11 has no `skip_file_prefixes`. *Why:* without it, warnings point inside the consumer rather than at the user's line.
+- **Q27.** Should a product be able to declare a softer coverage level? *Decided:* no; consumers adjust in their own loop, for example by logging QE002 rather than raising for it. *Why:* "outside coverage" should mean the same for every product, and tolerance belongs to the consumer.
+- **Q28.** Should draft rules count by default in `suitable()`? *Decided:* yes; v1 packs are written by their own users, and every finding shows its `status`, so a caller can leave drafts out. *Why:* in v1 the people who write a pack are the people who use it.
+- **Q29.** Dropped in v0.1.0; see [design.md section 17](../design.md#17-non-goals-for-v1-and-upgrade-paths). Is `"warn"` the right default mode? *Decided:* yes, for scripts and notebooks; consumer libraries set `mode="log"` in their adapters. *Why:* a person running a script or notebook sees warnings without configuring logging, while libraries control their own output.
+- **Q30.** Dropped in v0.1.0; see [design.md section 17](../design.md#17-non-goals-for-v1-and-upgrade-paths). Should `emit()` de-duplicate across calls within one context? *Decided:* not in v1. *Why:* cross-call de-duplication needs state that outlives a call, and query labels already keep messages for different requests apart.
+- **Q31.** Dropped in v0.1.0; see [design.md section 17](../design.md#17-non-goals-for-v1-and-upgrade-paths). `check()` may return several findings, which `emit()` then collapses by key. *Decided:* document one finding per rule per request, as CRU002 does, rather than widen the key. *Why:* one finding per rule per request keeps the de-duplication key simple.
+- **Q32.** Dropped in v0.1.0; see [design.md section 17](../design.md#17-non-goals-for-v1-and-upgrade-paths). Keep `Policy.skip_packages` (section [11](../design.md#11-reporting-findings))? *Decided:* yes; Python 3.11 has no `skip_file_prefixes`. *Why:* without it, warnings point inside the consumer rather than at the user's line.
 - **Q33.** Should `suitable()` return the products its coverage filter drops? *Decided:* yes, behind `include_dropped=True`, listed last with their QE001 or QE002 findings. *Why:* section [10.2](../design.md#102-the-default-score) says the explanation shows the dropped products too.
 - **Q35.** Should the Registry report how many rules exist per product, to expose rankings driven by missing rules (ERA5-Land in section [10.3](../design.md#103-worked-example-a-lake-with-cru-ts-era5-land-and-nwm))? *Decided:* yes; it is cheap. *Why:* rankings driven by missing rules are otherwise invisible.
 - **Q36.** Variable names differ between products (`pre` in CRU TS, `tp` in ERA5). *Decided:* a pack uses one vocabulary in `Product.variables` and the `variable` facet; add per-product variable aliases if packs need them. *Why:* `suitable(variable=...)` matches names literally.
@@ -109,7 +109,7 @@ Section [4.3](../design.md#43-matching-when-a-dimension-is-missing).
 
 A computed rule that needs a `Query.context` key the caller did not pass is undecided in the same way, on `"context:<key>"`. So `conditional_on` names every dimension the engine could not decide: omitted by the query, not comparable with the rule's form, or a missing context key.
 
-A rule therefore produces a finding exactly when no dimension fails. If `conditional_on` is empty the finding is **definite**; otherwise it is **conditional**. `Registry.query` returns conditional findings only when called with `include_conditional=True`, and `emit()` never emits them, because they describe what might apply rather than what does. A month recurrence counts as a time constraint even when the rule's `time` member is null.
+A rule therefore produces a finding exactly when no dimension fails. If `conditional_on` is empty the finding is **definite**; otherwise it is **conditional**. `Registry.query` returns conditional findings only when called with `include_conditional=True`, because they describe what might apply rather than what does. A month recurrence counts as a time constraint even when the rule's `time` member is null.
 
 The fields of a conditional finding follow one principle: measures of the decided dimensions are filled exactly as for a definite finding, and measures of the undecided ones report the rule's own extent or nothing.
 
@@ -117,7 +117,7 @@ The fields of a conditional finding follow one principle: measures of the decide
 - Time undecided: `time_fraction` is None, and `time_overlap` lists the rule's own periods. For a rule limited only by a month recurrence, `time_overlap` is empty and the months are given in `details["recurrence_months"]`.
 - Axis undecided: `axes` holds the rule's own interval for that axis.
 - Facet undecided: `matched_facets` leaves that facet out.
-- A computed rule's `check()` does not run. The finding carries the rule's declared outcome (kind, severity, title, message, suggestions) and empty `details`, apart from `recurrence_months`.
+- A computed rule's `check()` does not run. The finding carries the rule's declared outcome (kind, level, title, message, suggestions) and empty `details`, apart from `recurrence_months`.
 - On the bulk path (section [9.3](../design.md#93-the-bulk-path-query_points)), a conditional finding has no mask and no weighted fraction.
 
 The names in `conditional_on` are `"space"`, `"time"`, an axis name such as `"resolution"`, a facet name such as `"product"`, and `"context:<key>"` when a computed rule needs data the caller did not pass in `Query.context`. Every dimension name is unique on the Registry, and `space` and `time` are reserved, so the names are never ambiguous. They are listed in a fixed order: space, time, axes in declaration order, facets in declaration order, other plugin dimensions, then context keys. `assumed` (section [4.3](../design.md#43-matching-when-a-dimension-is-missing)) uses the same order.
@@ -160,7 +160,7 @@ A domain whose outline goes around a pole is closed along latitude 90 or -90 bef
 
 On the bulk path, `area_fraction` is the sum of the weights of covered points divided by the sum of all weights (section [9.3](../design.md#93-the-bulk-path-query_points)). When the rule is global and the query gives a space, `area_fraction` is 1.0. For coverage findings, `area_fraction` is the fraction of the query that lies outside the product's coverage.
 
-**Minimum overlap.** The engine reports every overlap, however small. A rule's `min_overlap` (default 0) only stops `emit()` from emitting findings whose `area_fraction` is below it, so a large domain that clips the edge of a regional caveat is still visible as data without raising a warning. A finding whose `area_fraction` is None (the query gave no space, or space is undecided) is never dropped by this threshold, in `emit()` or in `default_score` (section [10.2](../design.md#102-the-default-score)).
+**Minimum overlap.** The engine reports every overlap, however small. A rule's `min_overlap` (default 0) is a threshold on `area_fraction` that `default_score` uses (section [10.2](../design.md#102-the-default-score)) and callers may filter on, so a large domain that clips the edge of a regional warning is still visible as data without counting against a product. A finding whose `area_fraction` is None (the query gave no space, or space is undecided) is never below this threshold.
 
 ### Time, axes and facets in full
 
@@ -236,15 +236,15 @@ Section [4.9](../design.md#49-outcomes).
 
 Every match produces the same `Finding` type, and its `kind` says what sort of statement it is:
 
-| Kind | Produced by | Fires when | Default severity | Carries |
+| Kind | Produced by | Fires when | Default level | Carries |
 |---|---|---|---|---|
-| `caveat` | Records and computed rules | The query overlaps the scope | `WARNING` | `action`, `confidence`, `instruction` |
-| `coverage` | The built-in coverage rule, from `Product.coverage` | Part of the query lies outside the product's coverage | `SEVERE` | `area_fraction` and `time_overlap` of the part outside |
-| `recommendation` | Records and computed rules | The query overlaps the scope | `INFO` | `suggestions` |
+| `warning` | Records and computed rules | The query overlaps the scope | `WARNING` | `action`, `confidence`, `instruction` |
+| `coverage` | The built-in coverage rule, from `Product.coverage` | Part of the query lies outside the product's coverage | `ERROR` | `area_fraction` and `time_overlap` of the part outside |
+| `suggestion` | Records and computed rules | The query overlaps the scope | `INFO` | `suggestions` |
 
 #### Coverage findings QE001 and QE002
 
-**Coverage** is declared on products, not written as records, because its polarity is the opposite of a caveat's: being outside produces the finding. It may be static, or a callable evaluated per query for availability known only at run time. One built-in rule per code evaluates the product of every request (section [4.12](../design.md#412-several-products-in-one-query-requests)), against that request's space and time: `QE001` for outside the spatial coverage and `QE002` for outside the temporal coverage (the prefix `QE` is reserved). Its action is `do_not_use` when the request is entirely outside and `use_with_caution` when it is partly outside. A coverage finding always carries the product's canonical name in `product`.
+**Coverage** is declared on products, not written as records, because its polarity is the opposite of a warning's: being outside produces the finding. It may be static, or a callable evaluated per query for availability known only at run time. One built-in rule per code evaluates the product of every request (section [4.12](../design.md#412-several-products-in-one-query-requests)), against that request's space and time: `QE001` for outside the spatial coverage and `QE002` for outside the temporal coverage (the prefix `QE` is reserved). Its action is `do_not_use` when the request is entirely outside and `use_with_caution` when it is partly outside. A coverage finding always carries the product's canonical name in `product`.
 
 | | QE001: outside the spatial coverage | QE002: outside the temporal coverage |
 |---|---|---|
@@ -254,15 +254,15 @@ Every match produces the same `Finding` type, and its `kind` says what sort of s
 | Coverage dimension is None | Never fires (global coverage) | Never fires (coverage at all times) |
 | Query and request omit the dimension | Conditional on `"space"` | Never fires, because the request's time is filled from that coverage (section [4.3](../design.md#43-matching-when-a-dimension-is-missing)) |
 
-#### Severity, confidence, action and suggestions
+#### Level, confidence, action and suggestions
 
-**Severity** is a three-level `IntEnum` whose values equal the `logging` levels: `INFO = 20`, `WARNING = 30`, `SEVERE = 40` (the number of `logging.ERROR`), so a logger can use `logger.log(finding.severity, ...)` directly. A source's own wording, such as "critical" in the ESGF errata service or "Extreme" in CAP, is kept verbatim in `source_severity`. "Outside coverage" is a kind, not a fourth severity, so how bad something is stays separate from whether the product can serve the request at all.
+**Level** is a standard `logging` level, a plain `int`: `logging.INFO` (20), `logging.WARNING` (30) or `logging.ERROR` (40), so a caller logs a finding with `logger.log(finding.level, finding)`. A rule that gives no level takes its kind's default. A record may give `level` as `info`, `warning` or `error`; Python also accepts any standard level name, in any case, through `logging.getLevelNamesMapping()`. A source's own wording, such as "critical" in the ESGF errata service, can be kept in an `x_` extension field. "Outside coverage" is a kind, not a fourth level, so how bad something is stays separate from whether the product can serve the request at all.
 
 **Confidence** says how sure the source is, separately from how bad the problem is. It takes four of CAP 1.2's five certainty values: `observed`, `likely`, `possible` or `unknown` (the default).
 
-**Action** says what to do with the data, following the ISIMIP caveat messages: `can_be_used`, `use_with_caution`, `do_not_use` or `replaced`. It is optional, and recommendations normally leave it unset.
+**Action** says what to do with the data, following the ISIMIP caveat messages: `can_be_used`, `use_with_caution`, `do_not_use` or `replaced`. It is optional, and suggestion findings normally leave it unset.
 
-**Suggestions** make a recommendation something a program can act on:
+**Suggestions** make a suggestion finding something a program can act on:
 
 | Field | Meaning |
 |---|---|
@@ -271,11 +271,11 @@ Every match produces the same `Finding` type, and its `kind` says what sort of s
 | `value` | Any JSON value |
 | `rationale` | One sentence of explanation |
 
-The engine never interprets `target` or `key`. CrocoDash may log a MOM6 suggestion, record it in the case's `config.json`, or apply it. `{"target": "MOM_input", "key": "DT", "value": 240.0}` is the suggestion CROC104 computes for an Arctic domain whose finest cells are 8 km (section [16.2](../design.md#162-croc104-a-computed-recommendation)), and `{"target": "MOM_input", "key": "THICKNESSDIFFUSE", "value": false}` is an illustrative suggestion for CROC102.
+The engine never interprets `target` or `key`. CrocoDash may log a MOM6 suggestion, record it in the case's `config.json`, or apply it. `{"target": "MOM_input", "key": "DT", "value": 240.0}` is the suggestion CROC104 computes for an Arctic domain whose finest cells are 8 km (section [16.2](../design.md#162-croc104-a-computed-suggestion)), and `{"target": "MOM_input", "key": "THICKNESSDIFFUSE", "value": false}` is an illustrative suggestion for CROC102.
 
 **No known concerns is not good data.** A query that returns no findings means that no registered rule matched, nothing more. `suitable()` ranks products by their known concerns and says so, and no part of the API reports "good" or "suitable" as a quality judgement.
 
-**Order.** `Registry.query` returns findings sorted by severity (highest first), then kind (coverage, caveat, recommendation), then code, then part: the base query first, then the requests in order (section [4.12](../design.md#412-several-products-in-one-query-requests)).
+**Order.** `Registry.query` returns findings sorted by level (highest first), then kind (coverage, warning, suggestion), then code, then part: the base query first, then the requests in order (section [4.12](../design.md#412-several-products-in-one-query-requests)).
 
 ### Requests: an example
 
@@ -304,7 +304,7 @@ All rule kinds implement one protocol, `evaluate(query) -> Sequence[Finding]`, a
 | Kind | Written as | Example |
 |---|---|---|
 | Static record | A GeoJSON Feature in a pack, or a `Rule(...)` or record mapping passed to `Registry.add` | CRU001, ERA5-001, CROC101, CROC102 |
-| Computed (object predicate) | A `ComputedRule` subclass or an `@registry.rule(...)` function | GEN001: the caller's region is much smaller than the support (section [12.2](../design.md#122-computed-rules)); CROC104: an Arctic domain's time step from its finest cells (section [16.2](../design.md#162-croc104-a-computed-recommendation)) |
+| Computed (object predicate) | A `ComputedRule` subclass or an `@registry.rule(...)` function | GEN001: the caller's region is much smaller than the support (section [12.2](../design.md#122-computed-rules)); CROC104: an Arctic domain's time step from its finest cells (section [16.2](../design.md#162-croc104-a-computed-suggestion)) |
 | Raster-derived | A computed rule that reads data the caller already holds, passed in `Query.context` | CRU002: CRU TS cell-months with `stn = 0` in the cells used (section [12.4](../design.md#124-raster-derived-rules-cru002)) |
 | Coverage | Built in, from `Product.coverage` | QE001, QE002 |
 
@@ -316,7 +316,7 @@ Section [4.11](../design.md#411-core-objects).
 
 All core objects are frozen dataclasses ([objects.py](../../queryearth/objects.py)). Everything except `Query.context` and the shapely and numpy members of `Space` is JSON-serialisable through `to_dict()` and `Rule.from_feature()`. The record properties (section [5.2](../design.md#52-record-properties)) map onto the fields of a static `Rule` and its `Rule.scope`: `box`, `periods` and `recurrence` become the scope's space and time, and `x_*` extension fields are kept on the side. Python 3.11 or later is supported, with no upper limit, and shapely 2.1 or later and numpy are the only third-party dependencies at run time; cftime, pandas and numpy date values are accepted by duck typing, not imported (section [7.1](../design.md#71-the-time-key-and-its-wire-format)).
 
-Objects that hold only scalars and tuples (`Interval`, `TimeSpec`, `Axis`, `Suggestion`, `AxisOverlap`) are hashable, and so is `Request`, whose `support` hashes by identity. `Space` and `PointResult` compare and hash by identity. Objects that hold mappings (`Scope`, `Query`, `Match`, `Finding`, `Rule`) compare by value, which tests that compare findings need, but they are not hashable: Python raises `TypeError` if one is used in a set or as a dictionary key. Key findings by `(code, query_label, product)` instead, as `emit()` does.
+Objects that hold only scalars and tuples (`Interval`, `TimeSpec`, `Axis`, `Suggestion`, `AxisOverlap`) are hashable, and so is `Request`, whose `support` hashes by identity. `Space` and `PointResult` compare and hash by identity. Objects that hold mappings (`Scope`, `Query`, `Match`, `Finding`, `Rule`) compare by value, which tests that compare findings need, but they are not hashable: Python raises `TypeError` if one is used in a set or as a dictionary key. Key findings by `(code, query_label, product)` instead.
 
 **Axis** has `name` (a lowercase slug, unique among the Registry's dimensions, not `space` or `time`), `unit` (the only unit records and queries may use) and `description`.
 
@@ -340,13 +340,13 @@ Product names are global within one Registry. Declaring the same product name tw
 | `code` | Required unless `abstract=True`. A reused code raises `DuplicateCodeError`. |
 | `registry` | The Registry to register on; defaults to `Registry.default()` |
 | `abstract` | `True` for an intermediate base class that should not register |
-| `kind`, `severity`, `title` and the other `Outcome` fields | As for records; defaults `caveat`, and `WARNING` (`INFO` for a recommendation). `title` defaults to the first line of the docstring, and `message` to the rest. |
+| `kind`, `level`, `title` and the other `Outcome` fields | As for records; `kind` defaults to `warning`, and `level` to the kind's default (`WARNING`, or `INFO` for a suggestion). `title` defaults to the first line of the docstring, and `message` to the rest. |
 | `facets`, `axes`, `dims` | The scope, in the same forms as a record. The Registry checks every name. |
 | `space`, `time` | A `Space` from `queryearth.space`; a `TimeSpec`, a JSON-FG time member or a `(start, end)` pair |
 | `requires` | `Query.context` keys the rule reads. A missing key makes the finding conditional on `context:<key>`. |
-| `suggestions` | Default suggestions for a recommendation; `check()` may replace them |
+| `suggestions` | Default suggestions for a suggestion rule; `check()` may replace them |
 
-`evaluate()` matches the declared scope exactly as for a record. Only if the match is definite (`conditional_on` is empty) does it call `check(query, match)`; a conditional match yields a conditional finding with the declared defaults and empty `details`, and `check()` never runs with a context key missing. `check` returns `True` for one finding with the declared defaults, `False` or `None` for none, a mapping of Finding fields to override (`severity`, `message`, `area_fraction`, `time_overlap`, `suggestions`, `details`), or an iterable of such mappings. When `check()` overrides `time_overlap`, the engine recomputes `time_fraction` from it, so the two stay consistent. An optional `mask(lon, lat, query)` hook serves the bulk path; a rule without one is listed in `PointResult.skipped` rather than silently left out. `@registry.rule(code, **same_keywords)` wraps a plain function `(query, match) -> CheckResult` the same way, taking its title from the function's docstring. This is the `__init_subclass__` registration pattern CrocoDash already uses, with three fixes (section [12.3](../design.md#123-the-registry-codes-and-lifecycle)).
+`evaluate()` matches the declared scope exactly as for a record. Only if the match is definite (`conditional_on` is empty) does it call `check(query, match)`; a conditional match yields a conditional finding with the declared defaults and empty `details`, and `check()` never runs with a context key missing. `check` returns `True` for one finding with the declared defaults, `False` or `None` for none, a mapping of Finding fields to override (`level`, `message`, `area_fraction`, `time_overlap`, `suggestions`, `details`), or an iterable of such mappings. When `check()` overrides `time_overlap`, the engine recomputes `time_fraction` from it, so the two stay consistent. An optional `mask(lon, lat, query)` hook serves the bulk path; a rule without one is listed in `PointResult.skipped` rather than silently left out. `@registry.rule(code, **same_keywords)` wraps a plain function `(query, match) -> CheckResult` the same way, taking its title from the function's docstring. This is the `__init_subclass__` registration pattern CrocoDash already uses, with three fixes (section [12.3](../design.md#123-the-registry-codes-and-lifecycle)).
 
 **Query**:
 
@@ -358,7 +358,7 @@ Product names are global within one Registry. Declaring the same product name tw
 | `facets` | mapping of name to tuple of values | A plain string is accepted. `product` (with `variable` and `version`) here is shorthand for requests. |
 | `requests` | tuple of `Request` | One per product the caller uses: `Request(product, variables=(), version=None, time=None, support=None)` (section [4.12](../design.md#412-several-products-in-one-query-requests)). A plain string for `variables` means one variable, and a plain product name means a request with no variables. |
 | `context` | mapping | Data for computed rules, such as station counts already loaded; not serialised |
-| `label` | str | The caller's name for the query ("lake 1234", a case name), used in messages and de-duplication |
+| `label` | str | The caller's name for the query ("lake 1234", a case name), used in messages |
 
 `Registry.query(space=..., time=..., axes=..., facets=..., requests=..., context=..., label=..., include_conditional=False)` builds the Query itself and accepts shorthands: a pair of strings for `time`, and plain values for axes and facets.
 
@@ -367,9 +367,8 @@ Product names are global within one Registry. Declaring the same product name tw
 | Field | Meaning |
 |---|---|
 | `code`, `kind`, `title`, `message`, `instruction` | From the rule, possibly overridden by a computed rule |
-| `severity`, `confidence`, `action`, `status` | As defined in section [4.9](../design.md#49-outcomes) and section [5.2](../design.md#52-record-properties) |
-| `source_severity` | The source's own severity wording, verbatim (for example `REQ_AUTHORIZATION` for UAS001), or None |
-| `suggestions` | For recommendations |
+| `level`, `confidence`, `action`, `status` | As defined in section [4.9](../design.md#49-outcomes) and section [5.2](../design.md#52-record-properties) |
+| `suggestions` | For suggestion findings |
 | `product` | The canonical name of the request's product, for every finding from a request, coverage findings included; None for findings from the base query (rules that concern no product, such as CROC101) |
 | `request` | The position of the finding's request in the query's requests after shorthand expansion (section [4.12](../design.md#412-several-products-in-one-query-requests)); None for the base query |
 | `area_fraction`, `overlap_km2` | Spatial overlap (section [4.4](../design.md#44-space)) |
@@ -382,7 +381,7 @@ Product names are global within one Registry. Declaring the same product name tw
 | `details` | Rule-specific numbers, for example `{"stn0_fraction": 0.41}` |
 | `source`, `query_label` | Pack name, `python`, `computed` or `builtin`; the query's label |
 
-`Finding.to_dict()` writes severity as its lowercase name and intervals in wire form, so findings can go into a case's `config.json`, a README or a web page unchanged.
+`Finding.to_dict()` writes the level as its number and intervals in wire form, so findings can go into a case's `config.json`, a README or a web page unchanged, and `str(finding)` is the one-line message of section [11](../design.md#11-reporting-findings).
 
 **Registry**:
 
@@ -401,19 +400,18 @@ Product names are global within one Registry. Declaring the same product name tw
 
 ### Error classes
 
-These are the errors the design names, gathered in one place; [errors.py](../../queryearth/errors.py) and [emit.py](../../queryearth/emit.py) declare the classes. Where the design says only that something "is an error", the engine raises a plain `ValueError` or `TypeError` whose message names the problem.
+These are the errors the design names, gathered in one place; [objects.py](../../queryearth/objects.py) declares the classes. Where the design says only that something "is an error", the engine raises a plain `ValueError` or `TypeError` whose message names the problem.
 
 | Error | Raised when | Where specified |
 |---|---|---|
 | `UnknownNameError(KeyError)` | An undeclared axis, facet, dimension, product or region name appears in a record or a query; an unknown name is passed to `suitable(products=...)` | Sections [4.6](../design.md#46-axes), [4.7](../design.md#47-facets) and [10.1](../design.md#101-contract) |
 | `DuplicateCodeError(ValueError)` | A code the Registry already holds is registered again, from a pack, a `ComputedRule` subclass or an `@registry.rule` function | Sections [4.11](../design.md#411-core-objects) and [12.3](../design.md#123-the-registry-codes-and-lifecycle) |
-| `AdvisoryError(Exception)` | `emit()` runs in `"raise"` mode and keeps at least one caveat or coverage finding, or runs with `raise_at` and keeps one at or above that severity; `.findings` holds them all | Section [11.1](../design.md#111-modes-and-policy) |
 | `ValueError` | A query gives requests together with a `product`, `variable` or `version` facet; `suitable()` is asked for a named product that does not offer the variable; a ring goes around a pole, or encloses no area after repair | Sections [4.12](../design.md#412-several-products-in-one-query-requests), [10.1](../design.md#101-contract) and [6.2](../design.md#62-canonical-representation-and-normalisation) |
 | `TypeError` | A `ComputedRule` subclass has no `code` and is not `abstract=True`; an object that holds mappings (`Scope`, `Query`, `Match`, `Finding`, `Rule`) is put in a set or used as a dictionary key | Section [4.11](../design.md#411-core-objects) |
 | `LoadError(ValueError)`, listing every problem with the file, the feature's position and its code | A schema violation; a duplicate code; a code outside the pack's prefixes, a prefix claimed by two packs, or the reserved prefix `QE`; `periods` outside `time`; a date that is not a proleptic Gregorian date from year 1 to 9999; a box with `south` not below `north`; an undeclared name or a unit that does not match its axis; a version-range bound that is not a dotted integer; an unresolved `region_ref`; a latitude beyond plus or minus 90 by more than 1e-9 degrees; a ring that encloses no area or goes around a pole; a product name declared twice; a collection header that disagrees with `pack.toml` | Sections [4.4](../design.md#44-space), [4.6](../design.md#46-axes), [4.8](../design.md#48-version-ranges), [4.11](../design.md#411-core-objects), [5.3](../design.md#53-loader-checks), [5.4](../design.md#54-packs) and [6.2](../design.md#62-canonical-representation-and-normalisation) |
 | Other errors the design names without a class | `box()` with `east == west`; hour 24 or second 60 in a time; a `version` facet in the shorthand together with more than one product; `Request.support` given to `query_points()` | Sections [6.3](../design.md#63-boxes-closed-sets-and-areas), [7.1](../design.md#71-the-time-key-and-its-wire-format), [4.12](../design.md#412-several-products-in-one-query-requests) and [9.3](../design.md#93-the-bulk-path-query_points) |
 
-Warnings are not errors: `emit()` warns with `AdvisoryWarning(UserWarning)` subclasses `InfoAdvisory`, `WarningAdvisory` and `SevereAdvisory`, one per severity (section [11.1](../design.md#111-modes-and-policy)).
+A finding is never raised or warned: callers decide what to do with it (section [11](../design.md#11-reporting-findings)).
 
 ### Record properties in full
 
@@ -422,15 +420,14 @@ Section [5.2](../design.md#52-record-properties).
 | Property | Required | Meaning |
 |---|---|---|
 | `code` | yes | Unique identifier: a prefix plus three or four digits, optionally hyphenated (`CRU001`, `ERA5-014`). Messages start with `[CODE]`. |
-| `kind` | yes | `caveat` or `recommendation` (coverage is declared on products) |
+| `kind` | yes | `warning` or `suggestion` (coverage is declared on products) |
 | `title` | yes | One-line headline (CAP headline) |
 | `message` | yes | What applies and why (CAP description) |
 | `instruction` | no | What the reader should do (CAP instruction) |
-| `severity` | yes | `info`, `warning` or `severe` |
-| `source_severity` | no | The source's own severity wording, verbatim |
+| `level` | no | `info`, `warning` or `error`; by default `warning` for a warning and `info` for a suggestion |
 | `confidence` | no | `observed`, `likely`, `possible` or `unknown` (default) |
 | `action` | no | `can_be_used`, `use_with_caution`, `do_not_use` or `replaced` |
-| `suggestions` | for recommendations | At least one `{target, key, value, rationale}` |
+| `suggestions` | for suggestions | At least one `{target, key, value, rationale}` |
 | `facets` | no | Facet name to patterns, or `version` to ranges |
 | `axes` | no | Axis name to `{gt, ge, lt, le, unit}` |
 | `region_ref` | no | `namespace:id` or a list of them (a union); geometry must then be null |
@@ -438,7 +435,7 @@ Section [5.2](../design.md#52-record-properties).
 | `periods` | no | Closed intervals inside the `time` member (a union) |
 | `recurrence` | no | `{"months": [1, 2, 12]}` |
 | `time_start`, `time_end` | no | Fallback for editors that drop the JSON-FG member; never together with a non-null `time` |
-| `min_overlap` | no | Emission threshold on `area_fraction`, 0 to 1 (default 0) |
+| `min_overlap` | no | Threshold on `area_fraction`, 0 to 1 (default 0), used by `default_score` |
 | `evidence` | no | ISO 19157-style `{method, measure, result, script, notes}`; method is `documented`, `derived`, `measured` or `expert` |
 | `references` | no | `{type, citation, url, doi, retrieved}`, with at least one of citation, url or doi |
 | `status` | no | `draft` (default), `reviewed` or `deprecated`. Every finding carries it. |
@@ -536,7 +533,7 @@ Section [6.3](../design.md#63-boxes-closed-sets-and-areas).
 
 A point at latitude 90 or -90 is tested at its own longitude; the pole-edge rule, which matched it against every rule that reaches that pole, was dropped in v0.0.1; see [design.md section 17](../design.md#17-non-goals-for-v1-and-upgrade-paths).
 
-Closed sets matter because real grid points sit on rule edges. ERA5's 0.25 degree grid has 2,401 points in [-1, 11] by [-1, 11], and 1,681 of them lie in the closed square [0, 10] by [0, 10]. `contains_xy` finds 1,521 (it drops all 160 edge points), even-odd ray casting finds 1,600 (it drops the right and top edges), and `intersects_xy` finds all 1,681 (measured while drafting). The cost is deliberate over-warning: a query polygon that only shares an edge with a rule matches with `area_fraction` 0.0, and the rule's `min_overlap` decides whether `emit()` shows it.
+Closed sets matter because real grid points sit on rule edges. ERA5's 0.25 degree grid has 2,401 points in [-1, 11] by [-1, 11], and 1,681 of them lie in the closed square [0, 10] by [0, 10]. `contains_xy` finds 1,521 (it drops all 160 edge points), even-odd ray casting finds 1,600 (it drops the right and top edges), and `intersects_xy` finds all 1,681 (measured while drafting). The cost is deliberate over-warning: a query polygon that only shares an edge with a rule matches with `area_fraction` 0.0, and the rule's `min_overlap` decides whether it counts against a product in `default_score`.
 
 ### Area in full
 
@@ -677,7 +674,7 @@ Stage 0 splits the query into its base query and one sub-query per request (sect
 | 5. Exact test | `shapely.intersects` against the prepared rule geometry, or `shapely.intersects_xy` for a point query; both are closed-set tests. |
 | 6. Measures | If the rule `covers` the query, `area_fraction` is 1.0 and `overlap_km2` the query's area; if the query covers the rule, the overlap is the rule's cached area; otherwise intersect the two and take the spherical area. Also the time overlap and fraction, axis intersections and matched facet values. This stage dominates large queries. |
 | 7. Findings | A record builds a `Finding` from its outcome plus the match (about 2 µs each), with the part's `product` and `request`. A computed rule first has its `requires` keys checked against `Query.context` (a missing key adds `context:<key>`); `check(query, match)` runs only when the match is definite, and a conditional match yields the declared defaults with empty `details` (section [4.11](../design.md#411-core-objects)). The coverage rule measures the part of each request's space and time that lies outside its product's coverage. |
-| 8. Sort | By severity, then kind, then code, then part: the base query first, then the requests in order. Several findings from one computed rule are kept. |
+| 8. Sort | By level, then kind, then code, then part: the base query first, then the requests in order. Several findings from one computed rule are kept. |
 
 The cheap, vectorised, non-spatial stages come first because most real rules are scoped by product, variable or time rather than by area; about 80% of ERA5's known issues need no polygon at all.
 
@@ -725,11 +722,11 @@ GLHE wants a global per-cell map and CrocoDash wants masks over a model's cell c
 4. Dropped in v0.0.1; see [design.md section 17](../design.md#17-non-goals-for-v1-and-upgrade-paths). v0.0.1 instead tests, for each rule, the points inside the rule's bounding box with prepared `intersects_xy`, and also tests points at plus or minus 180 on the other side of the seam. Bucket the points into 64 × 64 tiles over their envelope and sort them by tile once. Give each tile the tight envelope of its own points, widened by 1e-9 degrees, and build a second STRtree over the tile boxes. Empty tiles are dropped, so a point set that straddles the antimeridian keeps its locality.
 5. Dropped in v0.0.1; see [design.md section 17](../design.md#17-non-goals-for-v1-and-upgrade-paths). For each rule still alive whose envelope meets the points', query the tile tree with the rule's prepared geometry twice: with predicate `covers` (tiles entirely inside) and `intersects` (tiles touched). Points in covered tiles are inside without a test; points in touched but not covered tiles are tested with `shapely.intersects_xy`.
 6. Dropped in v0.0.1; see [design.md section 17](../design.md#17-non-goals-for-v1-and-upgrade-paths). Points at latitude 90 or -90 are tested once per candidate rule against the whole pole edge (section [6.3](../design.md#63-boxes-closed-sets-and-areas)), and the result is broadcast to all of them, so the bulk path agrees with the single-query path at the poles. Plain `intersects_xy` would miss them: on a 0.25 degree global grid that includes both poles, a sector box from 0E to 90E and 80N to 90N holds 15,880 points with the pole-edge test and 14,801 without it (fixture 5).
-7. For each rule with at least one point inside, store a boolean mask shaped like `lon` and the weighted fraction, and emit one finding with that fraction as `area_fraction` (`overlap_km2` is None, because the weights' units are unknown).
+7. For each rule with at least one point inside, store a boolean mask shaped like `lon` and the weighted fraction, and make one finding with that fraction as `area_fraction` (`overlap_km2` is None, because the weights' units are unknown).
 8. Computed rules run their `mask(lon, lat, query)` hook or are listed in `skipped`. The coverage rule's mask marks points outside each request's product coverage.
-9. `PointResult.any(min_severity)` combines, with a logical or, the masks of the definite findings at or above that severity.
+9. `PointResult.any(min_level)` combines, with a logical or, the masks of the definite findings at or above that level.
 
-A rule's `min_overlap` is never applied on the bulk path. A bulk finding's `area_fraction` is a share of the whole point set, not of one request: over a global grid, CRU001's African regions hold about 6% of the cosine-weighted points (an estimate from the design review), below the rule's `min_overlap` of 0.1, which would hide the rule. Bulk findings are meant for maps and masks, not for `emit()`, and `PointResult.any()` ignores `min_overlap`.
+A rule's `min_overlap` is never applied on the bulk path. A bulk finding's `area_fraction` is a share of the whole point set, not of one request: over a global grid, CRU001's African regions hold about 6% of the cosine-weighted points (an estimate from the design review), below the rule's `min_overlap` of 0.1, which would hide the rule. Bulk findings are meant for maps and masks, not for logging, and `PointResult.any()` ignores `min_overlap`.
 
 Dropped in v0.0.1; see [design.md section 17](../design.md#17-non-goals-for-v1-and-upgrade-paths). The core of steps 4 to 7 for one part (the base query or one request) is sketched below. It is internal pseudo-code; the public API is in [index.py](../../queryearth/registry.py).
 
@@ -780,9 +777,9 @@ def suitable(
 
 1. **Candidates.** By default, all products whose `variables` include `variable`, in name order. Names in `products` go through alias resolution; an unknown name raises `UnknownNameError`, and a named product that does not offer the variable raises `ValueError`.
 2. **One request per product.** For each candidate P, the engine adds the request `Request(P, variables=(variable,))` to the caller's query, which must carry no requests and no `product`, `variable` or `version` facet of its own, and runs the request machinery of section [4.12](../design.md#412-several-products-in-one-query-requests). P's omitted `time` and `version` come from P. Only definite findings of P's sub-query are used. Findings of the base query (rules that concern no product) are the same for every product, so they do not affect the order and are not attached.
-3. **Coverage filter.** P is dropped when a coverage finding (QE001 or QE002) has action `do_not_use`, meaning the request lies entirely outside P's spatial or temporal coverage. A product that is only partly outside stays, and its SEVERE coverage finding counts against it.
+3. **Coverage filter.** P is dropped when a coverage finding (QE001 or QE002) has action `do_not_use`, meaning the request lies entirely outside P's spatial or temporal coverage. A product that is only partly outside stays, and its coverage finding, at `ERROR`, counts against it.
 4. **Score.** `score(P, q_P, findings)` returns a tuple of floats, where `q_P` is the caller's query with the single request for P, so its space is the caller's own region and the misfit term compares P's cells with the request, not with P's support; lower means fewer known concerns. The default is `default_score`.
-5. **Order.** Sort by score, then product name, and return `Suitability(product, score, findings)`, with P's findings sorted as in `Registry.query`, recommendations included.
+5. **Order.** Sort by score, then product name, and return `Suitability(product, score, findings)`, with P's findings sorted as in `Registry.query`, suggestions included.
 
 Two consequences follow. Callers pass their own region, such as the lake outline, and every product is judged on it; for a small lake that differs from the cells a product contributes (section [8.1](../design.md#81-the-contract)). And if the query has no time, each product is judged over its own whole record, so products are compared over different periods; pass a time range to compare like with like.
 
@@ -790,11 +787,11 @@ The default score is a tuple of three terms, compared in order:
 
 | Term | Definition | Why |
 |---|---|---|
-| `worst` | The highest severity value (20, 30 or 40) among the counted findings, or 0 | One severe concern outranks any number of minor ones |
-| `burden` | The sum over counted findings of weight × area part × time part. Weights are 1 for INFO, 2 for WARNING and 4 for SEVERE; the area and time parts are `area_fraction` and `time_fraction`, each 1.0 when None. Rounded to 0.001. | How much of the request is flagged, and how badly. It is a weighted sum, not a fraction: one SEVERE finding over the whole request scores 4. |
+| `worst` | The highest level (20, 30 or 40) among the counted findings, or 0 | One serious concern outranks any number of minor ones |
+| `burden` | The sum over counted findings of weight × area part × time part. Each weight is `2 ** ((level - 20) / 10)`: 1 for INFO, 2 for WARNING and 4 for ERROR; the area and time parts are `area_fraction` and `time_fraction`, each 1.0 when None. Rounded to 0.001. | How much of the request is flagged, and how badly. It is a weighted sum, not a fraction: one ERROR finding over the whole request scores 4. |
 | `misfit` | `max(0, log2(cell size / query size))`. Cell size is `Product.resolution` in km (a size in degrees is converted at the query's centroid latitude as the side of an equal-area square); query size is the square root of the query's area. 0 when the query has no area or the product declares no resolution. | How many halvings coarser a product cell is than the request; products at least as fine tie |
 
-Counted findings are definite findings of kind `caveat` or `coverage` whose `area_fraction` is not below the rule's `min_overlap`, the same threshold `emit()` uses; a finding whose `area_fraction` is None always counts. Recommendations are advice about what to do, not concerns about the data, so they are not counted, and conditional findings never count. The weights and the rounding are starting values to be tuned on GLHE lakes. `default_score` is exported at the package top level, so a custom score can build on it.
+Counted findings are definite findings of kind `warning` or `coverage` whose `area_fraction` is not below the rule's `min_overlap`; a finding whose `area_fraction` is None always counts. Suggestions are advice about what to do, not concerns about the data, so they are not counted, and conditional findings never count. The weights and the rounding are starting values to be tuned on GLHE lakes. `default_score` is exported at the package top level, so a custom score can build on it.
 
 Any function with the `ScoreFn` signature can replace it. It is called once per product that passed the coverage filter, must have no side effects, and must return tuples of the same length for every product:
 
@@ -816,58 +813,13 @@ The pack is illustrative. It declares three products that all offer a variable n
 - **CRU TS** gets CRU001, with version 4.07 assumed. The lake lies wholly inside CAF, so `area_fraction` is 1.0, above the rule's `min_overlap` of 0.1; `time_overlap` runs from 2000-01-01 to 2020-12-31, so `time_fraction` is 7,671 / 10,958 = 0.700. CRU002 needs `cru_ts.stn`, which an inverse query normally lacks, so it is conditional and not counted. A 0.5 degree cell near the equator is about 55.6 km across and the lake about 12.2 km, so `misfit` is log2(4.54), about 2.18. The score is (30, 1.4, 2.18).
 - **ERA5-Land** has no findings, and its 0.1 degree cell (about 11.1 km) is finer than the lake, so its score is (0, 0, 0).
 
-The result lists ERA5-Land, then CRU TS; NWM is not listed. A consumer should display it along these lines: "ERA5-Land: no registered rule matched this request." "CRU TS 4.07: [CRU001] precipitation falls back to climatology over much of Africa, covering 70% of the period." "NWM: outside coverage (QE001)." ERA5-Land ranks first partly because this pack holds no rule about it, although ECMWF does publish ERA5-Land known issues. If GLHE passes the station counts for the CRU cells, CRU002 becomes definite, and SEVERE where whole years are climatology (section [12.4](../design.md#124-raster-derived-rules-cru002)), which pushes CRU TS further down.
+The result lists ERA5-Land, then CRU TS; NWM is not listed. A consumer should display it along these lines: "ERA5-Land: no registered rule matched this request." "CRU TS 4.07: [CRU001] precipitation falls back to climatology over much of Africa, covering 70% of the period." "NWM: outside coverage (QE001)." ERA5-Land ranks first partly because this pack holds no rule about it, although ECMWF does publish ERA5-Land known issues. If GLHE passes the station counts for the CRU cells, CRU002 becomes definite, and at `ERROR` where whole years are climatology (section [12.4](../design.md#124-raster-derived-rules-cru002)), which pushes CRU TS further down.
 
 ### Emission in full
 
-Section [11](../design.md#11-emission-and-policy); the evidence is in [background.md](background.md#emission-evidence).
+Dropped in v0.1.0; see [design.md section 17](../design.md#17-non-goals-for-v1-and-upgrade-paths). Callers log findings with `logging` themselves; section [11](../design.md#11-reporting-findings) of design.md states what is built, and [background.md](background.md#emission-evidence) gives the evidence against Python warnings as the API.
 
-The switch between logging, warning and raising follows xclim.
-
-| Mode | What `emit()` does with each finding it keeps |
-|---|---|
-| `"warn"` (default) | `warnings.warn(text, category)`, where the category is `InfoAdvisory`, `WarningAdvisory` or `SevereAdvisory` by severity, all subclasses of `AdvisoryWarning(UserWarning)`. The warning instance carries the finding as `.finding`. |
-| `"log"` | `logging.getLogger("queryearth").log(finding.severity, text, extra={"finding": finding})`. Severity values equal logging levels, so no custom level is registered; a `SEVERE` finding shows as `ERROR`. |
-| `"raise"` | Raises one `AdvisoryError` whose `.findings` holds every kept caveat and coverage finding. If none is kept, nothing is raised and `emit()` returns normally. |
-| `"ignore"` | Nothing; returns an empty list, so consumers can call `emit()` unconditionally |
-
-**Recommendations are logged at INFO.** In the log, warn and raise modes, every recommendation that survives the filters below goes to the `queryearth` logger at `INFO`, whatever `min_severity` and `raise_at` say; a recommendation is never warned and never raised. This is the approved plan's rule: recommendations are emitted at info level by default and are also returned as data. Whether the line appears depends on the application's logging configuration, as for any `INFO` record; queryearth adds no handler. `Policy(show_recommendations=False)` turns this off, and the `"ignore"` mode emits nothing at all.
-
-`emit()` drops, before reporting: conditional findings; caveats and coverage findings below `min_severity` (default `WARNING`); findings whose `area_fraction` is below the rule's `min_overlap` (a None `area_fraction` is never dropped); codes in `ignore`, matched exactly or as a prefix such as `"QE"` or `"CRU"`; drafts when `include_drafts` is False; recommendations when `show_recommendations` is False; and a second finding with the same code, query label and product in the same call. The product is part of that key because one query can carry requests for two products that are both partly outside coverage, giving two QE001 findings.
-
-`raise_at` works with the log and warn modes: caveats and coverage findings below it are logged or warned first, then every one at or above it is raised together in one `AdvisoryError`. Collecting before raising, as pandera's lazy validation does, shows every blocking problem at once. `emit()` returns the findings it logged or warned, so a caller can record what the user was shown.
-
-Every message starts with the code in brackets, then the title, the query label, the spatial overlap, the overlapping periods, and `draft` for draft rules:
-
-```text
-[CRU001] CRU TS precipitation falls back to climatology over much of Africa (lake 1234; area 100%; 2000-01-01..2022-12-31; draft)
-```
-
-The label makes messages for different requests differ, so the once-per-call-site filter never hides one lake behind another. The leading code lets users filter messages without changing code:
-
-```bash
-python -W "ignore:[CRU001]" run.py                   # hide one rule
-python -W "ignore:[CRU" run.py                       # hide every code starting with CRU
-python -W "error::queryearth.SevereAdvisory" run.py  # turn SEVERE findings into exceptions
-```
-
-The active `Policy` is held in a `contextvars.ContextVar`. `policy(**changes)` installs a modified copy for the duration of a `with` block and restores the previous one, even after an exception. Keyword arguments to `emit()` override the active policy for that one call.
-
-Each thread has its own context, and each asyncio task runs in a copy of the context that created it, so a policy set while serving one dashboard session or MCP request never changes another. In Python 3.11 to 3.13 a new thread starts with an empty context; to carry the policy into a worker, submit `contextvars.copy_context().run`.
-
-A rule that fires on almost every request teaches people to ignore all advisories. GEN001 (section [12.2](../design.md#122-computed-rules)), "the request is much smaller than the product cells that represent it", fires for nearly every HydroLAKES lake against a 0.5 degree product, so it has severity `INFO`: at the default floor it is not emitted, but it stays in the findings. The defences, in order of preference: authors give an honest severity; a rule's `min_overlap` keeps a domain that only clips a regional caveat from warning; conditional findings are never emitted; repeats are dropped, and consumers make one query per case or lake, with one request per product, rather than one per chunk of work (section [15.1](../design.md#151-crocodash)); and users silence codes or prefixes with `Policy.ignore` or `-W`.
-
-Recommendations have severity `INFO` by default and are meant to be used as data: a consumer reads `finding.suggestions` and applies or records them. `emit()` also logs them at `INFO` in every mode except `"ignore"` (section [11.1](../design.md#111-modes-and-policy)), so a person running the code can see what was suggested without the consumer lowering `min_severity`, and a recommendation never turns into a warning. `emit()` never applies a suggestion.
-
-```python
-shown = qe.emit(found, mode="log")  # caveats from WARNING up; recommendations at INFO
-
-with qe.policy(raise_at=qe.Severity.SEVERE, ignore=frozenset({"GEN001"})):
-    try:
-        qe.emit(found)  # warns for caveats, then raises once for SEVERE findings
-    except qe.AdvisoryError as err:
-        blocked = [f.code for f in err.findings]
-```
+Until v0.1.0, `emit()` reported findings under a context-local `Policy`, in one of the modes `"warn"` (the default, with the warning classes `InfoAdvisory`, `WarningAdvisory` and `SevereAdvisory`), `"log"`, `"raise"` (one `AdvisoryError` holding every blocking finding) or `"ignore"`, or through a sink function. It dropped conditional findings, caveats and coverage findings below `min_severity`, findings below the rule's `min_overlap`, codes in `ignore`, drafts on request, and repeats of the same code, label and product; it logged recommendations at `INFO`; and with `raise_at` it reported the rest first, then raised every blocking finding together. Commit `ee94993` on `main` has the code and its tests.
 
 ### Schema validator
 
@@ -916,13 +868,13 @@ Registering a code the Registry already holds raises `DuplicateCodeError`, wheth
 
 Section [12.3](../design.md#123-the-registry-codes-and-lifecycle).
 
-**Codes.** A code is a prefix plus three or four digits, in the style of ruff and pylint (`CRU001`, `ERA5-014`). Prefix ownership is defined in section [5.3](../design.md#53-loader-checks): exclusive between packs, open to rules added from Python, and `QE` reserved. Prefixes let users silence a family of rules (`ignore={"CRU"}`, or `-W "ignore:[CRU"`). A code is never reused for a different issue; a retired rule is withdrawn instead.
+**Codes.** A code is a prefix plus three or four digits, in the style of ruff and pylint (`CRU001`, `ERA5-014`). Prefix ownership is defined in section [5.3](../design.md#53-loader-checks): exclusive between packs, open to rules added from Python, and `QE` reserved. Prefixes let callers filter a family of rules (`f.code.startswith("CRU")`). A code is never reused for a different issue; a retired rule is withdrawn instead.
 
 **Products.** Each product has a canonical lowercase slug and aliases, declared in `pack.toml` under `[products.<slug>]` or in Python with `Registry.add_product`; Python is needed when the coverage is a callable. The two consumers already name products differently (GLHE writes `CRUTS`, CrocoDash lower-cases names such as `glorys`), and aliases make both resolve to the same product.
 
 | Field | Use |
 |---|---|
-| `status` | `draft` (the default), `reviewed` or `deprecated`. Every finding carries it, and `Policy(include_drafts=False)` keeps drafts out of emission. |
+| `status` | `draft` (the default), `reviewed` or `deprecated`. Every finding carries it, so a caller can leave drafts out. |
 | `created`, `updated` | When the record itself changed; never the data time |
 | `withdrawn` | The rule is kept for history but never matches. Use it instead of deleting a rule or reusing its code. |
 | `supersedes` | Codes that stop matching while this rule is loaded, for example a reviewed rule that replaces a provisional one |

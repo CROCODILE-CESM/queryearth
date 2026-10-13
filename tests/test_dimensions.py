@@ -4,6 +4,7 @@ The Registry-level parts of fixtures 17, 20, 21 and 27 are in test_registry.py; 
 file checks the plugins one rule value against one query value.
 """
 
+import logging
 import math
 
 import pytest
@@ -161,12 +162,31 @@ def test_built_in_plugins_carry_a_schema():
 
 
 # ---- core objects -------------------------------------------------------------------
-def test_severity_values_equal_logging_levels():
-    assert [int(s) for s in qe.Severity] == [20, 30, 40]
-    finding = qe.Finding(
-        code="X001", kind="caveat", title="t", message="m", severity="severe"
+def test_levels_default_by_kind_and_accept_level_names():
+    def level(kind, **given):
+        return qe.Outcome(code="X001", kind=kind, title="t", message="m", **given).level
+
+    assert [level(k) for k in ("warning", "suggestion", "coverage")] == [30, 20, 40]
+    assert level("warning", level="Error") == logging.ERROR
+    assert level("suggestion", level=logging.CRITICAL) == 50
+    with pytest.raises(ValueError):
+        level("warning", level="severe")
+
+
+def test_finding_str_is_the_text_to_log():
+    def finding(code, **fields):
+        return qe.Finding(
+            code=code, kind="warning", title=f"{code} title", message="m", **fields
+        )
+
+    assert str(finding("CROC102")) == "[CROC102] CROC102 title (draft)"
+    assert str(finding("CRU001", query_label="lake 1234", area_fraction=1.0)) == (
+        "[CRU001] CRU001 title (lake 1234; area 100%; draft)"
     )
-    assert finding.severity is qe.Severity.SEVERE
+    assert str(finding("ERA5-023", time_overlap=[("2007-10-01", "2013-12-31")])) == (
+        "[ERA5-023] ERA5-023 title (2007-10-01..2013-12-31; draft)"
+    )
+    assert str(finding("CRU004", status="reviewed")) == "[CRU004] CRU004 title"
 
 
 def test_query_accepts_shorthands():
@@ -204,9 +224,9 @@ def test_objects_with_mappings_compare_by_value_but_do_not_hash():
         lambda: qe.Product("x", resolution=(0.5, "miles")),
         lambda: qe.Coverage(space=sp.point(0, 0)),
         lambda: qe.Coverage(time=qe.parse_time(None, recurrence={"months": [1]})),
-        lambda: qe.Outcome(code="X001", kind="warning", title="t", message="m"),
+        lambda: qe.Outcome(code="X001", kind="note", title="t", message="m"),
         lambda: qe.Outcome(
-            code="X001", kind="caveat", title="t", message="m", min_overlap=2
+            code="X001", kind="warning", title="t", message="m", min_overlap=2
         ),
     ],
 )
@@ -215,15 +235,15 @@ def test_constructors_reject_bad_values(build):
         build()
 
 
-def test_rule_requires_suggestions_for_a_recommendation_and_one_space():
+def test_rule_requires_suggestions_for_a_suggestion_and_one_space():
     with pytest.raises(ValueError):
-        qe.Rule(code="X001", kind="recommendation", title="t", message="m")
+        qe.Rule(code="X001", kind="suggestion", title="t", message="m")
     with pytest.raises(ValueError):
         qe.Rule(code="X001", kind="coverage", title="t", message="m")
     with pytest.raises(ValueError):
         qe.Rule(
             code="X001",
-            kind="caveat",
+            kind="warning",
             title="t",
             message="m",
             region_ref="ar6:CAF",
@@ -234,17 +254,16 @@ def test_rule_requires_suggestions_for_a_recommendation_and_one_space():
 def test_finding_to_dict_is_json_ready():
     finding = qe.Finding(
         code="CROC102",
-        kind="recommendation",
+        kind="suggestion",
         title="t",
         message="m",
-        severity=qe.Severity.INFO,
         suggestions=({"target": "MOM_input", "key": "DT", "value": 240.0},),
         time_overlap=[("2020-01-01", "..")],
         axes={"resolution": qe.AxisOverlap(-math.inf, 10.0, False, False)},
         dims={"basin": qe.DimMatch(("14",), 1.0)},
     )
     out = finding.to_dict()
-    assert out["severity"] == "info"
+    assert out["level"] == logging.INFO
     assert out["suggestions"] == [
         {"target": "MOM_input", "key": "DT", "value": 240.0, "rationale": ""}
     ]

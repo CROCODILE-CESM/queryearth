@@ -18,16 +18,16 @@ A **code** is a prefix plus three or four digits, such as `CRU001`, or `ERA5-014
 
 ## Queries and findings
 
-A {class}`~queryearth.Query` gives any subset of the same dimensions. "Resolution 8 km" on its own is a complete query. {meth}`Registry.query() <queryearth.Registry.query>` takes a `Query` or its fields as keywords, and returns a sorted list of {class}`~queryearth.Finding` objects: most severe first, then by kind and code.
+A {class}`~queryearth.Query` gives any subset of the same dimensions. "Resolution 8 km" on its own is a complete query. {meth}`Registry.query() <queryearth.Registry.query>` takes a `Query` or its fields as keywords, and returns a sorted list of {class}`~queryearth.Finding` objects: highest level first, then by kind and code.
 
 A finding is the rule's outcome plus how it matched:
 
-- `kind` is `caveat`, `coverage` or `recommendation`;
-- `severity` is `INFO`, `WARNING` or `SEVERE`, with the values of the matching `logging` levels (20, 30, 40);
+- `kind` is `warning`, `coverage` or `suggestion`;
+- `level` is a `logging` level: by default `logging.WARNING` (30) for a warning, `logging.INFO` (20) for a suggestion and `logging.ERROR` (40) for a coverage gap;
 - `area_fraction` and `overlap_km2` give how much of the query's area the rule covers;
 - `time_overlap` and `time_fraction` give the overlapping periods and their share of the query's time;
 - `axes`, `matched_facets` and `dims` hold the overlap on each other dimension;
-- `suggestions` holds structured actions (`target`, `key`, `value`, `rationale`) for a recommendation. queryearth never interprets them; your code applies them.
+- `suggestions` holds structured actions (`target`, `key`, `value`, `rationale`) for a suggestion. queryearth never interprets them; your code applies them.
 
 `Finding.to_dict()` gives a JSON-ready dictionary.
 

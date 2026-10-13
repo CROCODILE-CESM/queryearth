@@ -5,6 +5,7 @@ agreement between the loader and docs/reference/schema.json.
 
 import copy
 import json
+import logging
 import shutil
 from pathlib import Path
 
@@ -88,8 +89,7 @@ def example_registry(tmp_path):
 
     @registry.rule(
         "CROC104",
-        kind="recommendation",
-        severity=qe.Severity.INFO,
+        kind="suggestion",
         space=sp.box(-180, 66.5, 180, 90),
         facets={"model": "mom6"},
         axes={"resolution": {"gt": 0.0}},
@@ -102,8 +102,8 @@ def example_registry(tmp_path):
 
     @registry.rule(
         "GEN001",
-        kind="caveat",
-        severity=qe.Severity.INFO,
+        kind="warning",
+        level=logging.INFO,
         facets={"product": ["*"]},
         requires=["request_km2"],
     )
@@ -127,7 +127,7 @@ def example_registry(tmp_path):
             stn = query.context["cru_ts.stn"]
             zero = float((stn == 0).mean())
             if zero > 0:
-                return {"severity": "severe", "details": {"stn0_fraction": zero}}
+                return {"level": logging.ERROR, "details": {"stn0_fraction": zero}}
             return float(stn.mean()) <= 2
 
     return registry, codes
@@ -177,7 +177,7 @@ def test_example_query_1_lake_kariba(tmp_path):
         "GEN001",
     }
     cru002, cru001 = found[:2]
-    assert cru002.severity is qe.Severity.SEVERE and cru002.details["stn0_fraction"]
+    assert cru002.level == logging.ERROR and cru002.details["stn0_fraction"]
     assert cru001.assumed == ("version",) and cru001.source == "examples"
     assert cru001.area_fraction == 1.0 and cru001.time_fraction == 1.0
     assert cru001.time_overlap == (("2013-01-01", "2022-12-31"),)
@@ -268,7 +268,7 @@ def test_example_query_4_bulk(tmp_path):
     assert found["CRU001"].time_overlap == (("2000-01-01", "2022-12-31"),)
     assert q4.masks[("cru_ts", "CRU004")].sum() == 858
     assert found["CRU001"].area_fraction == q4.fractions[("cru_ts", "CRU001")] < 0.1
-    weak = q4.any(qe.Severity.WARNING)
+    weak = q4.any(logging.WARNING)
     union = q4.masks[("cru_ts", "CRU001")] | q4.masks[("cru_ts", "CRU004")]
     assert (weak == union).all() and weak.shape == lon.shape
 
@@ -288,8 +288,7 @@ def test_example_query_5_suitable(tmp_path):
 
 # ---- loader checks (section 5.3) ----------------------------------------------------
 def record(code="TST001", **props):
-    base = {"code": code, "kind": "caveat", "title": "t", "message": "m"}
-    base["severity"] = "warning"
+    base = {"code": code, "kind": "warning", "title": "t", "message": "m"}
     return {"type": "Feature", "geometry": None, "properties": {**base, **props}}
 
 
@@ -305,7 +304,7 @@ def write_pack(tmp_path, features, toml="", prefix='["TST"]', name="test"):
 
 def test_loader_reports_every_problem_and_leaves_the_registry_unchanged(tmp_path):
     registry = qe.Registry("x", axes=[qe.Axis("resolution", "km")])
-    registry.add(qe.Rule(code="OLD001", kind="caveat", title="t", message="m"))
+    registry.add(qe.Rule(code="OLD001", kind="warning", title="t", message="m"))
     features = [
         record("TST001"),
         record("TST002", facets={"product": ["nope"]}),
@@ -357,7 +356,7 @@ def test_prefixes_are_exclusive_between_packs_and_product_names_are_global(
     assert registry.load_pack(second) == ["OTH002"]
     assert registry.products["cru_ts"].aliases == ("CRUTS",)
     registry.add(
-        qe.Rule(code="TST009", kind="caveat", title="t", message="m")
+        qe.Rule(code="TST009", kind="warning", title="t", message="m")
     )  # Python
 
 
@@ -459,9 +458,9 @@ def test_fixture_27_plugin_values_in_records_pass_the_plugin_schema():
 
 # ---- the loader agrees with schema.json ----------------------------------------------
 BAD = {
-    "recommendation without suggestions": {"kind": "recommendation"},
+    "suggestion without suggestions": {"kind": "suggestion"},
     "unknown property": {"colour": "red"},
-    "unknown severity": {"severity": "critical"},
+    "level not info, warning or error": {"level": "critical"},
     "reviewed without references": {"status": "reviewed"},
     "box and region_ref": {
         "box": {"west": 0, "width": 1, "south": 0, "north": 1},

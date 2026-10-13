@@ -7,6 +7,8 @@ form; design.md section 12.4 describes the graded one, whose code is in
 examples/README.md.
 """
 
+import logging
+
 import numpy as np
 
 import queryearth as qe
@@ -21,8 +23,7 @@ y1991_2020 = qe.interval("1991-01-01", "2020-12-31")
 
 croc102 = qe.Rule(  # a record built in Python; the MOM_input key is illustrative
     code="CROC102",
-    kind="recommendation",
-    severity=qe.Severity.INFO,
+    kind="suggestion",  # level INFO by default
     title="Eddy-resolving grid: revisit coarse-grid parameterizations",
     message="Below about 10 km, schemes designed for coarser grids may conflict.",
     scope=qe.Scope(axes={"resolution": {"lt": 10.0}}),
@@ -44,7 +45,7 @@ class CruStations(
         stn = query.context["cru_ts.stn"]  # station counts the adapter already holds
         zero = float((stn == 0).mean())  # share of cell-months that are climatology
         if zero > 0:
-            return {"severity": qe.Severity.SEVERE, "details": {"stn0_fraction": zero}}
+            return {"level": logging.ERROR, "details": {"stn0_fraction": zero}}
         return float(stn.mean()) <= 2  # thinning: one or two gauges within 450 km
 
 
@@ -71,16 +72,19 @@ res = (8.0, 12.0)  # (finest, coarsest) cell spacing in km, computed by the call
 arctic = registry.query(
     space=ring, time=y1991_2020, axes={"resolution": res}, facets=mom6
 )
-todo = [s for f in arctic if f.kind == "recommendation" for s in f.suggestions]
+todo = [s for f in arctic if f.kind == "suggestion" for s in f.suggestions]
 
 glon, glat = np.meshgrid(np.arange(-179.75, 180, 0.5), np.arange(-89.75, 90, 0.5))
 lon, lat = glon.ravel(), glat.ravel()  # every 0.5 degree cell centre
 bulk = registry.query_points(lon, lat, weights=np.cos(np.radians(lat)), facets=cru)
-weak = bulk.any(qe.Severity.WARNING)  # per-point mask
+weak = bulk.any(logging.WARNING)  # per-point mask
 share = bulk.fractions[("cru_ts", "CRU001")]  # keyed by (product, code)
 
 ranked = registry.suitable(qe.Query(space=lake, time=y1991_2020), variable="pre")
 
-with qe.policy(raise_at=qe.Severity.SEVERE, ignore=frozenset({"CRU002"})):
-    qe.emit(found)  # warns "[CRU001] ..."; a coverage finding would raise
-qe.emit(arctic, mode="log")  # caveats from WARNING up; recommendations at INFO
+log = logging.getLogger("glhe")
+for f in found + arctic:
+    log.log(f.level, f)  # "[CRU001] ... (lake 1234; area 100%; ...)"
+gaps = [f for f in found if f.kind == "coverage"]  # QE001 or QE002 would stop here
+if gaps:
+    raise RuntimeError("\n".join(map(str, gaps)))

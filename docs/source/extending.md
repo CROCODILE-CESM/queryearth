@@ -12,7 +12,6 @@ Everything that varies between users plugs in through a small interface, so exte
 | Availability known only at run time | A callable `Product.coverage`, which takes the request's sub-query and returns a `Coverage` |
 | Named regions | `Registry.add_regions(namespace, regions)` |
 | A ranking of products | A score function, passed as `suitable(score=...)` |
-| A destination for findings | A sink function, passed as the `emit()` mode |
 
 Geometry and time semantics are not pluggable. Space and time are dimensions inside the engine, but `SpaceDimension` and `TimeDimension` are built into every Registry and cannot be replaced, so "overlaps" means the same thing for every rule.
 
@@ -52,7 +51,7 @@ registry = qe.Registry("basins", dimensions=[Pfafstetter()])
 registry.add(
     qe.Rule(
         code="BAS001",
-        kind="caveat",
+        kind="warning",
         title="Gauges sparse in basins 14 and 62",
         message="Few gauges report in these basins.",
         scope=qe.Scope(dims={"basin": ["14", "62"]}),

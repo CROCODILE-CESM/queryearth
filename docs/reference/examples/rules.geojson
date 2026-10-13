@@ -21,11 +21,10 @@
       "time": {"interval": ["2000-01-01", ".."]},
       "properties": {
         "code": "CRU001",
-        "kind": "caveat",
+        "kind": "warning",
         "title": "CRU TS precipitation falls back to climatology over much of Africa",
         "message": "Where no station lies within the correlation-decay distance (450 km for precipitation), CRU TS sets the monthly value to the 1961-1990 climatology and records stn = 0. Over the eight IPCC AR6 African land regions, the share of land cells with stn = 0 rose from 6.8% in 1973 to 34% in 2022. In those cells, year-to-year variability and trends are not observed.",
         "instruction": "Read the stn variable for the cells and months you use. Treat months with stn = 0 as climatology, not observations, and report how many such months your result depends on.",
-        "severity": "warning",
         "confidence": "observed",
         "action": "use_with_caution",
         "facets": {
@@ -62,10 +61,10 @@
       "time": {"interval": ["2000-01-01", ".."]},
       "properties": {
         "code": "CRU003",
-        "kind": "caveat",
+        "kind": "warning",
         "title": "South Africa precipitation is climatology since 2000 (withdrawn)",
         "message": "CRU TS precipitation over South Africa is filled with the 1961-1990 climatology from 2000 onward.",
-        "severity": "severe",
+        "level": "error",
         "confidence": "possible",
         "action": "do_not_use",
         "facets": {
@@ -88,11 +87,10 @@
       "time": {"interval": ["2010-01-01", ".."]},
       "properties": {
         "code": "CRU004",
-        "kind": "caveat",
+        "kind": "warning",
         "title": "South Africa precipitation rests on fewer stations since about 2010",
         "message": "Over South Africa, the mean number of stations within 450 km of each CRU TS precipitation cell fell from 8.0 (1930-1990) to 4.1 (2010) and 3.5 to 3.7 (2015-2022). Values are still interpolated from stations, but from fewer of them, so local extremes and trends are less certain than before.",
         "instruction": "Check stn for the cells you use (CRU002 flags months with no station at all) and compare with a second gauge-based product for the same area and period.",
-        "severity": "warning",
         "confidence": "observed",
         "action": "use_with_caution",
         "facets": {
@@ -129,11 +127,10 @@
       "time": {"interval": ["2000-01-01", "2006-12-31"]},
       "properties": {
         "code": "ERA5-001",
-        "kind": "caveat",
+        "kind": "warning",
         "title": "ERA5 lower-stratosphere cold bias, 2000-2006 (rerun as ERA5.1)",
         "message": "From 2000 to 2006, ERA5 fits radiosonde temperatures poorly in the stratosphere, with a cold bias in the lower stratosphere. ECMWF reran these years as ERA5.1, which corrects the lower-stratosphere cold bias.",
         "instruction": "For stratospheric temperature in 2000-2006, use ERA5.1 (available from MARS) instead of ERA5.",
-        "severity": "warning",
         "confidence": "observed",
         "action": "replaced",
         "facets": {
@@ -161,11 +158,10 @@
       "time": {"interval": ["..", "2013-12-31"]},
       "properties": {
         "code": "ERA5-014",
-        "kind": "caveat",
+        "kind": "warning",
         "title": "ERA5 2 m temperature over the Great Lakes has too strong an annual cycle before 2014",
         "message": "Before 2014, ERA5 did not use observed surface temperature over the Great Lakes to nudge its lake model. As a result, 2 m temperature there has too strong an annual cycle: winters are too cold and summers too warm.",
         "instruction": "Compare near-lake air temperature before 2014 with station observations, or start the analysis in 2014.",
-        "severity": "warning",
         "confidence": "observed",
         "action": "use_with_caution",
         "facets": {
@@ -196,11 +192,11 @@
       "time": {"interval": ["2007-10-01", "2013-12-31"]},
       "properties": {
         "code": "ERA5-023",
-        "kind": "caveat",
+        "kind": "warning",
         "title": "ERA5 sea-ice cover is missing in the Caspian Sea, late 2007 to 2013",
         "message": "ERA5 sea-ice cover is missing in the Caspian Sea from late 2007 to 2013, inclusive.",
         "instruction": "Do not use ERA5 sea-ice cover for the Caspian Sea in this period.",
-        "severity": "severe",
+        "level": "error",
         "confidence": "observed",
         "action": "do_not_use",
         "facets": {
@@ -233,10 +229,9 @@
       "time": null,
       "properties": {
         "code": "ERA5-024",
-        "kind": "caveat",
+        "kind": "warning",
         "title": "ERA5 Arctic winter sea-ice skin temperature can be 5 K or more too warm",
         "message": "In winter, ERA5 sea-ice surface (skin) temperature in the Arctic can have a warm bias of 5 K or more. The bias is largest over thick, snow-covered sea ice under cold, clear skies, when the modelled conductive heat flux from the ocean through the ice and snow is too high.",
-        "severity": "warning",
         "confidence": "likely",
         "action": "use_with_caution",
         "facets": {
@@ -266,11 +261,10 @@
       "time": {"interval": ["1993-01-01", "2003-12-31"]},
       "properties": {
         "code": "GLORYS001",
-        "kind": "caveat",
+        "kind": "warning",
         "title": "GLORYS12 subsurface temperature and salinity are less constrained before Argo",
         "message": "Before the Argo float array reached about 1,000 floats (January 2004), few profiles constrained GLORYS12 below the surface. Lellouche et al. (2021) report RMS differences against in-situ profiles of 0.75 °C and 0.2 psu in 1993-2002, against 0.45 °C and 0.1 psu in the Argo era, and find that salinity outperforms climatology only after 2013.",
         "instruction": "Expect larger subsurface errors in initial and boundary conditions taken from this period. If the start date is flexible, start after 2004.",
-        "severity": "warning",
         "confidence": "observed",
         "action": "use_with_caution",
         "facets": {
@@ -309,11 +303,10 @@
       "time": null,
       "properties": {
         "code": "CROC101",
-        "kind": "recommendation",
+        "kind": "suggestion",
         "title": "Arctic domain: consider active sea ice",
         "message": "Part of this domain lies north of the Arctic Circle. Sea ice becomes a factor this far north: its seasonal formation and retreat, and its transport by ocean currents, can matter for the ocean solution.",
         "instruction": "Decide whether the case needs an active sea-ice component and a grid built for high latitudes.",
-        "severity": "info",
         "confidence": "likely",
         "facets": {"model": ["mom6"]},
         "box": {"west": -180, "width": 360, "south": 66.5, "north": 90},
@@ -349,11 +342,10 @@
       "time": null,
       "properties": {
         "code": "CROC102",
-        "kind": "recommendation",
+        "kind": "suggestion",
         "title": "Eddy-resolving grid: revisit coarse-grid parameterizations",
         "message": "Below about 10 km grid spacing the model starts to resolve mesoscale eddies (about 1/10 degree is generally considered eddy-resolving). Parameterizations designed for coarser grids may then conflict with the resolved flow.",
         "instruction": "Review the mesoscale eddy and viscosity settings for this resolution, and compare simulated eddies with satellite observations.",
-        "severity": "info",
         "confidence": "possible",
         "axes": {"resolution": {"lt": 10, "unit": "km"}},
         "suggestions": [
@@ -382,10 +374,9 @@
       "time": null,
       "properties": {
         "code": "CROC103",
-        "kind": "recommendation",
+        "kind": "suggestion",
         "title": "Coarse grid at the Strait of Gibraltar: keep the strait open",
         "message": "At this resolution the Strait of Gibraltar is at most about two grid cells wide. It is the only exchange between the Mediterranean and the Atlantic, so it cannot be closed: without it the Mediterranean becomes far too salty. Coarse models often need hand edits to the topography here to keep a realistic exchange.",
-        "severity": "info",
         "confidence": "likely",
         "box": {"west": -6.5, "width": 1.5, "south": 35.5, "north": 36.5},
         "axes": {"resolution": {"ge": 25, "unit": "km"}},
@@ -415,11 +406,10 @@
       "time": {"interval": ["..", "1999-12-31"]},
       "properties": {
         "code": "BIO001",
-        "kind": "caveat",
+        "kind": "warning",
         "title": "Occurrence records here reflect sampling effort (illustrative)",
         "message": "Illustrative region and period. Presence-only occurrence records show where people looked as well as where species live. Here, records cluster along rivers and roads and around research stations, so a missing record is missing data, not evidence of absence.",
         "instruction": "Model sampling effort explicitly, or restrict the analysis to well-sampled cells, and report how many records come from this region and period.",
-        "severity": "warning",
         "confidence": "likely",
         "action": "use_with_caution",
         "facets": {
@@ -455,12 +445,12 @@
       "time": null,
       "properties": {
         "code": "UAS001",
-        "kind": "caveat",
+        "kind": "warning",
         "title": "Null Island geozone: authorisation needed from March to August (fictional)",
         "message": "Fictional zone for illustration, placed at Null Island (0N, 0E), the point in the Gulf of Guinea that geographic examples conventionally use. From March to August each year, drone flights in this zone up to 120 m above ground need authorisation from the zone authority.",
         "instruction": "Do not fly here in these months without authorisation.",
-        "severity": "severe",
-        "source_severity": "REQ_AUTHORIZATION",
+        "level": "error",
+        "x_restriction": "REQ_AUTHORIZATION",
         "confidence": "observed",
         "facets": {"activity": ["uas"]},
         "axes": {"altitude_agl": {"ge": 0, "le": 120, "unit": "m"}},
@@ -479,11 +469,10 @@
       "time": {"interval": ["2021-02-01", "2021-10-31"]},
       "properties": {
         "code": "EPI001",
-        "kind": "caveat",
+        "kind": "warning",
         "title": "Reporting gaps at island sentinel sites (fictional)",
         "message": "Fictional feed for illustration. In these periods several sentinel sites in this area did not report, and the feed filled its regional counts from earlier weeks. Counts for these weeks show reporting, not disease activity.",
         "instruction": "Exclude these weeks from trend estimates or mark them as imputed.",
-        "severity": "warning",
         "confidence": "observed",
         "action": "use_with_caution",
         "facets": {

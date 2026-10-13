@@ -4,7 +4,7 @@ queryearth.time holds time keys, intervals and their measures, and
 queryearth.space points, polygons and closed-set measures (imported as
 ``from queryearth import space as sp``). The rule engine is at the top level:
 a Registry of dimensions, products, regions and rules answers queries with
-Finding objects, and emit() reports findings under a policy. See docs/design.md
+Finding objects, which callers log with the logging module. See docs/design.md
 for the design.
 """
 
@@ -22,18 +22,6 @@ from queryearth.dimensions import (
     Prefilter,
     Versions,
 )
-from queryearth.emit import (
-    AdvisoryError,
-    AdvisoryWarning,
-    InfoAdvisory,
-    Policy,
-    SevereAdvisory,
-    Sink,
-    WarningAdvisory,
-    emit,
-    policy,
-)
-from queryearth.errors import DuplicateCodeError, LoadError, UnknownNameError
 from queryearth.registry import (
     Registry,
     PointResult,
@@ -46,17 +34,19 @@ from queryearth.objects import (
     AxisOverlap,
     Confidence,
     Coverage,
+    DuplicateCodeError,
     Finding,
     Kind,
+    LoadError,
     Match,
     Outcome,
     Product,
     Query,
     Request,
     Scope,
-    Severity,
     Status,
     Suggestion,
+    UnknownNameError,
 )
 from queryearth.rules import CheckResult, ComputedRule, Rule, RuleFunc, RuleKind
 from queryearth.space import Space
@@ -64,8 +54,6 @@ from queryearth.time import Interval, TimeSpec, interval, parse_time
 
 __all__ = [
     "Action",
-    "AdvisoryError",
-    "AdvisoryWarning",
     "Axis",
     "AxisOverlap",
     "CheckResult",
@@ -77,7 +65,6 @@ __all__ = [
     "DuplicateCodeError",
     "Finding",
     "Registry",
-    "InfoAdvisory",
     "Interval",
     "Kind",
     "Labels",
@@ -85,7 +72,6 @@ __all__ = [
     "Match",
     "Outcome",
     "PointResult",
-    "Policy",
     "Prefilter",
     "Product",
     "Query",
@@ -95,9 +81,6 @@ __all__ = [
     "RuleKind",
     "Scope",
     "ScoreFn",
-    "SevereAdvisory",
-    "Severity",
-    "Sink",
     "Space",
     "Status",
     "Suggestion",
@@ -105,12 +88,9 @@ __all__ = [
     "TimeSpec",
     "UnknownNameError",
     "Versions",
-    "WarningAdvisory",
     "__version__",
     "default_score",
-    "emit",
     "interval",
     "parse_time",
-    "policy",
     "space",
 ]

@@ -35,7 +35,8 @@ def show(findings):
         area, time = (
             "-" if x is None else f"{x:.0%}" for x in (f.area_fraction, f.time_fraction)
         )
-        print(f"  {f.code:7} {f.kind:14} {f.severity.name:8} {f.product or '-':11}")
+        level = logging.getLevelName(f.level)
+        print(f"  {f.code:7} {f.kind:10} {level:8} {f.product or '-':11}")
         print(f"          {f.title}")
         print(f"          area {area}, time {time}, periods {f.time_overlap}")
         if f.conditional_on:
@@ -92,10 +93,9 @@ show(
 registry.add(
     qe.Rule(
         code="TOY201",
-        kind="caveat",
+        kind="warning",
         title="toy_atmos 2 m temperature is too cold over sea ice",
         message="Over sea ice, toy_atmos t2m runs a few kelvin too cold.",
-        severity=qe.Severity.WARNING,
         scope=qe.Scope(
             space=sp.box(-180, 60, 180, 90), facets={"product": ["toy_atmos"]}
         ),
@@ -105,7 +105,7 @@ registry.add(
 
 @registry.rule(
     "TOY202",
-    kind="recommendation",
+    kind="suggestion",
     axes={"resolution": {"gt": 0}},  # needs a resolution, so conditional without one
 )
 def time_step(query, match):
@@ -124,7 +124,8 @@ show(
     )
 )
 
-# %% 6. Findings are data; emit() reports them. Try each mode.
+# %% 6. Findings are data. Log each at its own level, and raise for anything at
+# ERROR or above (nothing here; try requests=["toy_coastal"]).
 findings = registry.query(
     space=bering,
     time=winter,
@@ -132,23 +133,13 @@ findings = registry.query(
     facets={"model": ["mom6"]},
     requests=[qe.Request("toy_ocean", variables=("thetao", "so"))],
 )
-
-qe.emit(findings)  # default: Python warnings for caveats, log lines for advice
-
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s", force=True)
-qe.emit(findings, mode="log")
+for f in findings:
+    logging.getLogger("toy").log(f.level, f)  # str(f) is "[CODE] title (...)"
 
-collected = []
-qe.emit(findings, mode=lambda finding, text: collected.append(text))  # a sink
-print("sink got:", collected)
-
-try:
-    qe.emit(findings, mode="raise")
-except qe.AdvisoryError as err:
-    print("raised for:", [f.code for f in err.findings])
-
-with qe.policy(mode="log", ignore={"TOY002"}, show_recommendations=False):
-    qe.emit(findings)  # only TOY001 is left
+errors = [f for f in findings if f.level >= logging.ERROR]
+if errors:
+    raise RuntimeError("\n".join(map(str, errors)))
 
 # %% 7. Which product suits salinity in the Gulf in 2000? toy_coastal starts in
 # 2010 so it drops out; toy_ocean stays, with TOY001 against it. A low score
@@ -174,7 +165,7 @@ for key, mask in result.masks.items():
 try:
     import matplotlib.pyplot as plt
 
-    plt.pcolormesh(lon, lat, result.any(min_severity="info"), shading="nearest")
+    plt.pcolormesh(lon, lat, result.any(min_level="info"), shading="nearest")
     plt.title("points with a finding")
     plt.show()
 except ImportError:

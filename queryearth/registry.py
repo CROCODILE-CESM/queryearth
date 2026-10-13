@@ -11,6 +11,7 @@ from __future__ import annotations
 import copy
 import dataclasses
 import functools
+import logging
 import math
 import os
 import re
@@ -35,16 +36,17 @@ from queryearth.dimensions import (
     Versions,
     is_glob,
 )
-from queryearth.errors import DuplicateCodeError, UnknownNameError
 from queryearth.objects import (
+    KINDS,
     Coverage,
+    DuplicateCodeError,
     Finding,
     Product,
     Query,
     Request,
     Scope,
-    Severity,
-    severity_of,
+    UnknownNameError,
+    level_of,
     time_of,
 )
 from queryearth.rules import (
@@ -68,7 +70,6 @@ __all__ = ["Registry", "PointResult", "ScoreFn", "Suitability", "default_score"]
 _SLUG = re.compile(r"[a-z][a-z0-9_]*")
 _REGION = re.compile(r"[a-z][a-z0-9_.-]*:[A-Za-z0-9_.+-]+")
 _GROUPS = {"space": -2, "time": -1, "axes": 0, "facets": 1, "dims": 2}
-_KINDS = {"coverage": 0, "caveat": 1, "recommendation": 2}
 _PER_REQUEST = ("product", "variable", "version")
 
 _default: Registry | None = None
@@ -469,7 +470,7 @@ class Registry:
 
         fields are Query fields (they override those of query) and
         include_conditional, which also returns findings for rules the query
-        leaves undecided. Sorted by severity, kind, code, then part.
+        leaves undecided. Sorted by level, kind, code, then part.
         """
         conditional = fields.pop("include_conditional", False)
         found: list[Finding] = []
@@ -559,7 +560,6 @@ class Registry:
         finding = functools.partial(
             Finding,
             kind="coverage",
-            severity="severe",
             source="builtin",
             status="reviewed",
             product=name,
@@ -769,10 +769,10 @@ class Registry:
 
 
 def _sorted(findings: Iterable[Finding]) -> list[Finding]:
-    """By severity (highest first), kind, code, then part (base query first)."""
+    """By level (highest first), kind, code, then part (base query first)."""
     part = lambda f: -1 if f.request is None else f.request  # noqa: E731
     return sorted(
-        findings, key=lambda f: (-f.severity, _KINDS[f.kind], f.code, part(f))
+        findings, key=lambda f: (-f.level, KINDS.index(f.kind), f.code, part(f))
     )
 
 
@@ -789,13 +789,13 @@ class PointResult:
     skipped: tuple[tuple[str | None, str], ...] = ()
     shape: tuple[int, ...] = ()  # the shape of lon
 
-    def any(self, min_severity: Severity | str | int = Severity.WARNING) -> np.ndarray:
-        """Points inside some definite finding at or above min_severity."""
-        floor = severity_of(min_severity)
+    def any(self, min_level: int | str = logging.WARNING) -> np.ndarray:
+        """Points inside some definite finding at or above min_level."""
+        floor = level_of(min_level)
         out = np.zeros(self.shape, bool)
         for f in self.findings:
             key = (f.product, f.code)
-            if f.severity >= floor and key in self.masks:
+            if f.level >= floor and key in self.masks:
                 out |= self.masks[key]
         return out
 
@@ -809,7 +809,6 @@ class Suitability(NamedTuple):
 
 
 ScoreFn = Callable[[Product, Query, Sequence[Finding]], tuple[float, ...]]
-_WEIGHTS = {Severity.INFO: 1.0, Severity.WARNING: 2.0, Severity.SEVERE: 4.0}
 
 
 def default_score(
@@ -817,19 +816,20 @@ def default_score(
 ) -> tuple[float, float, float]:
     """(worst, burden, misfit): lower means fewer known concerns (section 10.2).
 
-    Counts definite caveat and coverage findings not below their min_overlap;
-    burden weighs severities 1, 2, 4 by area and time fractions (1.0 if None).
+    Counts definite warning and coverage findings not below their min_overlap;
+    burden weighs each by 2 ** ((level - 20) / 10), so INFO 1, WARNING 2 and
+    ERROR 4, times its area and time fractions (1.0 if None).
     """
     counted = [
         f
         for f in findings
         if not f.conditional_on
-        and f.kind in ("caveat", "coverage")
+        and f.kind in ("warning", "coverage")
         and (f.area_fraction is None or f.area_fraction >= f.min_overlap)
     ]
-    worst = max((int(f.severity) for f in counted), default=0)
+    worst = max((f.level for f in counted), default=0)
     burden = sum(
-        _WEIGHTS[f.severity]
+        2.0 ** ((f.level - 20) / 10)
         * (1.0 if f.area_fraction is None else f.area_fraction)
         * (1.0 if f.time_fraction is None else f.time_fraction)
         for f in counted

@@ -219,17 +219,19 @@
     },
     "properties": {
       "type": "object",
-      "required": ["code", "kind", "title", "message", "severity"],
+      "required": ["code", "kind", "title", "message"],
       "if": {"required": ["status"], "properties": {"status": {"const": "reviewed"}}},
       "then": {"required": ["references"], "properties": {"references": {"minItems": 1}}},
       "properties": {
         "code": {"$ref": "#/$defs/code"},
-        "kind": {"enum": ["caveat", "recommendation"]},
+        "kind": {"enum": ["warning", "suggestion"]},
         "title": {"type": "string", "minLength": 1, "maxLength": 200},
         "message": {"type": "string", "minLength": 1},
         "instruction": {"type": "string"},
-        "severity": {"enum": ["info", "warning", "severe"]},
-        "source_severity": {"type": "string", "minLength": 1},
+        "level": {
+          "description": "A logging level. When omitted, warning for a warning and info for a suggestion.",
+          "enum": ["info", "warning", "error"]
+        },
         "confidence": {"enum": ["observed", "likely", "possible", "unknown"]},
         "action": {"enum": ["can_be_used", "use_with_caution", "do_not_use", "replaced"]},
         "facets": {"$ref": "#/$defs/facets"},
@@ -298,7 +300,7 @@
       "not": {"required": ["box", "region_ref"]},
       "allOf": [
         {
-          "if": {"properties": {"kind": {"const": "recommendation"}}},
+          "if": {"properties": {"kind": {"const": "suggestion"}}},
           "then": {"required": ["suggestions"], "properties": {"suggestions": {"minItems": 1}}}
         }
       ]
