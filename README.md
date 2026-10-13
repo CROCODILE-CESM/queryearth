@@ -1,6 +1,6 @@
 # queryearth
 
-queryearth answers one question: given where (a point, a polygon or a model grid), when (a time range) and anything else that matters (grid resolution, product, variable and so on), which registered rules apply, how much of the request does each one cover, and what does it say to watch out for or to do?
+queryearth answers one question: given where (a point or a polygon, such as a lake outline or a model domain), when (a time range) and anything else that matters (grid resolution, product, variable and so on), which registered rules apply, how much of the request does each one cover, and what does it say to watch out for or to do?
 
 Rules are GeoJSON features or short Python classes. A query returns findings of three kinds: caveats ("these values are climatology, not observations"), coverage gaps ("this product does not reach part of your request") and recommendations ("set this model parameter"). queryearth ships no rules of its own; you bring yours.
 

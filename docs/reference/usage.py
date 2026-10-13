@@ -1,9 +1,10 @@
-"""Usage of the queryearth API sketch (illustrative; see api_sketch.py).
+"""Usage of the queryearth API (illustrative; examples/toy/play.py runs end to end).
 
-lake_geojson, stn, qlon and qlat stand for the caller's own data. The demo pack
-declares cru_ts (alias CRUTS) with its grid and era5_land without one. CRU002
-here is the simple form; design.md section 12.4 describes the graded one, whose
-code is in examples/README.md.
+lake_geojson, outline and stn stand for the caller's own data: a lake polygon, an
+Arctic domain's outer cell corners closed along 90N, and station counts. The
+demo pack declares cru_ts (alias CRUTS) and era5_land. CRU002 here is the simple
+form; design.md section 12.4 describes the graded one, whose code is in
+examples/README.md.
 """
 
 import numpy as np
@@ -42,14 +43,14 @@ class CruStations(
 
 
 lake = sp.polygon(lake_geojson)  # a HydroLAKES polygon; never lake.buffer(0.5)
-found = index.query(  # support: the CRU TS cells the lake touches, from the grid
+found = index.query(  # an adapter that reads CRU TS cells passes them as support=
     space=lake,
     time=y1991_2020,
     requests=[qe.Request("CRUTS", variables=("pre",))],  # version 4.07 assumed
-    context={"cru_ts.stn": stn},  # station counts for those cells
+    context={"cru_ts.stn": stn},  # station counts for the cells read
     label="lake 1234",
 )
-pair = index.query(  # each product with its own variables, time and support
+pair = index.query(  # each product with its own variables and time
     space=lake,
     requests=[qe.Request("cru_ts", ("pre",)), qe.Request("era5_land", ("tas",))],
     label="lake 1234",
@@ -59,8 +60,8 @@ named = [(f.product, f.code) for f in pair]  # every finding names its product
 only_res = index.query(axes={"resolution": 8.0}, include_conditional=True)
 # CROC102 is definite; CROC101 is conditional_on ("space", "model"), and so on.
 
-ring = sp.from_grid(qlon, qlat)  # Arctic cell corners (a supergrid's [::2, ::2])
-res = sp.resolution_of(qlon, qlat)  # (finest, coarsest) in km
+ring = sp.polygon(outline)  # outer cell corners, closed along 90N around the pole
+res = (8.0, 12.0)  # (finest, coarsest) cell spacing in km, computed by the caller
 arctic = index.query(space=ring, time=y1991_2020, axes={"resolution": res}, facets=mom6)
 todo = [s for f in arctic if f.kind == "recommendation" for s in f.suggestions]
 

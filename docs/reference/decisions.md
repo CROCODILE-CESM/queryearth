@@ -6,23 +6,23 @@ This file holds what [design.md](../design.md) condenses: the choices made while
 
 **Taken while assembling and reviewing this draft.** The section drafts and the two reviews disagreed in places. These were settled as follows and are listed so they can be reviewed:
 
-- Within the requests design: rules that constrain `product`, `variable` or `version` are evaluated once per request, and all other rules once on the base query, so model-level rules such as CROC101 appear once; GEN001 declares `product = ["*"]` so that it runs per request; a derived support is listed in `assumed` as `"space"`; `Index.expand()` shows the expansion; the shorthand gives every listed variable to every listed product.
+- Within the requests design: rules that constrain `product`, `variable` or `version` are evaluated once per request, and all other rules once on the base query, so model-level rules such as CROC101 appear once; GEN001 declares `product = ["*"]` so that it runs per request; a derived support is listed in `assumed` as `"space"` (dropped in v0.0.1; see [design.md section 17](../design.md#17-non-goals-for-v1-and-upgrade-paths)); `Index.expand()` shows the expansion; the shorthand gives every listed variable to every listed product.
 - `emit()` logs recommendations at `INFO` in every mode except `"ignore"`, whatever `min_severity` says, with `Policy.show_recommendations` to turn this off. This follows the approved plan; the first draft had dropped them at the default floor.
-- The calendar name is used for durations and for naming the last day of a month, not only for validation as the plan said (section [4.5](../design.md#45-time)).
+- Dropped in v0.0.1; see [design.md section 17](../design.md#17-non-goals-for-v1-and-upgrade-paths). The calendar name is used for durations and for naming the last day of a month, not only for validation as the plan said (section [4.5](../design.md#45-time)).
 - A full-turn edge of exactly 360 degrees keeps its direction, so planar caps and bands written as RFC 7946 polygons work, and edges longer than 180 degrees are otherwise read the short way, a deliberate departure from RFC 7946 (section [6.2](../design.md#62-canonical-representation-and-normalisation)).
 - Findings carry `product`, `request` and `source_severity`, and axis overlaps are `AxisOverlap` values that keep open ends.
-- Datetime-like values are second precision and dates are day precision; CrocoDash passes its exclusive end through `from_bounds` (sections [7.1](../design.md#71-the-civil-date-key-and-its-wire-format) and [8.3](../design.md#83-time-axes-and-facets)).
-- `check()` runs only for definite matches; the bulk path applies the pole-edge test and never applies `min_overlap`.
+- Datetime-like values are second precision and dates are day precision; CrocoDash passes its exclusive end through `from_bounds` (sections [7.1](../design.md#71-the-time-key-and-its-wire-format) and [8.3](../design.md#83-time-axes-and-facets); `from_bounds` was dropped in v0.0.1; see [design.md section 17](../design.md#17-non-goals-for-v1-and-upgrade-paths)).
+- `check()` runs only for definite matches; the bulk path applies the pole-edge test (dropped in v0.0.1; see [design.md section 17](../design.md#17-non-goals-for-v1-and-upgrade-paths)) and never applies `min_overlap`.
 - `Finding.assumed` lists only the product-filled dimensions that the rule constrains, in the order of `conditional_on`, so a time-only rule gets `("time",)`.
 - `emit()` de-duplicates by code, query label and product, not by code and label alone, so two products partly outside coverage give two QE001 messages.
 - Rules added from Python may use a code prefix that a loaded pack owns; prefixes are exclusive only between packs, and a duplicate code is always an error.
 - `Policy.skip_packages` and `default_score` were added to the API sketch, because sections [10](../design.md#10-inverse-query-which-products-suit-this-request) and [15](../design.md#15-consumer-integration) use them.
 - In Python, a bare string is shorthand for a one-item facet pattern list (the usage sketch relies on it); computed rules default to kind `caveat` and severity `WARNING`; `@index.rule` takes its title from the docstring.
-- `cells(mode="overlap")` selects cells whose intersection with the region has positive area, so a grid-aligned region does not pull in its neighbours.
-- Normalisation runs wrap, unwrap and count turns, close pole rings, repair, split, orient (section [6.2](../design.md#62-canonical-representation-and-normalisation)), the same steps as first proposed in a different order.
+- Dropped in v0.0.1; see [design.md section 17](../design.md#17-non-goals-for-v1-and-upgrade-paths). `cells(mode="overlap")` selects cells whose intersection with the region has positive area, so a grid-aligned region does not pull in its neighbours.
+- Normalisation runs wrap, unwrap and count turns, close pole rings (dropped in v0.0.1; see [design.md section 17](../design.md#17-non-goals-for-v1-and-upgrade-paths)), repair, split, orient (section [6.2](../design.md#62-canonical-representation-and-normalisation)), the same steps as first proposed in a different order.
 - Versions compare as dotted integers padded with zeros, in ranges and in `versions` lists, and a query version that is not a dotted integer never falls inside a range.
 - A callable coverage is evaluated once per request, and its result serves both the request's time default and QE001 and QE002.
-- `suitable()` is called with the caller's own geometry; products that declare a grid are judged on the cells that geometry uses (section [10.1](../design.md#101-contract)). The usage sketch passes cell corners, not a MOM6 supergrid, to `resolution_of()`.
+- `suitable()` is called with the caller's own geometry; products that declare a grid are judged on the cells that geometry uses (section [10.1](../design.md#101-contract)). The usage sketch passes cell corners, not a MOM6 supergrid, to `resolution_of()`. Product grids and `resolution_of()` were dropped in v0.0.1; see [design.md section 17](../design.md#17-non-goals-for-v1-and-upgrade-paths).
 - The computed-rule example "the support is smaller than one product cell" can never fire, because a support is at least one cell; it became GEN001, which compares the caller's own area with the support.
 
 Two parts of the first choice, which rules run once per request and the `"space"` that a derived support adds to `assumed`, became Q59, and the calendar and full-turn-edge choices Q60; the author adopted both with the other defaults (section [18.1](../design.md#181-decisions)). The shorthand rule in the first choice is part of the author's decision on requests. The other choices above stand as drafted; several of them interpret the author's decisions: which dimensions `Finding.assumed` lists, GEN001's `product = ["*"]`, a callable coverage evaluated once per request, and `suitable()` taking the caller's own geometry.
@@ -31,11 +31,11 @@ Two parts of the first choice, which rules run once per request and the `"space"
 
 On 2026-10-12 the author accepted the recommended default of every numbered question. Each question below keeps its number from earlier drafts, so that references stay stable, with its decision and a one-line reason. The questions that were settled before the prototype (Q3, Q6, Q7, Q13, Q47, Q48, Q59 and Q60), the author's action Q55, and the remaining work (Q24, Q37, Q45, Q49, Q56 and Q57) are in design.md, sections [18.1](../design.md#181-decisions) and [18.2](../design.md#182-outstanding-work).
 
-Decisions that change a contract are written into design.md, [api_sketch.py](api_sketch.py) and [schema.json](schema.json): `Index.products` (Q4), the optional `outcomes()` hook (Q5), a hyphen after a prefix ending in a digit (Q8), keywords inherited from an abstract base (Q9), replacing a rule that is redefined by the same function or class (Q10), the pole recorded on a `Space` (Q14), periodic grids refused by `from_grid` (Q15), the 1582 limit for `standard` durations (Q19), a day table for `julian` (Q20), `suitable(include_dropped=True)` (Q33), `Index.rule_counts()` (Q35) and a reference required for `reviewed` records (Q54). The others keep the draft as it was, or are plans for the prototype.
+Decisions that change a contract are written into design.md, the code and [schema.json](schema.json): `Index.products` (Q4), the optional `outcomes()` hook (Q5), a hyphen after a prefix ending in a digit (Q8), keywords inherited from an abstract base (Q9), replacing a rule that is redefined by the same function or class (Q10), the pole recorded on a `Space` (Q14), periodic grids refused by `from_grid` (Q15), the 1582 limit for `standard` durations (Q19), a day table for `julian` (Q20), `suitable(include_dropped=True)` (Q33), `Index.rule_counts()` (Q35) and a reference required for `reviewed` records (Q54). The others keep the draft as it was, or are plans for the prototype. Q14, Q15, Q19 and Q20 were dropped in v0.0.1; see [design.md section 17](../design.md#17-non-goals-for-v1-and-upgrade-paths).
 
 ### Matching and scope
 
-- **Q4.** `Match` now carries the resolved product name and the request position (section [4.11](../design.md#411-core-objects)). Should computed rules also reach the matched `Product` itself (its resolution, calendar or grid)? *Decided:* yes, through a read-only `products` mapping on the Index. *Why:* `Match` already carries the product's name, and a read-only mapping lets a rule read the product's resolution, calendar or grid without changing the Index.
+- **Q4.** `Match` now carries the resolved product name and the request position (section [4.11](../design.md#411-core-objects)). Should computed rules also reach the matched `Product` itself (its resolution, calendar or grid)? *Decided:* yes, through a read-only `products` mapping on the Index. *Why:* `Match` already carries the product's name, and a read-only mapping lets a rule read the product's resolution, coverage or version without changing the Index.
 - **Q5.** Should `RuleKind` gain an optional `outcomes(query, match)` method, so the vectorised Index need not repeat scope work for third-party rule kinds? *Decided:* yes, optional. *Why:* the Index could then do the scope work once for third-party rule kinds instead of each kind repeating it in `evaluate()`.
 - **Q8.** The code pattern lets `ERA5001` parse as `ERA` plus 5001 or `ERA5` plus 001. *Decided:* require the hyphen when a prefix ends in a digit (`ERA5-001`). *Why:* prefix ownership depends on where the prefix ends, so a code must parse one way only.
 - **Q9.** Should a `ComputedRule` subclass inherit class keywords (`index`, `facets`) from an `abstract=True` base? *Decided:* yes, merged, with the subclass's keywords winning. *Why:* a family of rules then states its shared index and scope once.
@@ -45,16 +45,16 @@ Decisions that change a contract are written into design.md, [api_sketch.py](api
 
 ### Geometry and time
 
-- **Q14.** `polygon(pole="auto")` picks the pole on the side of the ring's mean latitude, a heuristic. *Decided:* keep it, record the chosen pole on the `Space` and log it at debug level; model domains use `from_grid()`. *Why:* the heuristic is right for ordinary polar rings, and recording the choice makes a wrong guess visible.
-- **Q15.** Should `from_grid` accept grids periodic in longitude? *Decided:* not in v1; detect the case (winding 0, spanning 360 degrees) and raise with a pointer to `lat_band()`. *Why:* a periodic domain has no closed outline, and `lat_band()` already describes it.
+- **Q14.** Dropped in v0.0.1; see [design.md section 17](../design.md#17-non-goals-for-v1-and-upgrade-paths). `polygon(pole="auto")` picks the pole on the side of the ring's mean latitude, a heuristic. *Decided:* keep it, record the chosen pole on the `Space` and log it at debug level; model domains use `from_grid()`. *Why:* the heuristic is right for ordinary polar rings, and recording the choice makes a wrong guess visible.
+- **Q15.** Dropped in v0.0.1; see [design.md section 17](../design.md#17-non-goals-for-v1-and-upgrade-paths). Should `from_grid` accept grids periodic in longitude? *Decided:* not in v1; detect the case (winding 0, spanning 360 degrees) and raise with a pointer to `lat_band()`. *Why:* a periodic domain has no closed outline, and `lat_band()` already describes it.
 - **Q16.** Is 1e-9 degrees the right tolerance for clamping latitudes just beyond plus or minus 90? *Decided:* yes. *Why:* it absorbs projection round-off and still rejects real errors.
-- **Q17.** Should `cells()` accept curvilinear product grids? *Decided:* rectilinear only in v1. *Why:* a product with a curvilinear grid can declare a callable `Product.grid` instead.
-- **Q18.** `resolution_of` reports the shortest and longest cell edge, so a 1/4 degree grid reaches "below 10 km" north of about 69N and fires CROC102. *Decided:* keep (finest, coarsest) as the default and add a nominal-spacing option if rule authors need it. *Why:* the exact range lets `Finding.axes` show which part of a grid a rule concerns.
-- **Q19.** Durations treat `standard` and `gregorian` as proleptic Gregorian, wrong before 1582-10-15. *Decided:* return `time_fraction = None` for those calendars when the query starts earlier. *Why:* a missing fraction is better than a wrong one.
-- **Q20.** Should `julian` get a day table for `time_fraction`? *Decided:* yes; its leap rule is one line. *Why:* with a day table, `time_fraction` need not be None for `julian`.
-- **Q21.** Accept year-only or year-month dates on the wire (`"1990"`, `"1990-06"`)? *Decided:* not in v1, although it would be cheap: the key layout already leaves the slots (the end of month m is key(y, m, 32)). *Why:* dates and timestamps express every example, and the key layout keeps the option open.
+- **Q17.** Dropped in v0.0.1; see [design.md section 17](../design.md#17-non-goals-for-v1-and-upgrade-paths). Should `cells()` accept curvilinear product grids? *Decided:* rectilinear only in v1. *Why:* a product with a curvilinear grid can declare a callable `Product.grid` instead.
+- **Q18.** Dropped in v0.0.1; see [design.md section 17](../design.md#17-non-goals-for-v1-and-upgrade-paths). `resolution_of` reports the shortest and longest cell edge, so a 1/4 degree grid reaches "below 10 km" north of about 69N and fires CROC102. *Decided:* keep (finest, coarsest) as the default and add a nominal-spacing option if rule authors need it. *Why:* the exact range lets `Finding.axes` show which part of a grid a rule concerns.
+- **Q19.** Dropped in v0.0.1; see [design.md section 17](../design.md#17-non-goals-for-v1-and-upgrade-paths). Durations treat `standard` and `gregorian` as proleptic Gregorian, wrong before 1582-10-15. *Decided:* return `time_fraction = None` for those calendars when the query starts earlier. *Why:* a missing fraction is better than a wrong one.
+- **Q20.** Dropped in v0.0.1; see [design.md section 17](../design.md#17-non-goals-for-v1-and-upgrade-paths). Should `julian` get a day table for `time_fraction`? *Decided:* yes; its leap rule is one line. *Why:* with a day table, `time_fraction` need not be None for `julian`.
+- **Q21.** Accept year-only or year-month dates on the wire (`"1990"`, `"1990-06"`)? *Decided:* not in v1, although it would be cheap: the key layout already leaves the slots (the end of month m is key(y, m, 32)). *Why:* dates and timestamps express every example, and the key layout keeps the option open. (The civil-date key was dropped in v0.0.1; see [design.md section 17](../design.md#17-non-goals-for-v1-and-upgrade-paths).)
 - **Q22.** Recurrence holds months only. Add day-precision seasons (15 June to 15 September) or ED-318-style weekday and hour windows with a time zone? *Decided:* not in v1. *Why:* months cover every example except UAS001's weekday and hour windows.
-- **Q23.** Signed and five-digit years go beyond RFC 3339. *Decided:* keep the extension, documented; writers use the standard form whenever the year fits. *Why:* paleoclimate products need such years, and the standard form keeps other tools working.
+- **Q23.** Dropped in v0.0.1; see [design.md section 17](../design.md#17-non-goals-for-v1-and-upgrade-paths). Signed and five-digit years go beyond RFC 3339. *Decided:* keep the extension, documented; writers use the standard form whenever the year fits. *Why:* paleoclimate products need such years, and the standard form keeps other tools working.
 - **Q25.** Should a product be able to declare an ordered list of non-dotted versions (`GEBCO_2024`, `ERA5T`) so ranges work for them? *Decided:* not in v1. *Why:* exact `versions` lists cover the non-dotted versions in every example.
 - **Q26.** ERA5-001 constrains no variable and so over-warns, and no vertical dimension is designed. *Decided:* real packs list variables; an Index that needs it declares a `pressure_level` or `depth` axis. *Why:* the scope model already offers both tools; the example over-warns only because it is an example.
 
@@ -77,14 +77,14 @@ Decisions that change a contract are written into design.md, [api_sketch.py](api
 ### Engine and performance
 
 - **Q41.** Bulk masks cost about 1 MB per matching rule per million points. *Decided:* full arrays and chunking advice in v1; add a fractions-only mode or packed masks if memory bites. *Why:* chunking bounds the memory without new API.
-- **Q42.** Outlines that zigzag across a wide band defeat the tile shortcut (52 s in the pathological case). *Decided:* accept it. *Why:* it is a pathological case, not a target (section [9.3](../design.md#93-the-bulk-path-query_points)).
-- **Q43.** Lazy geometry decoding defers repair to first use. *Decided:* a pack linter in CI that builds every geometry, rather than a strict load mode. *Why:* loads stay fast, and bad geometry is still caught before a pack is released.
-- **Q44.** Should the tile count adapt to the number of points and the domain shape? *Decided:* fixed 64 × 64 in v1. *Why:* the fixed tiling met the bulk target in every benchmark case except the pathological one.
+- **Q42.** Dropped in v0.0.1; see [design.md section 17](../design.md#17-non-goals-for-v1-and-upgrade-paths). Outlines that zigzag across a wide band defeat the tile shortcut (52 s in the pathological case). *Decided:* accept it. *Why:* it is a pathological case, not a target (section [9.3](../design.md#93-the-bulk-path-query_points)).
+- **Q43.** Dropped in v0.0.1; see [design.md section 17](../design.md#17-non-goals-for-v1-and-upgrade-paths). Lazy geometry decoding defers repair to first use. *Decided:* a pack linter in CI that builds every geometry, rather than a strict load mode. *Why:* loads stay fast, and bad geometry is still caught before a pack is released.
+- **Q44.** Dropped in v0.0.1; see [design.md section 17](../design.md#17-non-goals-for-v1-and-upgrade-paths). Should the tile count adapt to the number of points and the domain shape? *Decided:* fixed 64 × 64 in v1. *Why:* the fixed tiling met the bulk target in every benchmark case except the pathological one.
 - **Q45.** Property-validation cost at load is unmeasured. *Decided:* measure it in the prototype against the load targets in section [13](../design.md#13-performance-targets) (20 ms or less for 100 rules of 500 vertices; 1 s or less for 10,000 rules). *Why:* the 10,000-rule load target stays provisional until then.
 
 ### Consumers
 
-- **Q50.** Who builds the crosswalk from HydroLAKES ids to NWM lakes needed by id-based coverage? *Decided:* nobody in v1; GLHE uses the callable coverage of section [15.2](../design.md#152-glhe). *Why:* the callable coverage runs the same test without a crosswalk.
+- **Q50.** Dropped in v0.0.1; see [design.md section 17](../design.md#17-non-goals-for-v1-and-upgrade-paths). Who builds the crosswalk from HydroLAKES ids to NWM lakes needed by id-based coverage? *Decided:* nobody in v1; GLHE uses the callable coverage of section [15.2](../design.md#152-glhe). *Why:* the callable coverage runs the same test without a crosswalk.
 - **Q51.** Should ERA5-024 become a raster-derived rule on ERA5's own sea-ice mask? *Decided:* later, in a real pack. *Why:* real content belongs in packs, not in the engine or its examples.
 
 ### Project and content
@@ -97,7 +97,7 @@ Decisions that change a contract are written into design.md, [api_sketch.py](api
 
 - **Q1.** Omitted time: decided by the author (section [18.1](../design.md#181-decisions)).
 - **Q2.** Splitting multi-valued facet queries: decided by the author through requests (sections [4.12](../design.md#412-several-products-in-one-query-requests) and [18.1](../design.md#181-decisions)).
-- **Q34.** A per-product support for `suitable()`: decided by the author through `Product.grid` and requests (sections [4.12](../design.md#412-several-products-in-one-query-requests) and [18.1](../design.md#181-decisions)).
+- **Q34.** Dropped in v0.0.1; see [design.md section 17](../design.md#17-non-goals-for-v1-and-upgrade-paths). A per-product support for `suitable()`: decided by the author through `Product.grid` and requests (sections [4.12](../design.md#412-several-products-in-one-query-requests) and [18.1](../design.md#181-decisions)).
 
 ## Detailed contracts
 
@@ -120,15 +120,15 @@ The fields of a conditional finding follow one principle: measures of the decide
 - A computed rule's `check()` does not run. The finding carries the rule's declared outcome (kind, severity, title, message, suggestions) and empty `details`, apart from `recurrence_months`.
 - On the bulk path (section [9.3](../design.md#93-the-bulk-path-query_points)), a conditional finding has no mask and no weighted fraction.
 
-The names in `conditional_on` are `"space"`, `"time"`, an axis name such as `"resolution"`, a facet name such as `"product"`, and `"context:<key>"` when a computed rule needs data the caller did not pass in `Query.context`. Axis and facet names share one namespace on the Index and may not be `space` or `time`, so the names are never ambiguous. They are listed in a fixed order: space, time, axes in declaration order, facets in declaration order, then context keys. `assumed` (section [4.3](../design.md#43-matching-when-a-dimension-is-missing)) uses the same order.
+The names in `conditional_on` are `"space"`, `"time"`, an axis name such as `"resolution"`, a facet name such as `"product"`, and `"context:<key>"` when a computed rule needs data the caller did not pass in `Query.context`. Every dimension name is unique on the Index, and `space` and `time` are reserved, so the names are never ambiguous. They are listed in a fixed order: space, time, axes in declaration order, facets in declaration order, other plugin dimensions, then context keys. `assumed` (section [4.3](../design.md#43-matching-when-a-dimension-is-missing)) uses the same order.
 
 ### Space forms in full
 
 Section [4.4](../design.md#44-space).
 
-Coordinates are float64 longitude and latitude in degrees on WGS84, longitude first (CRS84, as in RFC 7946). Edges are straight lines in longitude-latitude space ("planar" edges), which matches product grid cells and latitude-longitude boxes exactly. Every geometry is normalised once, when a record is loaded or a query is built: longitudes are wrapped exactly, rings that wind around a pole are closed along it, invalid polygons are repaired, shapes are split at plus and minus 180 and rings are oriented. Section [6](../design.md#6-geometry-semantics) specifies all of this.
+Coordinates are float64 longitude and latitude in degrees on WGS84, longitude first (CRS84, as in RFC 7946). Edges are straight lines in longitude-latitude space ("planar" edges), which matches product grid cells and latitude-longitude boxes exactly. A space is a point or a polygon, which may be a multipolygon. Every polygon is normalised once, when a record is loaded or a query is built: longitudes are wrapped exactly, a ring that goes around a pole is refused, invalid polygons are repaired, shapes are split at plus and minus 180 and rings are oriented. Section [6](../design.md#6-geometry-semantics) specifies all of this.
 
-**Rule space forms.**
+**Rule space forms.** A rule's space is always a polygon.
 
 | Form | How a record states it | Notes |
 |---|---|---|
@@ -136,38 +136,29 @@ Coordinates are float64 longitude and latitude in degrees on WGS84, longitude fi
 | Polygon or multipolygon | GeoJSON `geometry` | Holes are allowed |
 | Box | `properties.box` = `{west, width, south, north}` | A longitude arc: west 170 with width 20 covers 170E to 170W; width 360 is a latitude band. Use a box for anything that crosses the antimeridian. |
 | Named regions | `properties.region_ref`: one `namespace:id` string, or a list (a union) | Resolved at load time through regions registered on the Index (`Index.add_regions` or a pack's `[regions]` table). An unresolved reference is a load error. |
-| Object ids | Python only: `sp.features(ids, namespace)` | A set of ids in a namespace, such as National Water Model lake feature ids |
 
 **Query space forms**, built with helpers in `queryearth.space` (imported as `sp`):
 
 | Helper | Builds | Typical use |
 |---|---|---|
 | `point(lon, lat)` | A point | A station or one grid cell centre |
-| `polygon(shape, pole="auto")` | A normalised polygon from shapely, GeoJSON or a coordinate list | A lake outline or a drawn region |
-| `box(west, south, east, north)`, `box_arc(west, width, south, north)` | A longitude-arc box; `east < west` crosses the antimeridian | A request bounding box |
-| `lat_band(south, north)` | A full circle of latitude | Domains periodic in longitude, which have no bounding box |
-| `from_grid(lon2d, lat2d)` | The traced outline of a 2D grid of cell corners, with pole detection | A rotated, polar or seam-crossing model domain |
-| `weighted_points(lon, lat, weights)` | A point set with weights such as cell areas | Model cell centres |
-| `features(ids, namespace)` | A set of object ids | Rivers or lakes identified by id |
-| `cells(grid, region, mode)` | The union of the cells of `grid = (lon_edges, lat_edges)` that `region` uses (section [8.2](../design.md#82-choosing-a-space-and-selecting-product-cells)) | The support of a gridded product for a lake or a domain |
-| `cell_mask(grid, region, mode)` | The same selection as a boolean (latitude, longitude) array on `grid` | Selecting the product's data for exactly the support cells |
-| `nowhere()` | The empty space | A callable coverage that does not serve a query (section [15.2](../design.md#152-glhe)) |
-| `resolution_of(lon2d, lat2d, unit)` | Not a space: the (finest, coarsest) cell spacing in km or degrees (section [8.3](../design.md#83-time-axes-and-facets)) | The value for the `resolution` axis |
+| `polygon(shape)` | A normalised polygon from shapely, GeoJSON or a list of positions, in any longitude convention | A lake outline, a drawn region, a model domain's outline, or the cells a product contributes |
+| `box(west, south, east, north)` | A longitude-arc box; `east < west` crosses the antimeridian, and -180 to 180 is a latitude band | A request bounding box, or a domain periodic in longitude, which has no closed outline |
+| `nowhere()` | An empty polygon | A callable coverage that does not serve a query (section [15.2](../design.md#152-glhe)) |
 
-**Predicate.** Space overlaps when the closed sets intersect, so a query that only touches a rule's boundary matches, and points on a rule's edge, on the split at plus or minus 180, or at a pole are inside. This deliberately over-warns at boundaries rather than missing them (section [6.3](../design.md#63-boxes-closed-sets-and-areas)).
+A domain whose outline goes around a pole is closed along latitude 90 or -90 before it is passed to `polygon()`, the way ERA5-024's cap is written (section [6.2](../design.md#62-canonical-representation-and-normalisation)).
 
-**Overlap measure.** Every finding carries `area_fraction`, defined by the kind of query space, and `overlap_km2`, the absolute overlapping area:
+**Predicate.** Space overlaps when the closed sets intersect, so a query that only touches a rule's boundary matches, and points on a rule's edge or on the split at plus or minus 180 are inside. This deliberately over-warns at boundaries rather than missing them (section [6.3](../design.md#63-boxes-closed-sets-and-areas)).
+
+**Overlap measure.** Every finding carries `area_fraction` and `overlap_km2`, the absolute overlapping area:
 
 | Query space | `area_fraction` |
 |---|---|
 | None | None |
 | Point | 1.0 (a point that is not covered produces no finding) |
-| Polygon, box, band, grid outline or cells | Spherical area of the intersection divided by the spherical area of the query (section [6.3](../design.md#63-boxes-closed-sets-and-areas)) |
-| Weighted points | Sum of the weights of covered points divided by the sum of all weights (equal weights if none are given) |
-| Object ids against object ids in the same namespace | Shared ids divided by query ids |
-| Object ids against a geometry, or a geometry against object ids | Not comparable, so the finding is conditional on `"space"` (section [4.3](../design.md#43-matching-when-a-dimension-is-missing)), unless the Index has geometry for that namespace from `add_regions` |
+| Polygon | Spherical area of the intersection divided by the spherical area of the query (section [6.3](../design.md#63-boxes-closed-sets-and-areas)) |
 
-When the rule is global and the query gives a space, `area_fraction` is 1.0. For coverage findings, `area_fraction` is the fraction of the query that lies outside the product's coverage.
+On the bulk path, `area_fraction` is the sum of the weights of covered points divided by the sum of all weights (section [9.3](../design.md#93-the-bulk-path-query_points)). When the rule is global and the query gives a space, `area_fraction` is 1.0. For coverage findings, `area_fraction` is the fraction of the query that lies outside the product's coverage.
 
 **Minimum overlap.** The engine reports every overlap, however small. A rule's `min_overlap` (default 0) only stops `emit()` from emitting findings whose `area_fraction` is below it, so a large domain that clips the edge of a regional caveat is still visible as data without raising a warning. A finding whose `area_fraction` is None (the query gave no space, or space is undecided) is never dropped by this threshold, in `emit()` or in `default_score` (section [10.2](../design.md#102-the-default-score)).
 
@@ -186,16 +177,16 @@ Records, packs and `Finding.to_dict()` use the `time` member of OGC JSON-FG 1.0 
 
 Interval ends are inclusive at their stated precision, so `["2000-01-01", "2006-12-31"]` includes all of 31 December 2006. JSON-FG allows one `time` member per feature, so a rule that applies in several separate periods lists them in `properties.periods`, a union of closed intervals inside the `time` member, which then gives their overall extent. `properties.recurrence = {"months": [...]}` limits a rule to those calendar months in every year of its periods, or in every year if it has no time. If an editor drops the JSON-FG member, the loader accepts `properties.time_start` and `properties.time_end` instead, the field names GDAL uses for JSON-FG.
 
-Inside the code, each instant becomes a calendar-free integer key packed from the civil date and time, intervals are half-open, and every time specification carries a calendar name used for validation and durations but never for ordering (the plan said "validation only"; durations were added, section [18.1](../design.md#181-decisions)). Section [7](../design.md#7-time-semantics) specifies the key, calendars, recurrence and the measures `time_overlap` and `time_fraction`.
+Inside the code, each instant becomes an integer key, its count of seconds in the proleptic Gregorian calendar, and intervals are half-open. Section [7](../design.md#7-time-semantics) specifies the key, recurrence and the measures `time_overlap` and `time_fraction`.
 
 An axis is a named, ordered, numeric dimension that an Index declares with exactly one unit, for example `Axis("resolution", "km", "horizontal grid spacing")`. Other examples are `depth` in metres and `vertical_levels` as a count.
 
 | Side | Form | Rules |
 |---|---|---|
 | Rule | `{"gt": x, "ge": x, "lt": x, "le": x, "unit": u}`: any subset with at least one bound, never both `gt` and `ge` or both `lt` and `le` | A missing bound is open. If `unit` is given it must equal the declared unit; a mismatch is a load error. The core does no unit conversion. |
-| Query | A number `v` (treated as `[v, v]`) or a closed range `(lo, hi)` | For a curvilinear grid, pass `(finest, coarsest)` from `resolution_of()` |
+| Query | A number `v` (treated as `[v, v]`) or a closed range `(lo, hi)` | For a grid, pass its `(finest, coarsest)` spacing |
 
-The axis matches when the rule's interval and the query's range intersect, and `Finding.axes` records the intersection, so a reader can see that only the finest part of a grid (8 to 10 km of an 8 to 12 km grid) falls under a "below 10 km" rule. An axis name the Index has not declared raises `UnknownNameError` in records and queries alike, because a misspelled axis would otherwise look like "no issues". Conversions between km and degrees exist only in helpers that know a latitude, such as `resolution_of()`.
+The axis matches when the rule's interval and the query's range intersect, and `Finding.axes` records the intersection, so a reader can see that only the finest part of a grid (8 to 10 km of an 8 to 12 km grid) falls under a "below 10 km" rule. An axis name the Index has not declared raises `UnknownNameError` in records and queries alike, because a misspelled axis would otherwise look like "no issues". Converting degrees to km needs a latitude, so the caller does it.
 
 A facet is a categorical name declared on the Index. The default set is `product`, `variable`, `version`, `model` and `component`; an Index can replace or extend it. An undeclared facet name in a record or a query is an error.
 
@@ -295,7 +286,7 @@ lake = sp.polygon(lake_geojson)  # one outline for every product
 found = index.query(
     space=lake,
     requests=[
-        qe.Request("cru_ts", variables=("pre",)),  # support: the CRU TS cells used
+        qe.Request("cru_ts", variables=("pre",)),  # support: the lake outline
         qe.Request("era5_land", variables=("tas",)),  # time: ERA5-Land's whole record
     ],
     label="lake 1234",
@@ -323,11 +314,11 @@ Raster-derived rules are evaluated live in v1, inside the consumer's adapter, on
 
 Section [4.11](../design.md#411-core-objects).
 
-All core objects are frozen dataclasses ([api_sketch.py](api_sketch.py)). Everything except `Query.context` and the shapely and numpy members of `Space` is JSON-serialisable through `to_dict()` and `Rule.from_feature()`. The record properties (section [5.2](../design.md#52-record-properties)) map onto the fields of a static `Rule` and its `Rule.scope`: `box`, `periods`, `recurrence` and `calendar` become the scope's space and time, and `x_*` extension fields are kept on the side. Python 3.11 or later is supported, with no upper limit, and shapely 2.1 or later and numpy are the only third-party dependencies at run time; cftime, pandas and numpy date values are accepted by duck typing, not imported (section [7.1](../design.md#71-the-civil-date-key-and-its-wire-format)).
+All core objects are frozen dataclasses ([objects.py](../../queryearth/objects.py)). Everything except `Query.context` and the shapely and numpy members of `Space` is JSON-serialisable through `to_dict()` and `Rule.from_feature()`. The record properties (section [5.2](../design.md#52-record-properties)) map onto the fields of a static `Rule` and its `Rule.scope`: `box`, `periods` and `recurrence` become the scope's space and time, and `x_*` extension fields are kept on the side. Python 3.11 or later is supported, with no upper limit, and shapely 2.1 or later and numpy are the only third-party dependencies at run time; cftime, pandas and numpy date values are accepted by duck typing, not imported (section [7.1](../design.md#71-the-time-key-and-its-wire-format)).
 
-Objects that hold only scalars and tuples (`Interval`, `TimeSpec`, `Axis`, `Suggestion`, `AxisOverlap`) are hashable, and so is `Request`, whose `support` hashes by identity. `Space` and `PointResult` compare and hash by identity. Objects that hold mappings (`Scope`, `Query`, `Match`, `Finding`, `Rule`) compare by value, which the tests that compare the single and vectorised paths need, but they are not hashable: Python raises `TypeError` if one is used in a set or as a dictionary key. Key findings by `(code, query_label, product)` instead, as `emit()` does.
+Objects that hold only scalars and tuples (`Interval`, `TimeSpec`, `Axis`, `Suggestion`, `AxisOverlap`) are hashable, and so is `Request`, whose `support` hashes by identity. `Space` and `PointResult` compare and hash by identity. Objects that hold mappings (`Scope`, `Query`, `Match`, `Finding`, `Rule`) compare by value, which tests that compare findings need, but they are not hashable: Python raises `TypeError` if one is used in a set or as a dictionary key. Key findings by `(code, query_label, product)` instead, as `emit()` does.
 
-**Axis** has `name` (lowercase, unique among axes and facets, not `space` or `time`), `unit` (the only unit records and queries may use) and `description`.
+**Axis** has `name` (a lowercase slug, unique among the Index's dimensions, not `space` or `time`), `unit` (the only unit records and queries may use) and `description`.
 
 **Product** and **Coverage**:
 
@@ -338,21 +329,20 @@ Objects that hold only scalars and tuples (`Interval`, `TimeSpec`, `Axis`, `Sugg
 | `variables` | tuple[str, ...] | Variables the product offers, under the pack's own variable names; used by `suitable()` |
 | `coverage` | Coverage, or a callable `(Query) -> Coverage` | `Coverage(space=None, time=None)`; None means global or all time |
 | `resolution` | (float, "deg" or "km"), or None | Native grid spacing; used by ranking (section [10](../design.md#10-inverse-query-which-products-suit-this-request)) |
-| `calendar` | str | Calendar of the product's time axis |
 | `version` | str or None | The version this application uses; fills an omitted `version` facet |
-| `grid` | `(lon_edges, lat_edges)`, a callable `(Space) -> Space`, or None | The product's cells: the edges of a rectilinear grid, or a function that returns the cells a region uses. If declared, the engine derives a request's support from the caller's region (section [4.12](../design.md#412-several-products-in-one-query-requests)). |
 
-Product names are global within one Index. Two packs that declare the same product name are a load error, unless the second declaration only adds aliases.
+Product names are global within one Index. Declaring the same product name twice is a load error. (Letting a second pack add aliases to a declared product was cut from v0.0.1.)
 
-**ComputedRule.** A subclass declares its identity and scope with class keyword arguments, and defining the subclass registers one instance (examples in section [12.4](../design.md#124-raster-derived-rules-cru002) and [api_sketch.py](api_sketch.py)):
+**ComputedRule.** A subclass declares its identity and scope with class keyword arguments, and defining the subclass registers one instance (examples in section [12.4](../design.md#124-raster-derived-rules-cru002) and [usage.py](usage.py)):
 
 | Class keyword | Meaning |
 |---|---|
 | `code` | Required unless `abstract=True`. A reused code raises `DuplicateCodeError`. |
 | `index` | The Index to register on; defaults to `Index.default()` |
 | `abstract` | `True` for an intermediate base class that should not register |
-| `kind`, `severity`, `title` | As for records; defaults `caveat` and `WARNING`. `title` defaults to the first line of the docstring. |
-| `facets`, `axes`, `space`, `time` | The scope, in the same forms as a record; `space` also accepts a `Space` from `queryearth.space`, and `time` a `TimeSpec`. The Index checks every name. |
+| `kind`, `severity`, `title` and the other `Outcome` fields | As for records; defaults `caveat`, and `WARNING` (`INFO` for a recommendation). `title` defaults to the first line of the docstring, and `message` to the rest. |
+| `facets`, `axes`, `dims` | The scope, in the same forms as a record. The Index checks every name. |
+| `space`, `time` | A `Space` from `queryearth.space`; a `TimeSpec`, a JSON-FG time member or a `(start, end)` pair |
 | `requires` | `Query.context` keys the rule reads. A missing key makes the finding conditional on `context:<key>`. |
 | `suggestions` | Default suggestions for a recommendation; `check()` may replace them |
 
@@ -372,7 +362,7 @@ Product names are global within one Index. Two packs that declare the same produ
 
 `Index.query(space=..., time=..., axes=..., facets=..., requests=..., context=..., label=..., include_conditional=False)` builds the Query itself and accepts shorthands: a pair of strings for `time`, and plain values for axes and facets.
 
-**Finding** is the rule's outcome plus how its scope met the query (the `Outcome` and `Match` dataclasses in [api_sketch.py](api_sketch.py)):
+**Finding** is the rule's outcome plus how its scope met the query (the `Outcome` and `Match` dataclasses in [objects.py](../../queryearth/objects.py)):
 
 | Field | Meaning |
 |---|---|
@@ -383,14 +373,14 @@ Product names are global within one Index. Two packs that declare the same produ
 | `product` | The canonical name of the request's product, for every finding from a request, coverage findings included; None for findings from the base query (rules that concern no product, such as CROC101) |
 | `request` | The position of the finding's request in the query's requests after shorthand expansion (section [4.12](../design.md#412-several-products-in-one-query-requests)); None for the base query |
 | `area_fraction`, `overlap_km2` | Spatial overlap (section [4.4](../design.md#44-space)) |
-| `time_overlap`, `time_fraction` | Overlapping periods as closed wire-form intervals, and their share of the query's duration (section [7.2](../design.md#72-intervals-recurrence-and-calendars)) |
+| `time_overlap`, `time_fraction` | Overlapping periods as closed wire-form intervals, and their share of the query's duration (section [7.2](../design.md#72-intervals-and-recurrence)) |
 | `axes` | The intersection on each axis the rule constrains, as an `AxisOverlap(lo, hi, lo_closed, hi_closed)`, so `[8, 10)` keeps its open end |
 | `matched_facets` | The query values that matched each constrained facet |
 | `conditional_on` | Dimensions the engine could not decide: omitted by the query, not comparable with the rule's form, or a missing context key (section [4.3](../design.md#43-matching-when-a-dimension-is-missing)); empty means definite |
-| `assumed` | Dimensions the rule constrains that were filled from the request's product: `space` (a support derived from `Product.grid`), `time` and `version` |
+| `assumed` | Dimensions the rule constrains that were filled from the request's product: `time` and `version` |
 | `min_overlap`, `references`, `evidence` | Copied from the rule |
 | `details` | Rule-specific numbers, for example `{"stn0_fraction": 0.41}` |
-| `source`, `query_label` | Pack name, `computed` or `builtin`; the query's label |
+| `source`, `query_label` | Pack name, `python`, `computed` or `builtin`; the query's label |
 
 `Finding.to_dict()` writes severity as its lowercase name and intervals in wire form, so findings can go into a case's `config.json`, a README or a web page unchanged.
 
@@ -398,7 +388,7 @@ Product names are global within one Index. Two packs that declare the same produ
 
 | Method | Purpose |
 |---|---|
-| `Index(name, axes=..., facets=...)` | Declare axes (with units) and facet names |
+| `Index(name, axes=..., facets=..., dimensions=...)` | Declare axes (with units), facet names and other plugin dimensions, after the built-in `space` and `time` |
 | `add_product`, `add_regions` | Declare products and named regions |
 | `add(rule)` | Add a `Rule`, a record mapping or any `RuleKind`; raises `DuplicateCodeError` on a reused code |
 | `load_pack(path)` | Load a data-only pack; returns the codes loaded |
@@ -406,22 +396,22 @@ Product names are global within one Index. Two packs that declare the same produ
 | `query(...)` | One query, with any number of requests; returns a sorted `list[Finding]` (section [9.1](../design.md#91-the-pipeline-of-indexquery)) |
 | `expand(query)` | The base query and one sub-query per request, after shorthand expansion and product defaults, so a caller can see which combinations are checked (section [4.12](../design.md#412-several-products-in-one-query-requests)) |
 | `query_points(lon, lat, weights=None, time=..., axes=..., facets=..., requests=..., include_conditional=False)` | The bulk path; returns masks, weighted fractions and findings keyed by `(product, code)` as a `PointResult` (section [9.3](../design.md#93-the-bulk-path-query_points)) |
-| `suitable(query, variable, *, products=None, score=None)` | The inverse query: coverage filter, then a ranked `list[Suitability]` (section [10](../design.md#10-inverse-query-which-products-suit-this-request)) |
+| `suitable(query, variable, *, products=None, score=None, include_dropped=False)` | The inverse query: coverage filter, then a ranked `list[Suitability]` (section [10](../design.md#10-inverse-query-which-products-suit-this-request)) |
 | `Index.default()` | The application default Index, created on first use |
 
 ### Error classes
 
-These are the errors the design names, gathered in one place; [api_sketch.py](api_sketch.py) declares the classes. Where the design says only that something "is an error", the class is left to the prototype.
+These are the errors the design names, gathered in one place; [errors.py](../../queryearth/errors.py) and [emit.py](../../queryearth/emit.py) declare the classes. Where the design says only that something "is an error", the engine raises a plain `ValueError` or `TypeError` whose message names the problem.
 
 | Error | Raised when | Where specified |
 |---|---|---|
-| `UnknownNameError(KeyError)` | An undeclared axis, facet or product name appears in a record or a query; an unknown name is passed to `suitable(products=...)` | Sections [4.6](../design.md#46-axes), [4.7](../design.md#47-facets) and [10.1](../design.md#101-contract) |
+| `UnknownNameError(KeyError)` | An undeclared axis, facet, dimension, product or region name appears in a record or a query; an unknown name is passed to `suitable(products=...)` | Sections [4.6](../design.md#46-axes), [4.7](../design.md#47-facets) and [10.1](../design.md#101-contract) |
 | `DuplicateCodeError(ValueError)` | A code the Index already holds is registered again, from a pack, a `ComputedRule` subclass or an `@index.rule` function | Sections [4.11](../design.md#411-core-objects) and [12.3](../design.md#123-the-index-codes-and-lifecycle) |
 | `AdvisoryError(Exception)` | `emit()` runs in `"raise"` mode and keeps at least one caveat or coverage finding, or runs with `raise_at` and keeps one at or above that severity; `.findings` holds them all | Section [11.1](../design.md#111-modes-and-policy) |
-| `ValueError` | A query gives requests together with a `product`, `variable` or `version` facet; `suitable()` is asked for a named product that does not offer the variable; a ring winds around the globe more than once, or encloses no area after repair | Sections [4.12](../design.md#412-several-products-in-one-query-requests), [10.1](../design.md#101-contract) and [6.2](../design.md#62-canonical-representation-and-normalisation) |
-| `TypeError` | A `ComputedRule` subclass has no `code` and is not `abstract=True`; an object that holds mappings (`Scope`, `Query`, `Match`, `Finding`, `Rule`) is put in a set or used as a dictionary key | Section [4.11](../design.md#411-core-objects) and [api_sketch.py](api_sketch.py) |
-| Load error, reported with the file, the feature's position and its code | A schema violation; a duplicate code; a code outside the pack's prefixes, a prefix claimed by two packs, or the reserved prefix `QE`; `periods` outside `time`; a date invalid in its calendar; a box with `south` not below `north`; an undeclared name or a unit that does not match its axis; a version-range bound that is not a dotted integer; an unresolved `region_ref`; a latitude beyond plus or minus 90 by more than 1e-9 degrees; a ring that encloses no area; two packs declaring one product name beyond adding aliases; a collection header that disagrees with `pack.toml` | Sections [4.4](../design.md#44-space), [4.6](../design.md#46-axes), [4.8](../design.md#48-version-ranges), [4.11](../design.md#411-core-objects), [5.3](../design.md#53-loader-checks), [5.4](../design.md#54-packs) and [6.2](../design.md#62-canonical-representation-and-normalisation) |
-| Other errors the design names without a class | `box()` with `east == west`; `polygon(pole="auto")` on a ring whose mean latitude is exactly 0; second 60 in a time; a `version` facet in the shorthand together with more than one product; `Request.support` given to `query_points()` | Sections [6.3](../design.md#63-boxes-closed-sets-and-areas), [6.2](../design.md#62-canonical-representation-and-normalisation), [7.1](../design.md#71-the-civil-date-key-and-its-wire-format), [4.12](../design.md#412-several-products-in-one-query-requests) and [9.3](../design.md#93-the-bulk-path-query_points) |
+| `ValueError` | A query gives requests together with a `product`, `variable` or `version` facet; `suitable()` is asked for a named product that does not offer the variable; a ring goes around a pole, or encloses no area after repair | Sections [4.12](../design.md#412-several-products-in-one-query-requests), [10.1](../design.md#101-contract) and [6.2](../design.md#62-canonical-representation-and-normalisation) |
+| `TypeError` | A `ComputedRule` subclass has no `code` and is not `abstract=True`; an object that holds mappings (`Scope`, `Query`, `Match`, `Finding`, `Rule`) is put in a set or used as a dictionary key | Section [4.11](../design.md#411-core-objects) |
+| `LoadError(ValueError)`, listing every problem with the file, the feature's position and its code | A schema violation; a duplicate code; a code outside the pack's prefixes, a prefix claimed by two packs, or the reserved prefix `QE`; `periods` outside `time`; a date that is not a proleptic Gregorian date from year 1 to 9999; a box with `south` not below `north`; an undeclared name or a unit that does not match its axis; a version-range bound that is not a dotted integer; an unresolved `region_ref`; a latitude beyond plus or minus 90 by more than 1e-9 degrees; a ring that encloses no area or goes around a pole; a product name declared twice; a collection header that disagrees with `pack.toml` | Sections [4.4](../design.md#44-space), [4.6](../design.md#46-axes), [4.8](../design.md#48-version-ranges), [4.11](../design.md#411-core-objects), [5.3](../design.md#53-loader-checks), [5.4](../design.md#54-packs) and [6.2](../design.md#62-canonical-representation-and-normalisation) |
+| Other errors the design names without a class | `box()` with `east == west`; hour 24 or second 60 in a time; a `version` facet in the shorthand together with more than one product; `Request.support` given to `query_points()` | Sections [6.3](../design.md#63-boxes-closed-sets-and-areas), [7.1](../design.md#71-the-time-key-and-its-wire-format), [4.12](../design.md#412-several-products-in-one-query-requests) and [9.3](../design.md#93-the-bulk-path-query_points) |
 
 Warnings are not errors: `emit()` warns with `AdvisoryWarning(UserWarning)` subclasses `InfoAdvisory`, `WarningAdvisory` and `SevereAdvisory`, one per severity (section [11.1](../design.md#111-modes-and-policy)).
 
@@ -447,7 +437,6 @@ Section [5.2](../design.md#52-record-properties).
 | `box` | no | `{west, width, south, north}`; geometry must then be null |
 | `periods` | no | Closed intervals inside the `time` member (a union) |
 | `recurrence` | no | `{"months": [1, 2, 12]}` |
-| `calendar` | no | Calendar of the dates in this record |
 | `time_start`, `time_end` | no | Fallback for editors that drop the JSON-FG member; never together with a non-null `time` |
 | `min_overlap` | no | Emission threshold on `area_fraction`, 0 to 1 (default 0) |
 | `evidence` | no | ISO 19157-style `{method, measure, result, script, notes}`; method is `documented`, `derived`, `measured` or `expert` |
@@ -468,7 +457,7 @@ The JSON Schema covers structure. The loader also checks, and reports every erro
 - codes are unique in the Index;
 - each pack's codes belong to a prefix it owns: a code's prefix is the part before the optional hyphen and the final three or four digits, and it must equal an owned prefix exactly (so a pack owning `CRU` does not own `CRUX001`);
 - no two packs claim the same prefix, and `QE` is reserved. Rules added from Python (`Index.add`, `ComputedRule`, `@index.rule`) may use any prefix except `QE`, including one a loaded pack owns; only a duplicate code is an error;
-- `periods` lie inside `time`, and dates are valid in the stated calendar;
+- `periods` lie inside `time`, and dates are valid in the proleptic Gregorian calendar, from year 1 to 9999;
 - a `box` has `south` below `north`;
 - axis, facet, product and region names are declared, and `unit` matches the axis;
 - version-range bounds are dotted integers.
@@ -477,7 +466,7 @@ The JSON Schema covers structure. The loader also checks, and reports every erro
 
 Section [5.4](../design.md#54-packs).
 
-A pack is a directory with a `pack.toml` (read with the standard library's `tomllib`) and one or more FeatureCollection files. A FeatureCollection may also carry a `metadata` header with `pack`, `version`, `code_prefix`, `license`, `issued` and `technical_limitations`, in the style of EUROCAE ED-318. The header is required when the file is loaded on its own; otherwise it must agree with `pack.toml` (the header's `pack` is the toml's `[pack] name`).
+A pack is a directory with a `pack.toml` (read with the standard library's `tomllib`) and one or more FeatureCollection files. A FeatureCollection may also carry a `metadata` header with `pack`, `version`, `code_prefix`, `license`, `issued` and `technical_limitations`, in the style of EUROCAE ED-318. The header is optional; in a pack it must agree with `pack.toml` (the header's `pack` is the toml's `[pack] name`).
 
 ```toml
 [pack]
@@ -491,49 +480,47 @@ files = ["rules/*.geojson"]
 aliases = ["CRUTS", "CRU TS"]
 variables = ["pre", "tmp"]
 resolution = [0.5, "deg"]
-calendar = "standard"
 version = "4.07"
 coverage = { time = ["1901-01-01", "2022-12-31"] }
-grid = { lon = [-180.0, 180.0, 0.5], lat = [-90.0, 90.0, 0.5] }  # cell edges: first, last, step
 
 [regions.ar6]
 file = "regions/ar6_land.geojson"  # FeatureCollection of named regions
 id_property = "abbrev"             # property that holds each region's id
 ```
 
-A product's `grid` in `pack.toml` gives the edges of a regular grid as first edge, last edge and step, in degrees; an irregular grid or a callable is declared in Python (section [4.12](../design.md#412-several-products-in-one-query-requests)). Loading a pack never runs code, so packs from untrusted sources are safe to load.
+A callable coverage is declared in Python. Loading a pack never runs code, so packs from untrusted sources are safe to load.
 
 ### Normalisation steps in full
 
-Sections [6.2](../design.md#62-canonical-representation-and-normalisation) and [6.4](../design.md#64-not-supported); the code is in [geometry.py](geometry.py).
+Sections [6.2](../design.md#62-canonical-representation-and-normalisation) and [6.4](../design.md#64-not-supported); the code is in [space.py](../../queryearth/space.py). Step 3 below was dropped in v0.0.1, so design.md numbers the other steps 1 to 5.
 
 - **Coordinates** are float64 (longitude, latitude) in degrees on WGS84, longitude first. Stored longitudes lie in [-180, 180] and latitudes in [-90, 90]. A latitude outside that range by more than 1e-9 degrees is an error; a smaller excursion, such as projection round-off, is clamped.
 - **Edges** are straight lines in longitude-latitude ("planar" edges), declared as RFC 7946 and GeoParquet's default `edges="planar"` declare them. Product grid cells and latitude-longitude boxes have exactly these edges, so an edge written along 60N stays on 60N; read as a great circle, the edge from (-60, 60) to (60, 60) would peak at 73.9N. The two readings also give different areas: pyproj's geodesic area of a raw longitude-latitude box differs from its planar-edge area by -38% (120 by 20 degrees, 40N to 60N) to +10.8% (90 by 45 degrees, equator to 45N). One departure from RFC 7946 is deliberate: an edge that spans more than 180 degrees of longitude, other than a full-turn edge of exactly 360 degrees, is read the short way (section [6.2](../design.md#62-canonical-representation-and-normalisation), step 2). Under RFC 7946 the naive Fiji ring of section [6.1](../design.md#61-motivating-failures) really is the 340 degree shape; queryearth reads it as the intended 20 degree box.
 - **Shapes** are shapely Polygons or MultiPolygons. No part crosses plus or minus 180, exteriors run counterclockwise and holes clockwise, and a third coordinate (altitude) is dropped.
 
-Every record geometry, query polygon and grid outline is normalised once, when it is loaded or built. The steps run in this order because pole detection needs the ring before it is cut, and the cut needs a valid polygon.
+Every record geometry and query polygon is normalised once, when it is loaded or built. The steps run in this order because counting turns needs the ring before it is cut, and the cut needs a valid polygon.
 
 1. **Wrap** every longitude exactly into [-180, 180] (section [6.2](../design.md#62-canonical-representation-and-normalisation)).
-2. **Unwrap and count turns.** Walk each ring and take every step between consecutive vertices the short way, so the ring becomes continuous in longitude (a ring that crosses the antimeridian runs, say, from 170 to 190). Two kinds of step keep the direction in which they were written, computed from the raw input: a step of exactly 180 degrees, and a full-turn step of exactly 360 degrees, which RFC 7946 reads as an edge along the whole parallel. The full-turn rule is what makes a planar polar cap, such as ERA5-024's ring from (-180, 66.5) to (180, 66.5) to (180, 90) to (-180, 90), come out as the cap rather than as four copies of one point. The steps of a closed ring sum to 360 times a whole number, the winding number: 0 for an ordinary ring, plus or minus 1 for a ring that goes once around a pole, and anything else is an error. This is the winding-sum idea of the `_encircles_globe` helper in mom6_forge (a CROCODILE grid-generation package), written fresh; it gives exactly one turn for the polar-stereographic square of section [6.1](../design.md#61-motivating-failures) (fixture 4). Vertex latitudes and thresholds such as "spans 350 degrees" are not used. A ring that goes around a pole lists the seam longitude once: a ring at 70N written from -180 to 179 and closed has winding number 1, but the same ring listing both -180 and 180 gains a full-turn closing edge back, has winding number 0 and encloses nothing, which step 4 reports as an error.
-3. **Close pole rings.** A ring with winding number plus or minus 1 is closed along latitude 90 or -90: after its last vertex, the path continues to the copy of the first vertex one turn away, rises to the pole, runs along it back to the first vertex's longitude and comes down. `polygon(pole="auto")` picks the pole on the side of the ring's mean latitude and requires `pole=` when that mean is exactly 0. `from_grid()` keeps the north candidate if it covers the grid's middle node, and otherwise uses the south one.
-4. **Repair** with shapely `make_valid`, keep only the polygon parts and union them, so overlapping parts of a multipolygon are not counted twice. `make_valid` can return a GeometryCollection that holds a MultiPolygon, so the parts are taken two levels deep; one level silently drops the MultiPolygon. A shape left empty is a load error ("the ring encloses no area"), never a rule that silently matches nothing. `buffer(0)` is never used: for the bow-tie ring (0, 0), (2, 2), (2, 0), (0, 2), `make_valid` keeps both triangles (area 2.0) while `buffer(0)` keeps one (area 1.0). The reason from `is_valid_reason` goes into the load report.
-5. **Split.** Intersect the shape with each 360 degree strip [360k - 180, 360k + 180] it reaches, shift each piece by -360k, and union the pieces. The clip places new vertices exactly on the strip edge (all 8,259 seam vertices from 3,000 random seam-crossing quadrilaterals landed exactly on plus or minus 180), and a whole-turn shift is exact, so the halves meet exactly. An index stores each part's bounds separately, because the overall bounds of a split shape span the globe.
+2. **Unwrap and count turns.** Walk each ring and take every step between consecutive vertices the short way, so the ring becomes continuous in longitude (a ring that crosses the antimeridian runs, say, from 170 to 190). Two kinds of step keep the direction in which they were written, computed from the raw input: a step of exactly 180 degrees, and a full-turn step of exactly 360 degrees, which RFC 7946 reads as an edge along the whole parallel. The full-turn rule is what makes a planar polar cap, such as ERA5-024's ring from (-180, 66.5) to (180, 66.5) to (180, 90) to (-180, 90), come out as the cap rather than as four copies of one point. The steps of a closed ring sum to 360 times a whole number, the winding number. It is 0 for an ordinary ring; any other value means the ring goes around a pole, which raises `ValueError` with a message that says to close the ring along latitude 90 or -90 first. This is the winding-sum idea of the `_encircles_globe` helper in mom6_forge (a CROCODILE grid-generation package), written fresh; it gives exactly one turn for the polar-stereographic square of section [6.1](../design.md#61-motivating-failures), which is therefore refused rather than misread. Vertex latitudes and thresholds such as "spans 350 degrees" are not used. A ring that goes around a pole lists the seam longitude once: a ring at 70N written from -180 to 179 and closed has winding number 1 and raises that error, but the same ring listing both -180 and 180 gains a full-turn closing edge back, has winding number 0 and encloses nothing, which step 4 reports as an error.
+3. **Close pole rings.** Dropped in v0.0.1; see [design.md section 17](../design.md#17-non-goals-for-v1-and-upgrade-paths). A ring with winding number plus or minus 1 is closed along latitude 90 or -90: after its last vertex, the path continues to the copy of the first vertex one turn away, rises to the pole, runs along it back to the first vertex's longitude and comes down. `polygon(pole="auto")` picks the pole on the side of the ring's mean latitude and requires `pole=` when that mean is exactly 0. `from_grid()` keeps the north candidate if it covers the grid's middle node, and otherwise uses the south one.
+4. **Repair** with shapely `make_valid`, keep only the polygon parts and union them, so overlapping parts of a multipolygon are not counted twice. `make_valid` can return a GeometryCollection that holds a MultiPolygon, so the parts are taken two levels deep; one level silently drops the MultiPolygon. A shape left empty is a load error ("the ring encloses no area"), never a rule that silently matches nothing. `buffer(0)` is never used: for the bow-tie ring (0, 0), (2, 2), (2, 0), (0, 2), `make_valid` keeps both triangles (area 2.0) while `buffer(0)` keeps one (area 1.0).
+5. **Split.** Intersect the shape with each 360 degree strip [360k - 180, 360k + 180] it reaches, shift each piece by -360k, and union the pieces. The clip places new vertices exactly on the strip edge (all 8,259 seam vertices from 3,000 random seam-crossing quadrilaterals landed exactly on plus or minus 180), and a whole-turn shift is exact, so the halves meet exactly.
 6. **Orient** with shapely `orient_polygons`.
 
-Holes are normalised as separate rings and subtracted from the exterior, so a hole may itself enclose a pole: a band from 66.5N to 85N can be written as a ring at 66.5N with a hole ring at 85N. After step 2 the Fiji ring becomes the intended 20 degree box, and the same box written in 0 to 360 longitudes normalises to the same two parts. Boxes, longitude arcs and latitude bands (`box`, `box_arc`, `lat_band` and records' `box`) are built as polygons directly (section [6.3](../design.md#63-boxes-closed-sets-and-areas)) and never pass through ring normalisation. The code in [geometry.py](geometry.py) was run while revising this document on the Fiji ring in both longitude conventions, the polar-stereographic square, rings around 70N written with the seam once and twice, the planar caps and band of fixture 22, the bow-tie with and without a spike (fixture 7), and 3,000 random rings with small integer coordinates, of which none lost polygon area in the repair.
+Holes are normalised as separate rings and subtracted from the exterior. After step 2 the Fiji ring becomes the intended 20 degree box, and the same box written in 0 to 360 longitudes normalises to the same two parts. Boxes (`box()` and records' `box`) are built as polygons directly (section [6.3](../design.md#63-boxes-closed-sets-and-areas)) and never pass through ring normalisation. The reference code written for these steps was run while revising this document on the Fiji ring in both longitude conventions, the polar-stereographic square, rings around 70N written with the seam once and twice, the planar caps and band of fixture 22, the bow-tie with and without a spike (fixture 7), and 3,000 random rings with small integer coordinates, of which none lost polygon area in the repair.
 
-The common formula `((x + 180) % 360) - 180` rounds when it adds 180, so 179.99999999999997 becomes -180.0. During the design research it changed 488 of 2,000 samples taken within 5e-12 degrees of the seam; on the east edge of a box, such an error turns a sliver into nearly the whole globe. `wrap_lon` uses `math.fmod`, which is exact, and corrects by 360 only when the remainder lies beyond 180 in size; that correction is exact because the two numbers are within a factor of two of each other (Sterbenz's lemma). Both 180 and -180 are kept, since a split shape uses both.
+The common formula `((x + 180) % 360) - 180` rounds when it adds 180, so 179.99999999999997 becomes -180.0. During the design research it changed 488 of 2,000 samples taken within 5e-12 degrees of the seam; on the east edge of a box, such an error turns a sliver into nearly the whole globe. `wrap_lon` uses `fmod`, which is exact, and corrects by 360 only when the remainder lies beyond 180 in size; that correction is exact because the two numbers are within a factor of two of each other (Sterbenz's lemma). Both 180 and -180 are kept, since a split shape uses both.
 
 - **Great-circle edges.** A source whose edges are great circles must be densified first, for example with pyproj `Geod.npts`.
 - **Edges longer than 180 degrees of longitude**, other than full-turn edges of exactly 360 degrees. They are read the short way (step 2), a deliberate departure from RFC 7946; write a box, or add vertices.
-- **A ring read as "the larger side".** A ring with winding number 0 always encloses the side that contains no pole, and one with winding number plus or minus 1 is closed toward one pole. Spherical engines such as S2 choose a ring's side by size or orientation; queryearth never does. Regions larger than a hemisphere are written as pole caps, boxes and bands, with holes where needed. A shape containing both poles, or a ring that winds more than once, cannot be written as one ring.
+- **A ring read as "the larger side".** A ring with winding number 0 always encloses the side that contains no pole, and any other ring is refused. Spherical engines such as S2 choose a ring's side by size or orientation; queryearth never does. Regions larger than a hemisphere are written as pole caps, boxes and bands, with holes where needed. A shape containing both poles, or a ring that winds more than once, cannot be written as one ring.
 - **Coordinate systems other than CRS84**, and rule geometries other than polygons, multipolygons and null.
 
 ### Boxes in full
 
 Section [6.3](../design.md#63-boxes-closed-sets-and-areas).
 
-A box is a longitude arc plus latitude limits, `(west, width, south, north)`, with `west` in [-180, 180) and `width` in (0, 360]. A rule writes it as `properties.box`. A query uses `box_arc(west, width, south, north)` or `box(west, south, east, north)`, where the width is `east - west` if `east` is greater than `west` and `east - west + 360` otherwise. `east == west` is an error (`lat_band()` gives the full circle), and -90 <= south < north <= 90. A `west` that wraps to 180 is stored as -180, so stored values stay in [-180, 180).
+A box is a longitude arc plus latitude limits, `(west, width, south, north)`, with `width` in (0, 360]. A rule writes it as `properties.box`, with `west` in [-180, 180). A query uses `box(west, south, east, north)`, where the width is `east - west` if `east` is greater than `west` and `east - west + 360` otherwise. `east == west` is an error, -180 to 180 gives the full circle, and -90 <= south < north <= 90.
 
 Only `west` is wrapped; `width` is kept. Wrapping the two ends separately is the bug CrocoDash fixed in #283: before the fix, 7 of 14 combinations of box and longitude convention selected too little. A longitude x lies on the arc when `(x - west) mod 360 <= width`, the test CrocoDash's `bbox_mask` uses. For matching, a box becomes one polygon, or two when `west + width > 180`.
 
@@ -543,16 +530,17 @@ Section [6.3](../design.md#63-boxes-closed-sets-and-areas).
 
 | Query space | Test against a rule shape |
 |---|---|
-| Point | Prepared `covers` |
-| Point at latitude 90 or -90 | `intersects` with the whole pole edge (that latitude at every longitude), so a pole point matches every rule that reaches that pole. In longitude-latitude the pole is a line, and a sector box from 0E to 90E reaching 90N would otherwise miss the point (123, 90). |
-| Polygon, box, band, grid outline or cells | Prepared `intersects` |
-| Weighted points (bulk path) | `shapely.intersects_xy`, never `contains_xy`; points at latitude 90 or -90 use the pole-edge test above, once per rule (section [9.3](../design.md#93-the-bulk-path-query_points)) |
+| Point | Prepared `shapely.intersects_xy`, never `contains_xy`; a point at plus or minus 180 is also tested on the other side of the seam |
+| Polygon | Prepared `intersects`; shapes that touch across plus or minus 180 meet there |
+| Points on the bulk path | Prepared `intersects_xy` for the points inside the rule's bounding box (section [9.3](../design.md#93-the-bulk-path-query_points)) |
+
+A point at latitude 90 or -90 is tested at its own longitude; the pole-edge rule, which matched it against every rule that reaches that pole, was dropped in v0.0.1; see [design.md section 17](../design.md#17-non-goals-for-v1-and-upgrade-paths).
 
 Closed sets matter because real grid points sit on rule edges. ERA5's 0.25 degree grid has 2,401 points in [-1, 11] by [-1, 11], and 1,681 of them lie in the closed square [0, 10] by [0, 10]. `contains_xy` finds 1,521 (it drops all 160 edge points), even-odd ray casting finds 1,600 (it drops the right and top edges), and `intersects_xy` finds all 1,681 (measured while drafting). The cost is deliberate over-warning: a query polygon that only shares an edge with a rule matches with `area_fraction` 0.0, and the rule's `min_overlap` decides whether `emit()` shows it.
 
 ### Area in full
 
-Section [6.3](../design.md#63-boxes-closed-sets-and-areas); the code is in [geometry.py](geometry.py).
+Section [6.3](../design.md#63-boxes-closed-sets-and-areas); the code is in [space.py](../../queryearth/space.py).
 
 `overlap_km2` is the area of the intersection of the rule shape and the query shape, and `area_fraction` divides it by the area of the query shape. shapely computes the intersection in longitude-latitude, which is exact under planar edges.
 
@@ -562,21 +550,25 @@ A polygon's area is its exterior's minus its holes'; a multipolygon's is the sum
 
 ### Time conversion in full
 
-Section [7.1](../design.md#71-the-civil-date-key-and-its-wire-format).
+Dropped in v0.0.1; see [design.md section 17](../design.md#17-non-goals-for-v1-and-upgrade-paths).
+
+Section [7.1](../design.md#71-the-time-key-and-its-wire-format), which states what is built.
 
 queryearth compares civil dates instead: the labels (year, month, day, hour, minute, second) as written. Each instant becomes one integer:
 
 `interval()` and `from_bounds()` accept wire strings; `datetime.date` and `datetime.datetime` (aware values converted to UTC, naive values treated as UTC); cftime objects (their fields and calendar); numpy `datetime64` values in any unit, converted in their own unit and never through `datetime64[ns]`; and pandas `Timestamp` values, through their fields. None of these libraries is imported: cftime, pandas and numpy date values are recognised by duck typing, through their fields and attributes. All keys are UTC civil time. Second 60 is rejected, because no CF calendar has leap seconds.
 
-Precision follows the type of the value. Wire dates, `datetime.date` values and numpy `datetime64` values in days are day precision. Wire timestamps, `datetime.datetime`, cftime objects, `Timestamp` values and `datetime64` values in finer units are second precision, even at midnight. So `interval(Timestamp("2020-01-01"), Timestamp("2020-01-09"))` ends with the first second of 9 January, while `from_bounds` reads the same pair as the days 1 to 8 January (section [8.3](../design.md#83-time-axes-and-facets), fixture 11). An interval whose two ends differ in precision is written back with timestamps at both ends (section [7.2](../design.md#72-intervals-recurrence-and-calendars)).
+Precision follows the type of the value. Wire dates, `datetime.date` values and numpy `datetime64` values in days are day precision. Wire timestamps, `datetime.datetime`, cftime objects, `Timestamp` values and `datetime64` values in finer units are second precision, even at midnight. So `interval(Timestamp("2020-01-01"), Timestamp("2020-01-09"))` ends with the first second of 9 January, while `from_bounds` reads the same pair as the days 1 to 8 January (section [8.3](../design.md#83-time-axes-and-facets), fixture 11). An interval whose two ends differ in precision is written back with timestamps at both ends (section [7.2](../design.md#72-intervals-and-recurrence)).
 
-Years are astronomical (section [7.1](../design.md#71-the-civil-date-key-and-its-wire-format)). A cftime object whose calendar has no year zero (`has_year_zero=False`, cftime's default for `standard`, `gregorian` and `julian`) counts 1 BC as year -1, so the conversion adds 1 to years at or below 0; an object with `has_year_zero=True` is taken as written (fixture 16).
+Years are astronomical (section [7.1](../design.md#71-the-time-key-and-its-wire-format)). A cftime object whose calendar has no year zero (`has_year_zero=False`, cftime's default for `standard`, `gregorian` and `julian`) counts 1 BC as year -1, so the conversion adds 1 to years at or below 0; an object with `has_year_zero=True` is taken as written (fixture 16).
 
 The wire format is the JSON-FG `time` member (section [4.5](../design.md#45-time)). An end is inclusive at its stated precision: `"2006-12-31"` includes that whole day and `"2006-12-31T23:59:59Z"` that second. Version 1 has only these two precisions; a month is written as its first and last day, and the schema rejects `"2020-01"` (section [18](../design.md#18-decisions-and-outstanding-work)). Years with a sign or more than four digits (`"-5000-06-01"`, `"12000-01-01"`) are accepted for paleoclimate products, a documented extension beyond RFC 3339 and JSON-FG 1.0 (records that use them are not valid JSON-FG). Years are astronomical, as in ISO 8601's expanded years: year 0 is 1 BC and year -1 is 2 BC.
 
 ### Intervals in full
 
-Section [7.2](../design.md#72-intervals-recurrence-and-calendars).
+Dropped in v0.0.1; see [design.md section 17](../design.md#17-non-goals-for-v1-and-upgrade-paths).
+
+Section [7.2](../design.md#72-intervals-and-recurrence), which states what is built.
 
 Inside the code every interval is half-open, [start, end), with `None` for an open end:
 
@@ -595,15 +587,17 @@ When a finding writes `time_overlap`, each [start, end) goes back to closed wire
 
 ### Month recurrence in full
 
-Section [7.2](../design.md#72-intervals-recurrence-and-calendars).
+Section [7.2](../design.md#72-intervals-and-recurrence).
 
-`properties.recurrence = {"months": [12, 1, 2]}` limits a rule to those calendar months. Because the months are a set, a season that wraps the year end needs no special case. To evaluate it, intersect the rule's periods with the query to get B, then cut B into calendar months; month m of year y is [key(y, m, 1), key of the first day of the next month), which needs no month lengths, and runs that touch are merged so that December joins the following January. Adding the months of one year is plain integer arithmetic on keys, with no month lengths involved.
+`properties.recurrence = {"months": [12, 1, 2]}` limits a rule to those calendar months. Because the months are a set, a season that wraps the year end needs no special case. To evaluate it, intersect the rule's periods with the query to get B, then cut B into calendar months, and merge runs that touch, so that December joins the following January.
 
 If B has an open end (an open-ended query), every month occurs in it, the rule matches, and `time_overlap` reports B without expansion. December to February over CRU TS's record from 1901 to 2022 gives 123 runs. Seasonal windows at day precision, such as 15 June to 15 September, are not in version 1.
 
 ### Calendars in full
 
-Section [7.2](../design.md#72-intervals-recurrence-and-calendars).
+Dropped in v0.0.1; see [design.md section 17](../design.md#17-non-goals-for-v1-and-upgrade-paths).
+
+Section [7.2](../design.md#72-intervals-and-recurrence).
 
 Every time specification carries a CF calendar name, by default `proleptic_gregorian`. The calendar validates dates, names the last day of a month and measures durations. It never orders them.
 
@@ -626,12 +620,14 @@ Section [8.1](../design.md#81-the-contract).
 | Problem | What happens | With the support |
 |---|---|---|
 | Buffering a small shape | GLHE retries an empty extraction with `polygon.buffer(0.5)` (`CRUTS.py`, lines 119 to 125). A buffer in degrees is anisotropic: at 70N, 0.5 degree of longitude is about 19 km and of latitude about 56 km. The buffered outline is neither the lake nor the cells whose values are used. | The cells that supply the value are the query |
-| Small shapes and cell centres | A 0.15 by 0.15 degree lake (about 280 km² near the equator) inside one 0.5 degree cell, but not over its centre, selects no cell under centre masking (regionmask's default, and H3's classic polygon fill). A rule over the western 40% of that cell does not touch the lake, yet it affects the value the lake receives. | `cells(..., mode="overlap")` selects the cell, and the rule matches with `area_fraction` 0.4 |
+| Small shapes and cell centres | A 0.15 by 0.15 degree lake (about 280 km² near the equator) inside one 0.5 degree cell, but not over its centre, selects no cell under centre masking (regionmask's default, and H3's classic polygon fill). A rule over the western 40% of that cell does not touch the lake, yet it affects the value the lake receives. | With that cell as the support, the rule matches with `area_fraction` 0.4 |
 | Mid-month time stamps | A monthly value stamped 2020-01-16 stands for all of January; a rule for 20 to 25 January, compared with the stamp, misses it | The bounds [2020-01-01, 2020-02-01) overlap the rule |
 
 ### Query spaces and product cells in full
 
-Section [8.2](../design.md#82-choosing-a-space-and-selecting-product-cells).
+Dropped in v0.0.1; see [design.md section 17](../design.md#17-non-goals-for-v1-and-upgrade-paths).
+
+Section [8.2](../design.md#82-choosing-a-space), which states what is built.
 
 Section [4.4](../design.md#44-space) lists the helpers. A gridded product read for a region uses `cells()`; a model domain on a 2D grid uses `from_grid()` on its cell corners; a domain periodic in longitude (a Southern Ocean channel) uses `lat_band()`, because it has no bounding box or closed outline; objects known by id, such as the 5,782 lakes in the National Water Model retrospective v3.0 lake output, use `features()`. With `weighted_points()`, zero weights on land cells make `area_fraction` an ocean-only fraction. Any longitude convention is accepted: a lake from 350.0E to 350.15E and the same lake from -10.0 to -9.85 give the same findings, and a CrocoDash grid stored continuously from 170 to 200 normalises to two parts.
 
@@ -651,15 +647,17 @@ A product that declares `Product.grid` gets this selection, in `"overlap"` mode,
 
 Section [8.3](../design.md#83-time-axes-and-facets).
 
-`from_bounds(starts, ends)` builds the query time from the bounds of the time steps used: the CF `time_bnds` variable, or bounds inferred from the step frequency. Each pair is read as CF defines it, start inclusive and end exclusive, so monthly bounds from 2020-01-01T00:00Z to 2020-02-01T00:00Z become the closed wire interval 2020-01-01 to 2020-01-31, which does not touch a rule that starts on 1 February. Bounds at midnight give day precision, and consecutive steps merge into one interval. A caller with a range of days uses `interval(start, end)` with dates, whose ends are inclusive. A caller whose end is exclusive, such as CrocoDash, where a run from `date_range[0]` to `date_range[1]` lasts `(end - start).days` days, passes the pair to `from_bounds([start], [end])` instead (section [15.1](../design.md#151-crocodash)).
+Dropped in v0.0.1; see [design.md section 17](../design.md#17-non-goals-for-v1-and-upgrade-paths). Section [8.3](../design.md#83-time-axes-and-facets) states what callers pass instead. `from_bounds(starts, ends)` builds the query time from the bounds of the time steps used: the CF `time_bnds` variable, or bounds inferred from the step frequency. Each pair is read as CF defines it, start inclusive and end exclusive, so monthly bounds from 2020-01-01T00:00Z to 2020-02-01T00:00Z become the closed wire interval 2020-01-01 to 2020-01-31, which does not touch a rule that starts on 1 February. Bounds at midnight give day precision, and consecutive steps merge into one interval. A caller with a range of days uses `interval(start, end)` with dates, whose ends are inclusive. A caller whose end is exclusive, such as CrocoDash, where a run from `date_range[0]` to `date_range[1]` lasts `(end - start).days` days, passes the pair to `from_bounds([start], [end])` instead (section [15.1](../design.md#151-crocodash)).
 
-Axis values are given in the axis's declared unit, as a number or a closed range. A grid has a range of spacings, so pass the range. `resolution_of(lon2d, lat2d, unit="km")` returns (finest, coarsest): the shortest and longest cell edge, each measured as a great-circle length on a sphere of radius 6,371.0088 km (with `unit="deg"`, as central angles). A 1/4 degree latitude-longitude grid from 60N to 70N gives (9.51, 27.80) km, because its east-west edges shrink with latitude. Pass cell corners, not a MOM6 supergrid, whose nodes are half a cell apart: the supergrid of the same grid gives (4.75, 13.90); pass `x[::2, ::2]` and `y[::2, ::2]` instead. Other axes come from the configuration, for example `vertical_levels` from the length of the vertical grid.
+Axis values are given in the axis's declared unit, as a number or a closed range. A grid has a range of spacings, so pass the range. (Dropped in v0.0.1; see [design.md section 17](../design.md#17-non-goals-for-v1-and-upgrade-paths).) `resolution_of(lon2d, lat2d, unit="km")` returns (finest, coarsest): the shortest and longest cell edge, each measured as a great-circle length on a sphere of radius 6,371.0088 km (with `unit="deg"`, as central angles). A 1/4 degree latitude-longitude grid from 60N to 70N gives (9.51, 27.80) km, because its east-west edges shrink with latitude. Pass cell corners, not a MOM6 supergrid, whose nodes are half a cell apart: the supergrid of the same grid gives (4.75, 13.90); pass `x[::2, ::2]` and `y[::2, ::2]` instead. Other axes come from the configuration, for example `vertical_levels` from the length of the vertical grid.
 
 Facets are strings or tuples of strings, product names may be aliases, and an unknown name is an error. Give products and their variables as requests (section [4.12](../design.md#412-several-products-in-one-query-requests)).
 
 Adapters should pass every dimension they know, including the variables of each request. An adapter that forgets `resolution` turns CROC102 into a conditional finding, so its message silently disappears from the log; one that sends a request without variables does the same to every rule that constrains `variable`, such as GLORYS001. Test adapters with `include_conditional=True`: every conditional finding there names a dimension the adapter could have supplied.
 
 ### Query pipeline in full
+
+Dropped in v0.0.1; see [design.md section 17](../design.md#17-non-goals-for-v1-and-upgrade-paths). `Index.query` now calls `evaluate()` on every active rule; section [9.1](../design.md#91-the-pipeline-of-indexquery) states what is built.
 
 Sections [9](../design.md#9-matching-engine-and-bulk-path) and [9.1](../design.md#91-the-pipeline-of-indexquery).
 
@@ -687,6 +685,8 @@ With N rules, stages 1 to 3 are O(N) numpy operations plus one `fnmatch` call pe
 
 ### Index internals
 
+Dropped in v0.0.1; see [design.md section 17](../design.md#17-non-goals-for-v1-and-upgrade-paths).
+
 Section [9.1](../design.md#91-the-pipeline-of-indexquery).
 
 | Structure | Contents | Built |
@@ -703,6 +703,8 @@ Computed rules are stored in the same arrays, so the Index filters them exactly 
 
 ### Lazy loading in full
 
+Dropped in v0.0.1; see [design.md section 17](../design.md#17-non-goals-for-v1-and-upgrade-paths). Every geometry is built at load (section [9.2](../design.md#92-loading-packs)).
+
 Section [9.2](../design.md#92-loading-packs); the load measurements are in [background.md](background.md#engine-measurements).
 
 1. Parse with the standard `json` module; this dominates large packs.
@@ -718,18 +720,18 @@ Section [9.3](../design.md#93-the-bulk-path-query_points); the benchmark tables 
 GLHE wants a global per-cell map and CrocoDash wants masks over a model's cell centres: up to about a million points. `query_points(lon, lat, weights=None, time=..., axes=..., facets=..., requests=..., include_conditional=False)` returns a `PointResult` whose masks, fractions and skipped rules are keyed by `(product, code)`, with product None for rules evaluated on the base query:
 
 1. Convert `lon`, `lat` and `weights` to flat float64 arrays (weights default to 1) and wrap longitudes exactly. Points with a NaN coordinate (land on many model grids) are inside no rule: they are left out of every mask and of the weight total.
-2. Expand the requests as in section [4.12](../design.md#412-several-products-in-one-query-requests) and run stages 0 to 3 once for the base query and once per request, so each request gets its own default time and version. Space counts as given: the points are the support of every request, so `Request.support` must be None and `Product.grid` is not used. Object-id rules are conditional on `space` unless their namespace has region geometry. There is no `context`, so a computed rule needs a `mask()` hook to take part. Conditional findings get no mask (section [4.3](../design.md#43-matching-when-a-dimension-is-missing)).
+2. Expand the requests as in section [4.12](../design.md#412-several-products-in-one-query-requests) and match every rule's dimensions other than space once for the base query and once per request, so each request gets its own default time and version. Space counts as given: the points are the support of every request, so `Request.support` must be None. There is no `context`, so a computed rule needs a `mask()` hook to take part. Conditional findings get no mask (section [4.3](../design.md#43-matching-when-a-dimension-is-missing)).
 3. Give every rule without a space a mask of every valid point and a fraction of 1.0.
-4. Bucket the points into 64 × 64 tiles over their envelope and sort them by tile once. Give each tile the tight envelope of its own points, widened by 1e-9 degrees, and build a second STRtree over the tile boxes. Empty tiles are dropped, so a point set that straddles the antimeridian keeps its locality.
-5. For each rule still alive whose envelope meets the points', query the tile tree with the rule's prepared geometry twice: with predicate `covers` (tiles entirely inside) and `intersects` (tiles touched). Points in covered tiles are inside without a test; points in touched but not covered tiles are tested with `shapely.intersects_xy`.
-6. Points at latitude 90 or -90 are tested once per candidate rule against the whole pole edge (section [6.3](../design.md#63-boxes-closed-sets-and-areas)), and the result is broadcast to all of them, so the bulk path agrees with the single-query path at the poles. Plain `intersects_xy` would miss them: on a 0.25 degree global grid that includes both poles, a sector box from 0E to 90E and 80N to 90N holds 15,880 points with the pole-edge test and 14,801 without it (fixture 5).
+4. Dropped in v0.0.1; see [design.md section 17](../design.md#17-non-goals-for-v1-and-upgrade-paths). v0.0.1 instead tests, for each rule, the points inside the rule's bounding box with prepared `intersects_xy`, and also tests points at plus or minus 180 on the other side of the seam. Bucket the points into 64 × 64 tiles over their envelope and sort them by tile once. Give each tile the tight envelope of its own points, widened by 1e-9 degrees, and build a second STRtree over the tile boxes. Empty tiles are dropped, so a point set that straddles the antimeridian keeps its locality.
+5. Dropped in v0.0.1; see [design.md section 17](../design.md#17-non-goals-for-v1-and-upgrade-paths). For each rule still alive whose envelope meets the points', query the tile tree with the rule's prepared geometry twice: with predicate `covers` (tiles entirely inside) and `intersects` (tiles touched). Points in covered tiles are inside without a test; points in touched but not covered tiles are tested with `shapely.intersects_xy`.
+6. Dropped in v0.0.1; see [design.md section 17](../design.md#17-non-goals-for-v1-and-upgrade-paths). Points at latitude 90 or -90 are tested once per candidate rule against the whole pole edge (section [6.3](../design.md#63-boxes-closed-sets-and-areas)), and the result is broadcast to all of them, so the bulk path agrees with the single-query path at the poles. Plain `intersects_xy` would miss them: on a 0.25 degree global grid that includes both poles, a sector box from 0E to 90E and 80N to 90N holds 15,880 points with the pole-edge test and 14,801 without it (fixture 5).
 7. For each rule with at least one point inside, store a boolean mask shaped like `lon` and the weighted fraction, and emit one finding with that fraction as `area_fraction` (`overlap_km2` is None, because the weights' units are unknown).
 8. Computed rules run their `mask(lon, lat, query)` hook or are listed in `skipped`. The coverage rule's mask marks points outside each request's product coverage.
 9. `PointResult.any(min_severity)` combines, with a logical or, the masks of the definite findings at or above that severity.
 
 A rule's `min_overlap` is never applied on the bulk path. A bulk finding's `area_fraction` is a share of the whole point set, not of one request: over a global grid, CRU001's African regions hold about 6% of the cosine-weighted points (an estimate from the design review), below the rule's `min_overlap` of 0.1, which would hide the rule. Bulk findings are meant for maps and masks, not for `emit()`, and `PointResult.any()` ignores `min_overlap`.
 
-The core of steps 4 to 7 for one part (the base query or one request) is sketched below. It is internal pseudo-code; the public API is in [api_sketch.py](api_sketch.py).
+Dropped in v0.0.1; see [design.md section 17](../design.md#17-non-goals-for-v1-and-upgrade-paths). The core of steps 4 to 7 for one part (the base query or one request) is sketched below. It is internal pseudo-code; the public API is in [index.py](../../queryearth/index.py).
 
 ```python
 def _bulk_masks(index, part, lon, lat, weights=None):
@@ -772,16 +774,17 @@ def suitable(
     *,
     products: Sequence[str] | None = None,
     score: ScoreFn | None = None,
+    include_dropped: bool = False,
 ) -> list[Suitability]: ...
 ```
 
 1. **Candidates.** By default, all products whose `variables` include `variable`, in name order. Names in `products` go through alias resolution; an unknown name raises `UnknownNameError`, and a named product that does not offer the variable raises `ValueError`.
-2. **One request per product.** For each candidate P, the engine adds the request `Request(P, variables=(variable,))` to the caller's query, which must carry no requests and no `product`, `variable` or `version` facet of its own, and runs the request machinery of section [4.12](../design.md#412-several-products-in-one-query-requests). P's omitted `time` and `version` come from P, and if P declares a grid, P is judged on the cells the caller's region uses. Only definite findings of P's sub-query are used. Findings of the base query (rules that concern no product) are the same for every product, so they do not affect the order and are not attached.
+2. **One request per product.** For each candidate P, the engine adds the request `Request(P, variables=(variable,))` to the caller's query, which must carry no requests and no `product`, `variable` or `version` facet of its own, and runs the request machinery of section [4.12](../design.md#412-several-products-in-one-query-requests). P's omitted `time` and `version` come from P. Only definite findings of P's sub-query are used. Findings of the base query (rules that concern no product) are the same for every product, so they do not affect the order and are not attached.
 3. **Coverage filter.** P is dropped when a coverage finding (QE001 or QE002) has action `do_not_use`, meaning the request lies entirely outside P's spatial or temporal coverage. A product that is only partly outside stays, and its SEVERE coverage finding counts against it.
 4. **Score.** `score(P, q_P, findings)` returns a tuple of floats, where `q_P` is the caller's query with the single request for P, so its space is the caller's own region and the misfit term compares P's cells with the request, not with P's support; lower means fewer known concerns. The default is `default_score`.
 5. **Order.** Sort by score, then product name, and return `Suitability(product, score, findings)`, with P's findings sorted as in `Index.query`, recommendations included.
 
-Two consequences follow. Callers pass their own region, such as the lake outline: a product that declares a grid is judged on the cells that region uses, and a product without one on the region itself. For a small lake the difference matters (section [8.1](../design.md#81-the-contract)), so gridded products should declare their grids. And if the query has no time, each product is judged over its own whole record, so products are compared over different periods; pass a time range to compare like with like.
+Two consequences follow. Callers pass their own region, such as the lake outline, and every product is judged on it; for a small lake that differs from the cells a product contributes (section [8.1](../design.md#81-the-contract)). And if the query has no time, each product is judged over its own whole record, so products are compared over different periods; pass a time range to compare like with like.
 
 The default score is a tuple of three terms, compared in order:
 
@@ -791,7 +794,7 @@ The default score is a tuple of three terms, compared in order:
 | `burden` | The sum over counted findings of weight × area part × time part. Weights are 1 for INFO, 2 for WARNING and 4 for SEVERE; the area and time parts are `area_fraction` and `time_fraction`, each 1.0 when None. Rounded to 0.001. | How much of the request is flagged, and how badly. It is a weighted sum, not a fraction: one SEVERE finding over the whole request scores 4. |
 | `misfit` | `max(0, log2(cell size / query size))`. Cell size is `Product.resolution` in km (a size in degrees is converted at the query's centroid latitude as the side of an equal-area square); query size is the square root of the query's area. 0 when the query has no area or the product declares no resolution. | How many halvings coarser a product cell is than the request; products at least as fine tie |
 
-Counted findings are definite findings of kind `caveat` or `coverage` whose `area_fraction` is not below the rule's `min_overlap`, the same threshold `emit()` uses; a finding whose `area_fraction` is None always counts. Recommendations are advice about what to do, not concerns about the data, so they are not counted, and conditional findings never count. The weights and the rounding are starting values to be tuned on GLHE lakes. `default_score` is public ([api_sketch.py](api_sketch.py)), so a custom score can build on it.
+Counted findings are definite findings of kind `caveat` or `coverage` whose `area_fraction` is not below the rule's `min_overlap`, the same threshold `emit()` uses; a finding whose `area_fraction` is None always counts. Recommendations are advice about what to do, not concerns about the data, so they are not counted, and conditional findings never count. The weights and the rounding are starting values to be tuned on GLHE lakes. `default_score` is exported at the package top level, so a custom score can build on it.
 
 Any function with the `ScoreFn` signature can replace it. It is called once per product that passed the coverage filter, must have no side effects, and must return tuples of the same length for every product:
 
@@ -807,7 +810,7 @@ ranked = index.suitable(request, "pre", score=resolution_first)
 
 `Suitability.score` is for ordering only and should not be shown as a quality number. The explanation is the attached findings, each naming a rule, its message and how much of the request it covers, shown together with the products the coverage filter dropped. An empty findings list means only that no registered rule matched; consumers should word it as "no registered rule matched this request", and the documentation of `suitable()` describes its order as "fewest known concerns first". The documentation must also state the bias plainly: a product with fewer registered rules ranks higher simply because less has been written about it.
 
-The pack is illustrative. It declares three products that all offer a variable named `pre`, with resolutions and periods from the design research: CRU TS 4.07 (0.5 degree, 1901 to 2022, global land), ERA5-Land (0.1 degree, 1950 onward, global land) and NWM retrospective v3.0 (about 1 km; coverage simplified here to the contiguous United States from February 1979). It holds CRU001 and CRU002, and no rule for ERA5-Land precipitation. It declares no grids, so all three products are judged on the lake outline; if it declared CRU TS's grid, CRU TS would be judged on the cells the lake touches, with the same result as long as those cells also lie inside CAF. The request is a hypothetical lake of about 150 km² near the equator in the Congo basin, inside the AR6 Central Africa region (CAF), for 1991 to 2020: `index.suitable(qe.Query(space=lake, time=y1991_2020), "pre")`.
+The pack is illustrative. It declares three products that all offer a variable named `pre`, with resolutions and periods from the design research: CRU TS 4.07 (0.5 degree, 1901 to 2022, global land), ERA5-Land (0.1 degree, 1950 onward, global land) and NWM retrospective v3.0 (about 1 km; coverage simplified here to the contiguous United States from February 1979). It holds CRU001 and CRU002, and no rule for ERA5-Land precipitation. All three products are judged on the lake outline. The request is a hypothetical lake of about 150 km² near the equator in the Congo basin, inside the AR6 Central Africa region (CAF), for 1991 to 2020: `index.suitable(qe.Query(space=lake, time=y1991_2020), "pre")`.
 
 - **NWM** is dropped: the lake lies outside the contiguous United States, so QE001 reports the whole request outside with action `do_not_use`. GLHE meets this today as a late failure inside its NWM accessor; here it is known before any download.
 - **CRU TS** gets CRU001, with version 4.07 assumed. The lake lies wholly inside CAF, so `area_fraction` is 1.0, above the rule's `min_overlap` of 0.1; `time_overlap` runs from 2000-01-01 to 2020-12-31, so `time_fraction` is 7,671 / 10,958 = 0.700. CRU002 needs `cru_ts.stn`, which an inverse query normally lacks, so it is conditional and not counted. A 0.5 degree cell near the equator is about 55.6 km across and the lake about 12.2 km, so `misfit` is log2(4.54), about 2.18. The score is (30, 1.4, 2.18).
@@ -877,7 +880,7 @@ packs/croc/
   regions/ar6_land.geojson  # optional named regions for region_ref
 ```
 
-Section [5](../design.md#5-record-format) defines the record and the pack, and section [16](../design.md#16-worked-examples) gives a complete pack of 14 records. `index.load_pack("packs/croc")` validates each file against the JSON Schema with a small standard-library validator, runs the loader checks of section [5.3](../design.md#53-loader-checks), and returns the codes it loaded. The validator implements exactly the keywords [schema.json](schema.json) uses: `$ref` and `$defs`; `type`, `enum` and `const`; `properties`, `required`, `additionalProperties`, `patternProperties`, `propertyNames`, `minProperties` and `maxProperties`; `items`, `prefixItems`, `minItems`, `maxItems` and `uniqueItems`; `pattern`, `minLength` and `maxLength`; `minimum`, `maximum`, `exclusiveMinimum` and `exclusiveMaximum`; `oneOf`, `anyOf`, `allOf`, `not`, `if` and `then`. `format` is treated as an annotation, as JSON Schema 2020-12 does by default, and `title`, `description`, `$schema` and `$id` carry no rules. The third-party jsonschema package and pyproj are test extras, never run-time dependencies, and a test checks that the standard-library validator agrees with jsonschema on the 14 example records and on the broken variants listed in [examples/README.md](examples/README.md#how-the-examples-were-checked). During the design research, GDAL 3.12.4 (through pyogrio 0.13.0) recognised a pack file as JSON-FG automatically and exposed `time_start` and `time_end` columns. Not every editor keeps the `time` member (whether geojson.io does is unverified, and QGIS moves the top-level `id` into the properties), which is why the code in `properties` is authoritative and `time_start`/`time_end` are accepted as a fallback. Load times are in sections [9.2](../design.md#92-loading-packs) and [13](../design.md#13-performance-targets).
+Section [5](../design.md#5-record-format) defines the record and the pack, and section [16](../design.md#16-worked-examples) gives a complete pack of 14 records. `index.load_pack("packs/croc")` checks every record by hand against what [schema.json](schema.json) states (`Rule.from_feature`), runs the loader checks of section [5.3](../design.md#53-loader-checks), and returns the codes it loaded; it runs no general JSON Schema validator. A plugin dimension's values are checked against that plugin's `schema` by a small validator, `schema_problem` in [dimensions.py](../../queryearth/dimensions.py), which implements `type`, `enum`, `pattern`, `minLength`, `minimum`, `maximum`, `items`, `minItems`, `maxItems`, `properties`, `required`, `additionalProperties`, `anyOf`, `oneOf` and `not`, treats `title`, `description` and `$comment` as annotations, and raises `ValueError` for any other keyword rather than pass silently. The third-party jsonschema package and pyproj are test extras, never run-time dependencies, and a test checks that the loader and jsonschema both accept the 14 example records and both reject the broken variants listed in [examples/README.md](examples/README.md#how-the-examples-were-checked). During the design research, GDAL 3.12.4 (through pyogrio 0.13.0) recognised a pack file as JSON-FG automatically and exposed `time_start` and `time_end` columns. Not every editor keeps the `time` member (whether geojson.io does is unverified, and QGIS moves the top-level `id` into the properties), which is why the code in `properties` is authoritative and `time_start`/`time_end` are accepted as a fallback. Load times are in sections [9.2](../design.md#92-loading-packs) and [13](../design.md#13-performance-targets).
 
 ### Authoring paths
 
@@ -915,7 +918,7 @@ Section [12.3](../design.md#123-the-index-codes-and-lifecycle).
 
 **Codes.** A code is a prefix plus three or four digits, in the style of ruff and pylint (`CRU001`, `ERA5-014`). Prefix ownership is defined in section [5.3](../design.md#53-loader-checks): exclusive between packs, open to rules added from Python, and `QE` reserved. Prefixes let users silence a family of rules (`ignore={"CRU"}`, or `-W "ignore:[CRU"`). A code is never reused for a different issue; a retired rule is withdrawn instead.
 
-**Products.** Each product has a canonical lowercase slug and aliases, declared in `pack.toml` under `[products.<slug>]` or in Python with `Index.add_product`; Python is needed when the coverage or the grid is a callable. The two consumers already name products differently (GLHE writes `CRUTS`, CrocoDash lower-cases names such as `glorys`), and aliases make both resolve to the same product.
+**Products.** Each product has a canonical lowercase slug and aliases, declared in `pack.toml` under `[products.<slug>]` or in Python with `Index.add_product`; Python is needed when the coverage is a callable. The two consumers already name products differently (GLHE writes `CRUTS`, CrocoDash lower-cases names such as `glorys`), and aliases make both resolve to the same product.
 
 | Field | Use |
 |---|---|

@@ -10,11 +10,11 @@ This directory holds the worked examples of [section 16 of design.md](../../desi
 
 ## The pack
 
-The pack is [pack.toml](pack.toml) plus one FeatureCollection, [rules.geojson](rules.geojson). Its seven code prefixes cover every code in the collection, whose `metadata` header repeats the name, version, prefixes and licence. ERA5 itself calls total precipitation `tp`, but `suitable(variable="pre")` matches names literally, so the pack uses `pre` for both CRU TS and ERA5 (Q36 in [decisions.md](../decisions.md#outcomes-emission-and-the-inverse-query)). The regions files are not included: `ar6` holds the IPCC AR6 reference regions keyed by abbreviation, and `ne` holds named lakes keyed by a slug such as `caspian_sea`. In this directory the collection sits next to `pack.toml`, so the toml lists `files = ["rules.geojson"]`. The pack lives only under the package's `tests/` and `docs/` directories, is excluded from the wheel, and carries the header line "Worked examples for the design document, not a curated pack", so it never ships as content (section [1.3](../../design.md#13-what-queryearth-is-and-is-not)). Only CRU TS declares a grid, so the examples show both a derived support and a product judged on the caller's own geometry.
+The pack is [pack.toml](pack.toml) plus one FeatureCollection, [rules.geojson](rules.geojson). Its seven code prefixes cover every code in the collection, whose `metadata` header repeats the name, version, prefixes and licence. ERA5 itself calls total precipitation `tp`, but `suitable(variable="pre")` matches names literally, so the pack uses `pre` for both CRU TS and ERA5 (Q36 in [decisions.md](../decisions.md#outcomes-emission-and-the-inverse-query)). The regions files are not included: `ar6` holds the IPCC AR6 reference regions keyed by abbreviation, and `ne` holds named lakes keyed by a slug such as `caspian_sea`. In this directory the collection sits next to `pack.toml`, so the toml lists `files = ["rules.geojson"]`. The pack lives only under the package's `tests/` and `docs/` directories, is excluded from the wheel, and carries the header line "Worked examples for the design document, not a curated pack", so it never ships as content (section [1.3](../../design.md#13-what-queryearth-is-and-is-not)).
 
 ## How the examples were checked
 
-All 14 records validate against the JSON Schema in [schema.json](../schema.json), one at a time and as a FeatureCollection (jsonschema 4.26.0, Python 3.11.16; rechecked while revising). A script also ran the loader checks the schema cannot express: unique codes with owned prefixes; declared axis, facet, product and region-namespace names and matching units; periods inside `time` and valid dates; valid polygons with counterclockwise exteriors. Fourteen deliberately broken variants were all rejected, for example a recommendation without suggestions, a box together with a polygon, a version range with both `fixed` and `last_affected`, and a code with the reserved prefix `QE`. The Python snippets parse under the Python 3.11 grammar and black leaves them unchanged.
+[tests/test_packs.py](../../../tests/test_packs.py) checks the examples. All 14 records validate against the JSON Schema in [schema.json](../schema.json), one at a time and as a FeatureCollection, and the loader accepts them, with its checks the schema cannot express: unique codes with owned prefixes; declared axis, facet, product and region-namespace names and matching units; periods inside `time` and valid dates; valid polygons. Nineteen deliberately broken variants are rejected by both, for example a recommendation without suggestions, a box together with a polygon, a version range with both `fixed` and `last_affected`, a `calendar` property and a code with the reserved prefix `QE`. The five queries below run against the pack, with each region stubbed by a box roughly where it lies, and return the findings listed. The Python snippets parse under the Python 3.11 grammar and black leaves them unchanged.
 
 ## Each rule in brief
 
@@ -37,7 +37,7 @@ Each entry says what the rule states, what it demonstrates, and whether its cont
 - **BIO001** (caveat, warning). Presence-only occurrence records in a box over Amazonia up to 1999 reflect where people looked. It shows a custom facet (`basis_of_record`); the region and period are illustrative, and the concern follows Beck et al. 2014 (spatial bias in GBIF records) and Kadmon et al. 2004 (roadside bias).
 - **UAS001** (caveat, severe). A fictional geozone at Null Island (0N, 0E), where drone flights up to 120 m need authorisation from March to August. It shows recurring months and a second axis (`altitude_agl`), and keeps the source wording `REQ_AUTHORIZATION` in `source_severity`.
 - **EPI001** (caveat, warning). A fictional influenza-like-illness feed with reporting gaps at island sentinel sites, in two periods of 2021. It shows a box across the antimeridian and a union of periods.
-- **`nwm_retro`** (product coverage, Python). NWM retrospective v3.0 lake output covers a set of 5,782 lakes from 1979-02-01 to 2023-01-31, declared as object ids. Outside it, QE001 and QE002 fire; the numbers come from the design research.
+- **`nwm_retro`** (product coverage, Python). NWM retrospective v3.0 lake output covers 5,782 lakes in the contiguous United States from 1979-02-01 to 2023-01-31; here its coverage is simplified to a box over the contiguous United States. Outside it, QE001 and QE002 fire; the numbers come from the design research.
 
 ## Rules at a glance
 
@@ -60,13 +60,13 @@ Each entry says what the rule states, what it demonstrates, and whether its cont
 | BIO001 | Occurrence-record sampling bias, with a custom facet | Box over Amazonia; up to 1999; `gbif`; `basis_of_record` | caveat, warning | Illustrative |
 | UAS001 | A geozone for uncrewed aircraft systems (UAS, drones): recurring months and a second axis | Small polygon; March to August every year; `altitude_agl` 0 to 120 m; activity `uas` | caveat, severe | Fictional |
 | EPI001 | An epidemiological surveillance gap across the antimeridian, in two periods, for a fictional feed of influenza-like illness (ILI) counts | Box from 170E to 170W; two periods in 2021 | caveat, warning | Fictional |
-| `nwm_retro` | Coverage declared on a product, over object ids (Python, [below](#index-setup-and-the-nwm-coverage)) | HydroLAKES ids of NWM lakes; 1979-02-01 to 2023-01-31 | coverage, severe (QE001, QE002) | Design research |
+| `nwm_retro` | Coverage declared on a product in Python ([below](#index-setup-and-the-nwm-coverage)) | A box over the contiguous United States; 1979-02-01 to 2023-01-31 | coverage, severe (QE001, QE002) | Design research |
 
 Notes on individual records:
 
 - **CRU003 and CRU004 (lifecycle).** CRU003 records the concern as first stated: South African precipitation is climatology. The data did not support it: in the South Africa box the share of land cells with `stn = 0` stayed at or below 10% in every year checked, while the mean station count fell from 8.0 to about 3.5. CRU003 is kept for history with `status: deprecated`, a `withdrawn` timestamp and an `x_withdrawn_reason`, and CRU004 states what the data support and lists CRU003 in `supersedes`. Either field alone would stop CRU003 matching; both are used because `withdrawn` says the statement was wrong and `supersedes` says what replaces it.
 - **ERA5-001 (versions).** The rule lists the exact version `ERA5`, so a caller using `ERA5.1` gets no finding. It constrains no variable, so it also fires for ERA5 precipitation in 2000 to 2006, which over-warns (Q26 in [decisions.md](../decisions.md#geometry-and-time)).
-- **ERA5-024 (polar cap).** On the wire a cap is a polygon whose top edge runs along latitude 90 from 180 to -180, a valid planar polygon any GeoJSON reader draws correctly. The loader reads its two full-turn edges as written, so it normalises to the cap (section [6.2](../../design.md#62-canonical-representation-and-normalisation), fixture 22). The loader also accepts a ring around the pole without that edge and closes it.
+- **ERA5-024 (polar cap).** On the wire a cap is a polygon whose top edge runs along latitude 90 from 180 to -180, a valid planar polygon any GeoJSON reader draws correctly. The loader reads its two full-turn edges as written, so it normalises to the cap (section [6.2](../../design.md#62-canonical-representation-and-normalisation), fixture 22). A ring around the pole without that edge is refused, with a message that says to close it along latitude 90 first.
 - **EPI001 (antimeridian).** The box `{west: 170, width: 20}` covers 170E to 170W; written naively as a shapely box from -170 to 170 it would be 340 degrees wide. Its `time` member gives the overall extent and `periods` lists the two gaps.
 - **UAS001 (geozone).** The source's restriction type, `REQ_AUTHORIZATION` from the ED-318 vocabulary, is kept in `source_severity`. `action` is unset, because that vocabulary describes data use. Recurrence holds months only, so ED-318's weekday and hour windows cannot be expressed (Q22 in [decisions.md](../decisions.md#geometry-and-time)).
 
@@ -92,16 +92,15 @@ index = qe.Index(
 )
 index.load_pack("docs/reference/examples")  # pack.toml + rules.geojson
 
-# NWM retrospective v3.0 lake output covers a set of lakes, not an area.
-# hylak_ids: HydroLAKES ids of the lakes that the 5,782 NWM lake features
-# represent, from a crosswalk the adapter builds once (illustrative).
+# NWM retrospective v3.0 lake output covers a set of lakes, not an area;
+# here its coverage is simplified to a box over the contiguous United States.
 index.add_product(
     qe.Product(
         name="nwm_retro",
         aliases=("NWM", "NWM v3.0"),
         variables=("inflow", "outflow", "water_sfc_elev"),
         coverage=qe.Coverage(
-            space=sp.features(hylak_ids, "hydrolakes"),
+            space=sp.box(-125, 24, -66, 50),
             time=qe.interval("1979-02-01", "2023-01-31"),
         ),
         resolution=(1.0, "km"),
@@ -114,7 +113,7 @@ index.add_product(
     "CROC104",
     kind="recommendation",
     severity=qe.Severity.INFO,
-    space=sp.lat_band(66.5, 90.0),
+    space=sp.box(-180, 66.5, 180, 90),  # a latitude band
     facets={"model": "mom6"},
     axes={"resolution": {"gt": 0.0}},  # needs the spacing: conditional without it
 )
@@ -128,7 +127,7 @@ def arctic_time_step(query, match):
 
 CROC104 is the parameter-style answer to the Arctic example of section [1.1](../../design.md#11-three-motivating-examples). Its scope is CROC101's, plus the axis bound `resolution > 0`, which every real spacing meets but which makes the rule conditional on `resolution` when a query leaves the spacing out, so `check()` never runs without it. It reads the finest spacing from the match and suggests the MOM_input parameter `DT`: for a domain whose finest cells are 8 km, `{"target": "MOM_input", "key": "DT", "value": 240.0}`. The coefficient of 30 seconds per km is an illustrative author choice; a real rule would compute the time step from the model's stability limit for its fastest waves.
 
-NWM's retrospective lake output is a set of 5,782 lake features (from the CONUS `lakeout.zarr` metadata, design research), not an area, so its coverage here is a set of object ids. The hourly time axis has 385,704 steps from 1979-02-01, so its last step is 2023-01-31 23:00. A caller queries NWM with `sp.features([hylak_id], "hydrolakes")`, and a lake NWM does not represent produces QE001 (SEVERE, `do_not_use`, `area_fraction` 1.0) before any download. GLHE queries with lake polygons instead, so its adapter uses the callable coverage of section [15.2](../../design.md#152-glhe); both declarations are valid.
+NWM's retrospective lake output is a set of 5,782 lake features (from the CONUS `lakeout.zarr` metadata, design research), not an area, so the box here is a simplification: a lake outside it produces QE001 (SEVERE, `do_not_use`, `area_fraction` 1.0) before any download. The hourly time axis has 385,704 steps from 1979-02-01, so its last step is 2023-01-31 23:00. GLHE's adapter uses the callable coverage of section [15.2](../../design.md#152-glhe) instead, which tests NWM's own lakes; both declarations are valid.
 
 ## GEN001
 
@@ -223,7 +222,7 @@ import numpy as np
 y2013_2022 = qe.interval("2013-01-01", "2022-12-31")
 cru = {"product": "CRUTS", "variable": "pre"}  # CRUTS is an alias of cru_ts
 
-# 1. A lake and a period (GLHE): the engine derives the CRU TS cells from its grid.
+# 1. A lake and a period (GLHE): the lake outline is the support.
 kariba = sp.polygon(kariba_geojson)  # HydroLAKES outline
 # stn: station counts for the support cells and months; request_km2 for GEN001
 ctx = {"cru_ts.stn": stn, "request_km2": kariba.area_km2}
@@ -235,12 +234,13 @@ q1 = index.query(
     label="Kariba",
 )
 
-# 2. An Arctic MOM6 domain (CrocoDash): polar stereographic, +-1500 km, pole inside.
-ring = sp.from_grid(qlon, qlat)  # cell corners
+# 2. An Arctic MOM6 domain (CrocoDash), closed along the pole: the cap north of
+# 70.6N, where a +-1500 km polar stereographic square ends.
+domain = sp.box(-180, 70.6, 180, 90)
 q2 = index.query(
-    space=ring,
+    space=domain,
     time=qe.interval("2020-01-01", "2020-12-31"),
-    axes={"resolution": (8.0, 12.0)},  # illustrative; from sp.resolution_of()
+    axes={"resolution": (8.0, 12.0)},  # illustrative: finest and coarsest spacing
     facets={"model": "mom6"},
     requests=[
         qe.Request("glorys", variables=("thetao", "so")),
@@ -266,21 +266,20 @@ ranked = index.suitable(
 )
 ```
 
-**Query 1: Lake Kariba, 2013 to 2022, one request for `CRUTS` with variable `pre`.** The query passes the lake outline, and the engine derives the support, the CRU TS cells the lake touches, from the product's grid. Every finding below has `product` `cru_ts` and `request` 0.
+**Query 1: Lake Kariba, 2013 to 2022, one request for `CRUTS` with variable `pre`.** The query passes the lake outline as the support. Every finding below has `product` `cru_ts` and `request` 0.
 
 | Code | Kind, severity | Result | What the finding records |
 |---|---|---|---|
 | CRU002 | caveat, SEVERE | definite | `details.stn0_fraction`: about 0.30 at the cell at the lake's location (design research, 2013 to 2022); the support as a whole may differ |
-| CRU001 | caveat, WARNING | definite | `assumed=("space", "version")`: the support from the grid and version 4.07; `area_fraction` 1.0; `time_overlap` 2013-01-01 to 2022-12-31; `time_fraction` 1.0 |
-| GEN001 | caveat, INFO | definite only if the lake covers less than a tenth of its support | `details.request_to_support` |
+| CRU001 | caveat, WARNING | definite | `assumed=("version",)`: version 4.07; `area_fraction` 1.0; `time_overlap` 2013-01-01 to 2022-12-31; `time_fraction` 1.0 |
 
-No finding: CRU004 (Kariba lies north of the box's 22S edge), CRU003 (withdrawn), the ERA5 and GLORYS rules (other products), QE001 and QE002 (2013 to 2022 is inside CRU TS coverage). CROC102, evaluated on the base query, is conditional on `resolution` and hidden; CROC101, CROC103 and CROC104 do not reach the lake.
+No finding: GEN001 (the lake is its own support, so its ratio is 1; an adapter that passes the CRU TS cells as `Request.support` gets GEN001 when the lake covers less than a tenth of them), CRU004 (Kariba lies north of the box's 22S edge), CRU003 (withdrawn), the ERA5 and GLORYS rules (other products), QE001 and QE002 (2013 to 2022 is inside CRU TS coverage). CROC102, evaluated on the base query, is conditional on `resolution` and hidden; CROC101, CROC103 and CROC104 do not reach the lake.
 
-**Query 2: an Arctic MOM6 domain in 2020**, a polar stereographic square of ±1,500 km around the North Pole with grid spacing of 8 to 12 km (illustrative), model `mom6`, and two requests: `glorys` with `thetao` and `so` (request 0) and `era5` with `t2m` and `skt` (request 1), run with `include_conditional=True`. This is the query shape of CrocoDash's adapter (section [15.1](../../design.md#151-crocodash)).
+**Query 2: an Arctic MOM6 domain in 2020**, the cap north of 70.6N, closed along the pole, where a polar stereographic square of ±1,500 km around the North Pole ends, with grid spacing of 8 to 12 km (illustrative), model `mom6`, and two requests: `glorys` with `thetao` and `so` (request 0) and `era5` with `t2m` and `skt` (request 1), run with `include_conditional=True`. This is the query shape of CrocoDash's adapter (section [15.1](../../design.md#151-crocodash)).
 
 | Code | Kind, severity | Result | What the finding records |
 |---|---|---|---|
-| CROC101 | recommendation, INFO | definite, base query | `area_fraction` 1.0, since the whole square lies north of 70.6N; suggestions `ice_component = CICE` and `crs = EPSG:3995` |
+| CROC101 | recommendation, INFO | definite, base query | `area_fraction` 1.0, since the whole domain lies north of 66.5N; suggestions `ice_component = CICE` and `crs = EPSG:3995` |
 | CROC104 | recommendation, INFO | definite, base query | `area_fraction` 1.0; `axes`: resolution [8, 12]; suggestion `DT = 240.0` seconds from the finest spacing of 8 km (illustrative formula) |
 | CROC102 | recommendation, INFO | definite, base query | `axes`: resolution [8, 10), so only the finest part of the grid is below 10 km; suggestion `THICKNESSDIFFUSE = false` (illustrative) |
 | ERA5-024 | caveat, WARNING | definite, request 1 (`era5`) | `area_fraction` 1.0; `time_overlap` 2020-01-01 to 2020-02-29 and 2020-12-01 to 2020-12-31; `matched_facets` `{"product": ("era5",), "variable": ("skt",)}` |
@@ -306,6 +305,6 @@ No finding: ERA5-001 (2020 is outside 2000 to 2006), GLORYS001 (outside 1993 to 
 
 Recurrence counts as a time constraint, so ERA5-024 and UAS001 are conditional on `time` although their `time` member is null.
 
-**Query 4: every 0.5 degree cell centre (259,200 points), weighted by the cosine of latitude, product `CRUTS`, variable `pre`.** The facet shorthand becomes one request for `cru_ts`, and the results are keyed by `(product, code)`, for example `("cru_ts", "CRU001")`. No time is given, so the product fills both time (its coverage, 1901 to 2022) and version; the points themselves are the support, so the grid is not used. CRU001 is definite with `assumed=("time", "version")`, a mask of the points inside the eight AR6 African regions and `time_overlap` 2000-01-01 to 2022-12-31. CRU004 is definite with the same `assumed`, a mask of the 858 cell centres in its box (732 of them land in CRU TS, design research) and `time_overlap` 2010-01-01 to 2022-12-31. CRU002 and GEN001 are listed in `q4.skipped`, because they have no `mask()` hook. `q4.any(qe.Severity.WARNING)` is the union of the CRU001 and CRU004 masks. `min_overlap` does not apply here (section [9.3](../../design.md#93-the-bulk-path-query_points)), so CRU001 keeps its mask although the African regions hold a small share of the global weight.
+**Query 4: every 0.5 degree cell centre (259,200 points), weighted by the cosine of latitude, product `CRUTS`, variable `pre`.** The facet shorthand becomes one request for `cru_ts`, and the results are keyed by `(product, code)`, for example `("cru_ts", "CRU001")`. No time is given, so the product fills both time (its coverage, 1901 to 2022) and version; the points themselves are the support. CRU001 is definite with `assumed=("time", "version")`, a mask of the points inside the eight AR6 African regions and `time_overlap` 2000-01-01 to 2022-12-31. CRU004 is definite with the same `assumed`, a mask of the 858 cell centres in its box (732 of them land in CRU TS, design research) and `time_overlap` 2010-01-01 to 2022-12-31. CRU002 and GEN001 are listed in `q4.skipped`, because they have no `mask()` hook. `q4.any(qe.Severity.WARNING)` is the union of the CRU001 and CRU004 masks. `min_overlap` does not apply here (section [9.3](../../design.md#93-the-bulk-path-query_points)), so CRU001 keeps its mask although the African regions hold a small share of the global weight.
 
-**Query 5: `suitable()` for precipitation at Lake Kariba, 2013 to 2022,** with the lake outline as the space (section [10.1](../../design.md#101-contract)). `cru_ts` is judged on the CRU TS cells the lake touches, derived from its grid, and `era5`, which declares no grid, on the outline. `era5` ranks first with a worst-severity term of 0 and no findings, which means only that no registered rule matched. `cru_ts` ranks second with worst severity 40, from CRU002 (SEVERE, because the station counts are passed in the context) and CRU001 (WARNING). `glorys`, `gbif`, `demo_ili` and `nwm_retro` are not ranked, because they do not offer `pre`.
+**Query 5: `suitable()` for precipitation at Lake Kariba, 2013 to 2022,** with the lake outline as the space (section [10.1](../../design.md#101-contract)), on which both products are judged. `era5` ranks first with a worst-severity term of 0 and no findings, which means only that no registered rule matched. `cru_ts` ranks second with worst severity 40, from CRU002 (SEVERE, because the station counts are passed in the context) and CRU001 (WARNING). `glorys`, `gbif`, `demo_ili` and `nwm_retro` are not ranked, because they do not offer `pre`.

@@ -43,7 +43,7 @@ It is an engine only: the package ships no curated rules. Rule packs belong to t
 | `tests/` | One file per module, plus `test_queries.py` (bulk path, `suitable`) and `test_packs.py` |
 | `examples/toy/` | A made-up pack and `play.py`, a walkthrough to run cell by cell |
 | `docs/design.md` | The design and the spec. "As built" notes mark where the code differs from it |
-| `docs/reference/` | `fixtures.md` (correctness fixtures, each with a test), `schema.json` (record schema), `decisions.md` (the Q-numbered decisions), the example pack and API sketches |
+| `docs/reference/` | `fixtures.md` (correctness fixtures, each with a test unless marked dropped), `schema.json` (record schema), `decisions.md` (the Q-numbered decisions and detailed contracts), the example pack, `usage.py` (a usage example), and background, consumer and glossary notes |
 
 ## Concepts worth knowing before changing the engine
 
