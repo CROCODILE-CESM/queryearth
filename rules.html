@@ -1,0 +1,261 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Writing rules &mdash; queryearth 0.0.2.dev1</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=ab1fadd3"></script>
+      <script src="_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Using findings" href="results.html" />
+    <link rel="prev" title="Concepts" href="concepts.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            queryearth
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="concepts.html">Concepts</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Writing rules</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#rules-in-python">Rules in Python</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#computed-rules">Computed rules</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#packs">Packs</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#records">Records</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="results.html">Using findings</a></li>
+<li class="toctree-l1"><a class="reference internal" href="extending.html">Extending queryearth</a></li>
+<li class="toctree-l1"><a class="reference internal" href="example.html">The toy example</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api.html">API reference</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">queryearth</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Writing rules</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/rules.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="writing-rules">
+<h1>Writing rules<a class="headerlink" href="#writing-rules" title="Link to this heading"></a></h1>
+<p>There are three ways to write a rule: a <a class="reference internal" href="api.html#queryearth.Rule" title="queryearth.Rule"><code class="xref py py-class docutils literal notranslate"><span class="pre">Rule</span></code></a> built in Python, a computed rule whose outcome depends on the request, or a record in a GeoJSON <strong>pack</strong>. All three end up on an <a class="reference internal" href="api.html#queryearth.Index" title="queryearth.Index"><code class="xref py py-class docutils literal notranslate"><span class="pre">Index</span></code></a>.</p>
+<section id="rules-in-python">
+<h2>Rules in Python<a class="headerlink" href="#rules-in-python" title="Link to this heading"></a></h2>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">queryearth</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">qe</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">queryearth</span><span class="w"> </span><span class="kn">import</span> <span class="n">space</span> <span class="k">as</span> <span class="n">sp</span>
+
+<span class="n">index</span> <span class="o">=</span> <span class="n">qe</span><span class="o">.</span><span class="n">Index</span><span class="p">(</span><span class="s2">"mine"</span><span class="p">,</span> <span class="n">axes</span><span class="o">=</span><span class="p">[</span><span class="n">qe</span><span class="o">.</span><span class="n">Axis</span><span class="p">(</span><span class="s2">"resolution"</span><span class="p">,</span> <span class="s2">"km"</span><span class="p">)])</span>
+<span class="n">index</span><span class="o">.</span><span class="n">add</span><span class="p">(</span>
+    <span class="n">qe</span><span class="o">.</span><span class="n">Rule</span><span class="p">(</span>
+        <span class="n">code</span><span class="o">=</span><span class="s2">"MINE001"</span><span class="p">,</span>
+        <span class="n">kind</span><span class="o">=</span><span class="s2">"caveat"</span><span class="p">,</span>
+        <span class="n">title</span><span class="o">=</span><span class="s2">"Coastal values are interpolated"</span><span class="p">,</span>
+        <span class="n">message</span><span class="o">=</span><span class="s2">"Within this box, values near the coast come from interpolation."</span><span class="p">,</span>
+        <span class="n">severity</span><span class="o">=</span><span class="n">qe</span><span class="o">.</span><span class="n">Severity</span><span class="o">.</span><span class="n">WARNING</span><span class="p">,</span>
+        <span class="n">action</span><span class="o">=</span><span class="s2">"use_with_caution"</span><span class="p">,</span>
+        <span class="n">scope</span><span class="o">=</span><span class="n">qe</span><span class="o">.</span><span class="n">Scope</span><span class="p">(</span>
+            <span class="n">space</span><span class="o">=</span><span class="n">sp</span><span class="o">.</span><span class="n">box</span><span class="p">(</span><span class="o">-</span><span class="mi">98</span><span class="p">,</span> <span class="mi">18</span><span class="p">,</span> <span class="o">-</span><span class="mi">80</span><span class="p">,</span> <span class="mi">31</span><span class="p">),</span>
+            <span class="n">facets</span><span class="o">=</span><span class="p">{</span><span class="s2">"variable"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"thetao"</span><span class="p">,</span> <span class="s2">"so"</span><span class="p">]},</span>
+        <span class="p">),</span>
+    <span class="p">)</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">kind</span></code> is <code class="docutils literal notranslate"><span class="pre">&quot;caveat&quot;</span></code> or <code class="docutils literal notranslate"><span class="pre">&quot;recommendation&quot;</span></code>; a recommendation needs at least one <a class="reference internal" href="api.html#queryearth.Suggestion" title="queryearth.Suggestion"><code class="xref py py-class docutils literal notranslate"><span class="pre">Suggestion</span></code></a>. Adding a code that is already on the Index raises <code class="docutils literal notranslate"><span class="pre">DuplicateCodeError</span></code>.</p>
+</section>
+<section id="computed-rules">
+<h2>Computed rules<a class="headerlink" href="#computed-rules" title="Link to this heading"></a></h2>
+<p>A computed rule decides its outcome from the request, or from data the caller passes in <code class="docutils literal notranslate"><span class="pre">Query.context</span></code>. Register a function with <code class="docutils literal notranslate"><span class="pre">&#64;index.rule</span></code>; its docstring is the title:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="nd">@index</span><span class="o">.</span><span class="n">rule</span><span class="p">(</span><span class="s2">"MINE102"</span><span class="p">,</span> <span class="n">kind</span><span class="o">=</span><span class="s2">"recommendation"</span><span class="p">,</span> <span class="n">axes</span><span class="o">=</span><span class="p">{</span><span class="s2">"resolution"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"gt"</span><span class="p">:</span> <span class="mi">0</span><span class="p">}})</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">time_step</span><span class="p">(</span><span class="n">query</span><span class="p">,</span> <span class="n">match</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Set the time step from the finest cells"""</span>
+    <span class="n">finest_km</span> <span class="o">=</span> <span class="n">match</span><span class="o">.</span><span class="n">axes</span><span class="p">[</span><span class="s2">"resolution"</span><span class="p">]</span><span class="o">.</span><span class="n">lo</span>
+    <span class="k">return</span> <span class="p">{</span><span class="s2">"suggestions"</span><span class="p">:</span> <span class="p">[</span><span class="n">qe</span><span class="o">.</span><span class="n">Suggestion</span><span class="p">(</span><span class="s2">"settings"</span><span class="p">,</span> <span class="s2">"dt"</span><span class="p">,</span> <span class="mf">30.0</span> <span class="o">*</span> <span class="n">finest_km</span><span class="p">)]}</span>
+</pre></div>
+</div>
+<p>The function runs only when the scope matches definitely. It returns <code class="docutils literal notranslate"><span class="pre">True</span></code> (one finding with the declared outcome), <code class="docutils literal notranslate"><span class="pre">False</span></code> or <code class="docutils literal notranslate"><span class="pre">None</span></code> (no finding), a mapping of <code class="docutils literal notranslate"><span class="pre">Finding</span></code> fields to override, or several such mappings. For a class-based rule, subclass <a class="reference internal" href="api.html#queryearth.ComputedRule" title="queryearth.ComputedRule"><code class="xref py py-class docutils literal notranslate"><span class="pre">ComputedRule</span></code></a> with the same keywords and define <code class="docutils literal notranslate"><span class="pre">check(self,</span> <span class="pre">query,</span> <span class="pre">match)</span></code>. <code class="docutils literal notranslate"><span class="pre">requires=[&quot;key&quot;]</span></code> names <code class="docutils literal notranslate"><span class="pre">Query.context</span></code> keys the rule needs: without them, the finding is conditional. A <code class="docutils literal notranslate"><span class="pre">mask(lon,</span> <span class="pre">lat,</span> <span class="pre">query)</span></code> method lets the rule take part in <a class="reference internal" href="api.html#queryearth.Index.query_points" title="queryearth.Index.query_points"><code class="xref py py-meth docutils literal notranslate"><span class="pre">query_points()</span></code></a>.</p>
+</section>
+<section id="packs">
+<h2>Packs<a class="headerlink" href="#packs" title="Link to this heading"></a></h2>
+<p>A pack is a directory with a <code class="docutils literal notranslate"><span class="pre">pack.toml</span></code> and one or more GeoJSON FeatureCollections, loaded with <a class="reference internal" href="api.html#queryearth.Index.load_pack" title="queryearth.Index.load_pack"><code class="xref py py-meth docutils literal notranslate"><span class="pre">Index.load_pack()</span></code></a>. Loading never runs code. Every problem is reported at once in a <code class="docutils literal notranslate"><span class="pre">LoadError</span></code> that names the file, the feature’s position and its code, and the Index is left unchanged.</p>
+<p><code class="docutils literal notranslate"><span class="pre">pack.toml</span></code> declares the pack’s name, version, the code prefixes it owns and its files. It also declares the axes, facets and products its records use, and any named regions:</p>
+<div class="highlight-toml notranslate"><div class="highlight"><pre><span></span><span class="c1"># A made-up pack to play with. The products, rules and parameter names are</span>
+<span class="c1"># invented; nothing here describes real data or real model guidance.</span>
+<span class="k">[pack]</span>
+<span class="n">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"toy"</span>
+<span class="n">version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"0.1.0"</span>
+<span class="n">code_prefix</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"TOY"</span><span class="p">]</span>
+<span class="n">license</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"CC0-1.0"</span>
+<span class="n">files</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"rules.geojson"</span><span class="p">]</span>
+
+<span class="c1"># The dimensions the records use. They must exist on the Index the pack is</span>
+<span class="c1"># loaded into (play.py declares the resolution axis; the facets are defaults).</span>
+<span class="k">[axes.resolution]</span>
+<span class="n">unit</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"km"</span>
+<span class="n">description</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"horizontal grid spacing"</span>
+
+<span class="k">[facets]</span>
+<span class="n">names</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"product"</span><span class="p">,</span><span class="w"> </span><span class="s2">"variable"</span><span class="p">,</span><span class="w"> </span><span class="s2">"model"</span><span class="p">]</span>
+
+<span class="c1"># A global ocean reanalysis, from 1993 onwards.</span>
+<span class="k">[products.toy_ocean]</span>
+<span class="n">aliases</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"TOYO"</span><span class="p">]</span>
+<span class="n">variables</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"thetao"</span><span class="p">,</span><span class="w"> </span><span class="s2">"so"</span><span class="p">,</span><span class="w"> </span><span class="s2">"zos"</span><span class="p">]</span>
+<span class="n">resolution</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="mf">0.25</span><span class="p">,</span><span class="w"> </span><span class="s2">"deg"</span><span class="p">]</span>
+<span class="n">coverage</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">time</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"1993-01-01"</span><span class="p">,</span><span class="w"> </span><span class="s2">".."</span><span class="p">]</span><span class="w"> </span><span class="p">}</span>
+
+<span class="c1"># A global atmosphere reanalysis, from 1950 onwards.</span>
+<span class="k">[products.toy_atmos]</span>
+<span class="n">variables</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"t2m"</span><span class="p">,</span><span class="w"> </span><span class="s2">"tp"</span><span class="p">]</span>
+<span class="n">resolution</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="mf">0.5</span><span class="p">,</span><span class="w"> </span><span class="s2">"deg"</span><span class="p">]</span>
+<span class="n">coverage</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">time</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"1950-01-01"</span><span class="p">,</span><span class="w"> </span><span class="s2">".."</span><span class="p">]</span><span class="w"> </span><span class="p">}</span>
+
+<span class="c1"># A regional ocean product that covers one box (roughly the Gulf of Mexico)</span>
+<span class="c1"># for 2010 to 2023 only.</span>
+<span class="k">[products.toy_coastal]</span>
+<span class="n">variables</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"thetao"</span><span class="p">,</span><span class="w"> </span><span class="s2">"so"</span><span class="p">]</span>
+<span class="n">resolution</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="mf">2.0</span><span class="p">,</span><span class="w"> </span><span class="s2">"km"</span><span class="p">]</span>
+<span class="n">coverage</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">time</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"2010-01-01"</span><span class="p">,</span><span class="w"> </span><span class="s2">"2023-12-31"</span><span class="p">],</span><span class="w"> </span><span class="n">box</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">west</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="mi">-98</span><span class="p">,</span><span class="w"> </span><span class="n">width</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="mi">18</span><span class="p">,</span><span class="w"> </span><span class="n">south</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="mi">18</span><span class="p">,</span><span class="w"> </span><span class="n">north</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="mi">31</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="p">}</span>
+</pre></div>
+</div>
+<p>The axes and facets a pack declares must exist on the Index it is loaded into. A product under <code class="docutils literal notranslate"><span class="pre">[products.&lt;name&gt;]</span></code> has <code class="docutils literal notranslate"><span class="pre">aliases</span></code>, <code class="docutils literal notranslate"><span class="pre">variables</span></code>, <code class="docutils literal notranslate"><span class="pre">resolution</span></code>, <code class="docutils literal notranslate"><span class="pre">version</span></code> and a <code class="docutils literal notranslate"><span class="pre">coverage</span></code> with a <code class="docutils literal notranslate"><span class="pre">time</span></code> range and, optionally, a <code class="docutils literal notranslate"><span class="pre">box</span></code>. Named regions go under <code class="docutils literal notranslate"><span class="pre">[regions.&lt;namespace&gt;]</span></code>, with a GeoJSON <code class="docutils literal notranslate"><span class="pre">file</span></code> and the <code class="docutils literal notranslate"><span class="pre">id_property</span></code> that names each region. Records then refer to them as <code class="docutils literal notranslate"><span class="pre">region_ref</span> <span class="pre">=</span> <span class="pre">&quot;namespace:id&quot;</span></code>.</p>
+<section id="records">
+<h3>Records<a class="headerlink" href="#records" title="Link to this heading"></a></h3>
+<p>Each rule is one GeoJSON Feature. Its <code class="docutils literal notranslate"><span class="pre">geometry</span></code> is a Polygon, a MultiPolygon or null (null means everywhere). Its time goes in the top-level JSON-FG <code class="docutils literal notranslate"><span class="pre">time</span></code> member: <code class="docutils literal notranslate"><span class="pre">{&quot;interval&quot;:</span> <span class="pre">[&quot;2000-01-01&quot;,</span> <span class="pre">&quot;2003-12-31&quot;]}</span></code>, <code class="docutils literal notranslate"><span class="pre">{&quot;date&quot;:</span> <span class="pre">...}</span></code>, <code class="docutils literal notranslate"><span class="pre">{&quot;timestamp&quot;:</span> <span class="pre">...}</span></code> or null. The rest is in <code class="docutils literal notranslate"><span class="pre">properties</span></code>:</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Group</p></th>
+<th class="head"><p>Properties</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>Identity and outcome (required)</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">code</span></code>, <code class="docutils literal notranslate"><span class="pre">kind</span></code> (<code class="docutils literal notranslate"><span class="pre">caveat</span></code> or <code class="docutils literal notranslate"><span class="pre">recommendation</span></code>), <code class="docutils literal notranslate"><span class="pre">title</span></code>, <code class="docutils literal notranslate"><span class="pre">message</span></code>, <code class="docutils literal notranslate"><span class="pre">severity</span></code> (<code class="docutils literal notranslate"><span class="pre">info</span></code>, <code class="docutils literal notranslate"><span class="pre">warning</span></code> or <code class="docutils literal notranslate"><span class="pre">severe</span></code>)</p></td>
+</tr>
+<tr class="row-odd"><td><p>Advice</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">instruction</span></code>, <code class="docutils literal notranslate"><span class="pre">confidence</span></code>, <code class="docutils literal notranslate"><span class="pre">action</span></code>, <code class="docutils literal notranslate"><span class="pre">source_severity</span></code>, and <code class="docutils literal notranslate"><span class="pre">suggestions</span></code> (required for a recommendation)</p></td>
+</tr>
+<tr class="row-even"><td><p>Scope</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">facets</span></code>, <code class="docutils literal notranslate"><span class="pre">axes</span></code>, <code class="docutils literal notranslate"><span class="pre">dimensions</span></code> (for plugin dimensions), <code class="docutils literal notranslate"><span class="pre">region_ref</span></code> or <code class="docutils literal notranslate"><span class="pre">box</span></code> (<code class="docutils literal notranslate"><span class="pre">{west,</span> <span class="pre">width,</span> <span class="pre">south,</span> <span class="pre">north}</span></code>; geometry must then be null), <code class="docutils literal notranslate"><span class="pre">periods</span></code> (intervals inside <code class="docutils literal notranslate"><span class="pre">time</span></code>), <code class="docutils literal notranslate"><span class="pre">recurrence</span></code> (<code class="docutils literal notranslate"><span class="pre">{&quot;months&quot;:</span> <span class="pre">[12,</span> <span class="pre">1,</span> <span class="pre">2]}</span></code>), and the fallback <code class="docutils literal notranslate"><span class="pre">time_start</span></code> and <code class="docutils literal notranslate"><span class="pre">time_end</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p>Emission</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">min_overlap</span></code>, a threshold on the area fraction from 0 to 1 below which <code class="docutils literal notranslate"><span class="pre">emit()</span></code> stays quiet</p></td>
+</tr>
+<tr class="row-even"><td><p>Provenance</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">evidence</span></code>, <code class="docutils literal notranslate"><span class="pre">references</span></code>, <code class="docutils literal notranslate"><span class="pre">aliases</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p>Lifecycle</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">status</span></code> (<code class="docutils literal notranslate"><span class="pre">draft</span></code>, <code class="docutils literal notranslate"><span class="pre">reviewed</span></code> or <code class="docutils literal notranslate"><span class="pre">deprecated</span></code>; a reviewed record cites a reference), <code class="docutils literal notranslate"><span class="pre">created</span></code>, <code class="docutils literal notranslate"><span class="pre">updated</span></code>, <code class="docutils literal notranslate"><span class="pre">withdrawn</span></code> (kept for history, never matched), <code class="docutils literal notranslate"><span class="pre">supersedes</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p>Extensions</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">x_*</span></code> fields, kept and ignored</p></td>
+</tr>
+</tbody>
+</table>
+<p>A record from the toy pack:</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">"type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Feature"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"TOY002"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"geometry"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">"type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Polygon"</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"coordinates"</span><span class="p">:</span><span class="w"> </span><span class="p">[[[</span><span class="mi">165</span><span class="p">,</span><span class="w"> </span><span class="mi">52</span><span class="p">],</span><span class="w"> </span><span class="p">[</span><span class="mi">-160</span><span class="p">,</span><span class="w"> </span><span class="mi">52</span><span class="p">],</span><span class="w"> </span><span class="p">[</span><span class="mi">-160</span><span class="p">,</span><span class="w"> </span><span class="mi">66</span><span class="p">],</span><span class="w"> </span><span class="p">[</span><span class="mi">165</span><span class="p">,</span><span class="w"> </span><span class="mi">66</span><span class="p">],</span><span class="w"> </span><span class="p">[</span><span class="mi">165</span><span class="p">,</span><span class="w"> </span><span class="mi">52</span><span class="p">]]]</span>
+<span class="w">  </span><span class="p">},</span>
+<span class="w">  </span><span class="nt">"time"</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"properties"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">"code"</span><span class="p">:</span><span class="w"> </span><span class="s2">"TOY002"</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"kind"</span><span class="p">:</span><span class="w"> </span><span class="s2">"caveat"</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"title"</span><span class="p">:</span><span class="w"> </span><span class="s2">"toy_ocean is too warm in the Bering Sea in winter"</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"message"</span><span class="p">:</span><span class="w"> </span><span class="s2">"From December to March, toy_ocean sea temperature in the Bering Sea runs about 1 K too warm."</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"severity"</span><span class="p">:</span><span class="w"> </span><span class="s2">"warning"</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"facets"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"product"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"toy_ocean"</span><span class="p">],</span><span class="w"> </span><span class="nt">"variable"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"thetao"</span><span class="p">]},</span>
+<span class="w">    </span><span class="nt">"recurrence"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"months"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="mi">12</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="mi">3</span><span class="p">]},</span>
+<span class="w">    </span><span class="nt">"status"</span><span class="p">:</span><span class="w"> </span><span class="s2">"draft"</span>
+<span class="w">  </span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>Its ring crosses the antimeridian the way most tools write it, from 165 to -160, and queryearth splits it at ±180.</p>
+<p>A single Feature or FeatureCollection can also be added directly with <code class="docutils literal notranslate"><span class="pre">Index.add(mapping)</span></code>.</p>
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="concepts.html" class="btn btn-neutral float-left" title="Concepts" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="results.html" class="btn btn-neutral float-right" title="Using findings" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2026, Manish Venumuddula.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

@@ -1,0 +1,214 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Concepts &mdash; queryearth 0.0.2.dev1</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=ab1fadd3"></script>
+      <script src="_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Writing rules" href="rules.html" />
+    <link rel="prev" title="queryearth" href="index.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            queryearth
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Concepts</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#rules-and-their-scope">Rules and their scope</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#queries-and-findings">Queries and findings</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#conditional-findings">Conditional findings</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#several-products-in-one-query-requests">Several products in one query: requests</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#query-with-what-you-use">Query with what you use</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#space">Space</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#time">Time</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="rules.html">Writing rules</a></li>
+<li class="toctree-l1"><a class="reference internal" href="results.html">Using findings</a></li>
+<li class="toctree-l1"><a class="reference internal" href="extending.html">Extending queryearth</a></li>
+<li class="toctree-l1"><a class="reference internal" href="example.html">The toy example</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api.html">API reference</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">queryearth</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Concepts</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/concepts.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="concepts">
+<h1>Concepts<a class="headerlink" href="#concepts" title="Link to this heading"></a></h1>
+<section id="rules-and-their-scope">
+<h2>Rules and their scope<a class="headerlink" href="#rules-and-their-scope" title="Link to this heading"></a></h2>
+<p>A <strong>rule</strong> has a code, an outcome (what it says) and a scope (where, when and for what it applies). A scope is a conjunction over dimensions, and a dimension the rule leaves out matches anything:</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Dimension</p></th>
+<th class="head"><p>Rule side</p></th>
+<th class="head"><p>Query side</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">space</span></code></p></td>
+<td><p>a polygon, or a named region</p></td>
+<td><p>a point or a polygon</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">time</span></code></p></td>
+<td><p>intervals, optionally limited to some months of the year</p></td>
+<td><p>an interval</p></td>
+</tr>
+<tr class="row-even"><td><p>axes, such as <code class="docutils literal notranslate"><span class="pre">resolution</span></code></p></td>
+<td><p>a range: <code class="docutils literal notranslate"><span class="pre">{&quot;gt&quot;,</span> <span class="pre">&quot;ge&quot;,</span> <span class="pre">&quot;lt&quot;,</span> <span class="pre">&quot;le&quot;}</span></code> in the axis’s unit</p></td>
+<td><p>a number or a range <code class="docutils literal notranslate"><span class="pre">(lo,</span> <span class="pre">hi)</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p>facets: <code class="docutils literal notranslate"><span class="pre">product</span></code>, <code class="docutils literal notranslate"><span class="pre">variable</span></code>, <code class="docutils literal notranslate"><span class="pre">version</span></code>, <code class="docutils literal notranslate"><span class="pre">model</span></code>, <code class="docutils literal notranslate"><span class="pre">component</span></code></p></td>
+<td><p>values or glob patterns; versions as ranges</p></td>
+<td><p>values</p></td>
+</tr>
+<tr class="row-even"><td><p>plugin dimensions</p></td>
+<td><p>whatever the plugin parses</p></td>
+<td><p>whatever the plugin parses</p></td>
+</tr>
+</tbody>
+</table>
+<p>Axes are declared on the <a class="reference internal" href="api.html#queryearth.Index" title="queryearth.Index"><code class="xref py py-class docutils literal notranslate"><span class="pre">Index</span></code></a> with one unit each, for example <code class="docutils literal notranslate"><span class="pre">qe.Axis(&quot;resolution&quot;,</span> <span class="pre">&quot;km&quot;)</span></code>. The default facets can be replaced or extended with <code class="docutils literal notranslate"><span class="pre">Index(facets=...)</span></code>.</p>
+<p>A <strong>code</strong> is a prefix plus three or four digits, such as <code class="docutils literal notranslate"><span class="pre">CRU001</span></code>, or <code class="docutils literal notranslate"><span class="pre">ERA5-014</span></code> (a prefix that ends in a digit needs the hyphen). The prefix <code class="docutils literal notranslate"><span class="pre">QE</span></code> is reserved for the built-in coverage findings.</p>
+</section>
+<section id="queries-and-findings">
+<h2>Queries and findings<a class="headerlink" href="#queries-and-findings" title="Link to this heading"></a></h2>
+<p>A <a class="reference internal" href="api.html#queryearth.Query" title="queryearth.Query"><code class="xref py py-class docutils literal notranslate"><span class="pre">Query</span></code></a> gives any subset of the same dimensions. “Resolution 8 km” on its own is a complete query. <a class="reference internal" href="api.html#queryearth.Index.query" title="queryearth.Index.query"><code class="xref py py-meth docutils literal notranslate"><span class="pre">Index.query()</span></code></a> takes a <code class="docutils literal notranslate"><span class="pre">Query</span></code> or its fields as keywords, and returns a sorted list of <a class="reference internal" href="api.html#queryearth.Finding" title="queryearth.Finding"><code class="xref py py-class docutils literal notranslate"><span class="pre">Finding</span></code></a> objects: most severe first, then by kind and code.</p>
+<p>A finding is the rule’s outcome plus how it matched:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">kind</span></code> is <code class="docutils literal notranslate"><span class="pre">caveat</span></code>, <code class="docutils literal notranslate"><span class="pre">coverage</span></code> or <code class="docutils literal notranslate"><span class="pre">recommendation</span></code>;</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">severity</span></code> is <code class="docutils literal notranslate"><span class="pre">INFO</span></code>, <code class="docutils literal notranslate"><span class="pre">WARNING</span></code> or <code class="docutils literal notranslate"><span class="pre">SEVERE</span></code>, with the values of the matching <code class="docutils literal notranslate"><span class="pre">logging</span></code> levels (20, 30, 40);</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">area_fraction</span></code> and <code class="docutils literal notranslate"><span class="pre">overlap_km2</span></code> give how much of the query’s area the rule covers;</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">time_overlap</span></code> and <code class="docutils literal notranslate"><span class="pre">time_fraction</span></code> give the overlapping periods and their share of the query’s time;</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">axes</span></code>, <code class="docutils literal notranslate"><span class="pre">matched_facets</span></code> and <code class="docutils literal notranslate"><span class="pre">dims</span></code> hold the overlap on each other dimension;</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">suggestions</span></code> holds structured actions (<code class="docutils literal notranslate"><span class="pre">target</span></code>, <code class="docutils literal notranslate"><span class="pre">key</span></code>, <code class="docutils literal notranslate"><span class="pre">value</span></code>, <code class="docutils literal notranslate"><span class="pre">rationale</span></code>) for a recommendation. queryearth never interprets them; your code applies them.</p></li>
+</ul>
+<p><code class="docutils literal notranslate"><span class="pre">Finding.to_dict()</span></code> gives a JSON-ready dictionary.</p>
+</section>
+<section id="conditional-findings">
+<h2>Conditional findings<a class="headerlink" href="#conditional-findings" title="Link to this heading"></a></h2>
+<p>When a query leaves out a dimension that a rule constrains, the rule can neither match nor fail. Its finding is <strong>conditional</strong>: <code class="docutils literal notranslate"><span class="pre">conditional_on</span></code> names what is missing, for example <code class="docutils literal notranslate"><span class="pre">(&quot;space&quot;,</span> <span class="pre">&quot;model&quot;)</span></code>. Conditional findings are hidden unless you pass <code class="docutils literal notranslate"><span class="pre">include_conditional=True</span></code>, which is a quick way to see every rule that might apply:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">index</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="n">axes</span><span class="o">=</span><span class="p">{</span><span class="s2">"resolution"</span><span class="p">:</span> <span class="mi">8</span><span class="p">},</span> <span class="n">include_conditional</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="several-products-in-one-query-requests">
+<h2>Several products in one query: requests<a class="headerlink" href="#several-products-in-one-query-requests" title="Link to this heading"></a></h2>
+<p>A query can name the products it uses, each with its own variables, version, time and support. With the products of the <a class="reference internal" href="example.html"><span class="std std-doc">toy pack</span></a>:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">index</span><span class="o">.</span><span class="n">query</span><span class="p">(</span>
+    <span class="n">space</span><span class="o">=</span><span class="n">domain</span><span class="p">,</span>
+    <span class="n">time</span><span class="o">=</span><span class="n">qe</span><span class="o">.</span><span class="n">interval</span><span class="p">(</span><span class="s2">"2020-01-01"</span><span class="p">,</span> <span class="s2">"2020-12-31"</span><span class="p">),</span>
+    <span class="n">requests</span><span class="o">=</span><span class="p">[</span>
+        <span class="n">qe</span><span class="o">.</span><span class="n">Request</span><span class="p">(</span><span class="s2">"toy_ocean"</span><span class="p">,</span> <span class="n">variables</span><span class="o">=</span><span class="p">(</span><span class="s2">"thetao"</span><span class="p">,</span> <span class="s2">"so"</span><span class="p">)),</span>
+        <span class="n">qe</span><span class="o">.</span><span class="n">Request</span><span class="p">(</span><span class="s2">"toy_atmos"</span><span class="p">,</span> <span class="n">variables</span><span class="o">=</span><span class="p">(</span><span class="s2">"t2m"</span><span class="p">,)),</span>
+    <span class="p">],</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<p>Each request runs as its own sub-query, and every finding names its <code class="docutils literal notranslate"><span class="pre">product</span></code> and <code class="docutils literal notranslate"><span class="pre">request</span></code>. When the query gives no time, a request takes its product’s coverage time. When a request gives no version, it takes the product’s version. Either way, <code class="docutils literal notranslate"><span class="pre">Finding.assumed</span></code> lists what was filled in. <code class="docutils literal notranslate"><span class="pre">facets={&quot;product&quot;:</span> <span class="pre">[...],</span> <span class="pre">&quot;variable&quot;:</span> <span class="pre">[...]}</span></code> is shorthand for one request per product.</p>
+<p>Products are declared with <a class="reference internal" href="api.html#queryearth.Index.add_product" title="queryearth.Index.add_product"><code class="xref py py-meth docutils literal notranslate"><span class="pre">Index.add_product()</span></code></a> or in a pack. A product’s <strong>coverage</strong> (a time range and optionally an area) produces two built-in findings: <strong>QE001</strong> when part of the request lies outside its area, and <strong>QE002</strong> when part lies outside its time.</p>
+</section>
+<section id="query-with-what-you-use">
+<h2>Query with what you use<a class="headerlink" href="#query-with-what-you-use" title="Link to this heading"></a></h2>
+<p>Pass the space and time a product actually contributes: the cells and time steps you read, not a buffered shape. A model grid is converted to a polygon by the caller, for example its outline.</p>
+</section>
+<section id="space">
+<h2>Space<a class="headerlink" href="#space" title="Link to this heading"></a></h2>
+<p>Coordinates are longitude and latitude in degrees, and edges are straight lines in longitude and latitude, as in GeoJSON. Helpers in <code class="docutils literal notranslate"><span class="pre">queryearth.space</span></code>:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">point(lon,</span> <span class="pre">lat)</span></code>;</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">box(west,</span> <span class="pre">south,</span> <span class="pre">east,</span> <span class="pre">north)</span></code>, where <code class="docutils literal notranslate"><span class="pre">west</span> <span class="pre">&gt;</span> <span class="pre">east</span></code> crosses the antimeridian;</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">polygon(shape)</span></code> for a GeoJSON mapping, a shapely geometry or a coordinate list.</p></li>
+</ul>
+<p>Shapes are normalised once: longitudes from 0 to 360 are wrapped, rings that cross ±180 are split there, and invalid rings are repaired. A ring that goes all the way around a pole raises an error: close it along latitude 90 or -90 first. Matching uses closed sets, so a point on an edge is inside. Area fractions use spherical areas.</p>
+</section>
+<section id="time">
+<h2>Time<a class="headerlink" href="#time" title="Link to this heading"></a></h2>
+<p>queryearth uses one calendar, the proleptic Gregorian. A time is an ISO 8601 date or timestamp string, a <code class="docutils literal notranslate"><span class="pre">datetime.date</span></code> or <code class="docutils literal notranslate"><span class="pre">datetime.datetime</span></code>, a numpy <code class="docutils literal notranslate"><span class="pre">datetime64</span></code>, or any object with <code class="docutils literal notranslate"><span class="pre">year</span></code>, <code class="docutils literal notranslate"><span class="pre">month</span></code> and <code class="docutils literal notranslate"><span class="pre">day</span></code> attributes (so cftime and pandas values work). <code class="docutils literal notranslate"><span class="pre">&quot;..&quot;</span></code> is an open end. An end date covers its whole day, so <code class="docutils literal notranslate"><span class="pre">qe.interval(&quot;2020-01-01&quot;,</span> <span class="pre">&quot;2020-01-31&quot;)</span></code> is all of January.</p>
+<p>Model calendars such as <code class="docutils literal notranslate"><span class="pre">noleap</span></code> work unchanged, because every noleap date is a valid Gregorian date. A date that does not exist in the Gregorian calendar, such as 30 February in a 360-day calendar, raises an error.</p>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="index.html" class="btn btn-neutral float-left" title="queryearth" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="rules.html" class="btn btn-neutral float-right" title="Writing rules" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2026, Manish Venumuddula.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

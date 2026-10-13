@@ -1,0 +1,226 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Extending queryearth &mdash; queryearth 0.0.2.dev1</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=ab1fadd3"></script>
+      <script src="_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="The toy example" href="example.html" />
+    <link rel="prev" title="Using findings" href="results.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            queryearth
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="concepts.html">Concepts</a></li>
+<li class="toctree-l1"><a class="reference internal" href="rules.html">Writing rules</a></li>
+<li class="toctree-l1"><a class="reference internal" href="results.html">Using findings</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Extending queryearth</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#dimension-plugins">Dimension plugins</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="example.html">The toy example</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api.html">API reference</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">queryearth</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Extending queryearth</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/extending.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="extending-queryearth">
+<h1>Extending queryearth<a class="headerlink" href="#extending-queryearth" title="Link to this heading"></a></h1>
+<p>Everything that varies between users plugs in through a small interface, so extending queryearth never means forking it. Plugins are passed explicitly to the Index or to a call.</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>To add</p></th>
+<th class="head"><p>Write</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>A new kind of scope: a hierarchy, a taxonomy, a network</p></td>
+<td><p>A <code class="docutils literal notranslate"><span class="pre">Dimension</span></code> plugin, passed to <code class="docutils literal notranslate"><span class="pre">Index(dimensions=...)</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p>A rule computed from the request or from data you hold</p></td>
+<td><p>A <code class="docutils literal notranslate"><span class="pre">ComputedRule</span></code> subclass or an <code class="docutils literal notranslate"><span class="pre">&#64;index.rule</span></code> function</p></td>
+</tr>
+<tr class="row-even"><td><p>A computed rule on the bulk path</p></td>
+<td><p>A <code class="docutils literal notranslate"><span class="pre">mask(lon,</span> <span class="pre">lat,</span> <span class="pre">query)</span></code> method on that rule</p></td>
+</tr>
+<tr class="row-odd"><td><p>A new kind of rule altogether</p></td>
+<td><p>Any object with <code class="docutils literal notranslate"><span class="pre">code</span></code>, <code class="docutils literal notranslate"><span class="pre">scope</span></code> and <code class="docutils literal notranslate"><span class="pre">evaluate(query)</span></code> (the <code class="docutils literal notranslate"><span class="pre">RuleKind</span></code> protocol), passed to <code class="docutils literal notranslate"><span class="pre">Index.add</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p>Rules from another format</p></td>
+<td><p>Build records and pass them to <code class="docutils literal notranslate"><span class="pre">Index.add</span></code>, or <code class="docutils literal notranslate"><span class="pre">Rule.from_feature</span></code> per feature</p></td>
+</tr>
+<tr class="row-odd"><td><p>Availability known only at run time</p></td>
+<td><p>A callable <code class="docutils literal notranslate"><span class="pre">Product.coverage</span></code>, which takes the request’s sub-query and returns a <code class="docutils literal notranslate"><span class="pre">Coverage</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p>Named regions</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">Index.add_regions(namespace,</span> <span class="pre">regions)</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p>A ranking of products</p></td>
+<td><p>A score function, passed as <code class="docutils literal notranslate"><span class="pre">suitable(score=...)</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p>A destination for findings</p></td>
+<td><p>A sink function, passed as the <code class="docutils literal notranslate"><span class="pre">emit()</span></code> mode</p></td>
+</tr>
+</tbody>
+</table>
+<p>Geometry and time semantics are not pluggable. Space and time are dimensions inside the engine, but <code class="docutils literal notranslate"><span class="pre">SpaceDimension</span></code> and <code class="docutils literal notranslate"><span class="pre">TimeDimension</span></code> are built into every Index and cannot be replaced, so “overlaps” means the same thing for every rule.</p>
+<section id="dimension-plugins">
+<h2>Dimension plugins<a class="headerlink" href="#dimension-plugins" title="Link to this heading"></a></h2>
+<p>A dimension has a <code class="docutils literal notranslate"><span class="pre">name</span></code>, a <code class="docutils literal notranslate"><span class="pre">schema</span></code> (JSON Schema for the value in records), and three methods:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">parse_rule(value)</span></code> checks and parses a rule’s value when the rule is added;</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">parse_query(value)</span></code> does the same for a query’s value;</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">match(rule,</span> <span class="pre">query)</span></code> returns a <code class="docutils literal notranslate"><span class="pre">DimMatch(overlap,</span> <span class="pre">fraction)</span></code> when they meet, or <code class="docutils literal notranslate"><span class="pre">None</span></code> when they do not.</p></li>
+</ul>
+<p>The Index does everything else: conditional findings, unknown names, requests and sorting. This plugin matches HydroBASINS Pfafstetter basin codes, where basin 1423 lies inside basin 14:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">Pfafstetter</span><span class="p">:</span>
+    <span class="n">name</span> <span class="o">=</span> <span class="s2">"basin"</span>
+    <span class="n">schema</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"type"</span><span class="p">:</span> <span class="s2">"array"</span><span class="p">,</span> <span class="s2">"items"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"type"</span><span class="p">:</span> <span class="s2">"string"</span><span class="p">,</span> <span class="s2">"pattern"</span><span class="p">:</span> <span class="s2">"^[1-9]+$"</span><span class="p">}}</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">parse_rule</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+        <span class="k">return</span> <span class="nb">tuple</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">v</span><span class="p">)</span> <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">value</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">parse_query</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+        <span class="n">code</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">code</span><span class="o">.</span><span class="n">isdigit</span><span class="p">()</span> <span class="ow">or</span> <span class="s2">"0"</span> <span class="ow">in</span> <span class="n">code</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"not a Pfafstetter code: </span><span class="si">{</span><span class="n">value</span><span class="si">!r}</span><span class="s2">"</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">code</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">match</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">rule</span><span class="p">,</span> <span class="n">query</span><span class="p">):</span>
+        <span class="n">hits</span> <span class="o">=</span> <span class="p">[</span><span class="n">b</span> <span class="k">for</span> <span class="n">b</span> <span class="ow">in</span> <span class="n">rule</span> <span class="k">if</span> <span class="n">query</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="n">b</span><span class="p">)</span> <span class="ow">or</span> <span class="n">b</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="n">query</span><span class="p">)]</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">hits</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">None</span>
+        <span class="n">inside</span> <span class="o">=</span> <span class="nb">any</span><span class="p">(</span><span class="n">query</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="n">b</span><span class="p">)</span> <span class="k">for</span> <span class="n">b</span> <span class="ow">in</span> <span class="n">hits</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">qe</span><span class="o">.</span><span class="n">DimMatch</span><span class="p">(</span><span class="n">overlap</span><span class="o">=</span><span class="nb">tuple</span><span class="p">(</span><span class="n">hits</span><span class="p">),</span> <span class="n">fraction</span><span class="o">=</span><span class="mf">1.0</span> <span class="k">if</span> <span class="n">inside</span> <span class="k">else</span> <span class="kc">None</span><span class="p">)</span>
+
+
+<span class="n">index</span> <span class="o">=</span> <span class="n">qe</span><span class="o">.</span><span class="n">Index</span><span class="p">(</span><span class="s2">"basins"</span><span class="p">,</span> <span class="n">dimensions</span><span class="o">=</span><span class="p">[</span><span class="n">Pfafstetter</span><span class="p">()])</span>
+<span class="n">index</span><span class="o">.</span><span class="n">add</span><span class="p">(</span>
+    <span class="n">qe</span><span class="o">.</span><span class="n">Rule</span><span class="p">(</span>
+        <span class="n">code</span><span class="o">=</span><span class="s2">"BAS001"</span><span class="p">,</span>
+        <span class="n">kind</span><span class="o">=</span><span class="s2">"caveat"</span><span class="p">,</span>
+        <span class="n">title</span><span class="o">=</span><span class="s2">"Gauges sparse in basins 14 and 62"</span><span class="p">,</span>
+        <span class="n">message</span><span class="o">=</span><span class="s2">"Few gauges report in these basins."</span><span class="p">,</span>
+        <span class="n">scope</span><span class="o">=</span><span class="n">qe</span><span class="o">.</span><span class="n">Scope</span><span class="p">(</span><span class="n">dims</span><span class="o">=</span><span class="p">{</span><span class="s2">"basin"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"14"</span><span class="p">,</span> <span class="s2">"62"</span><span class="p">]}),</span>
+    <span class="p">)</span>
+<span class="p">)</span>
+<span class="n">index</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="n">dims</span><span class="o">=</span><span class="p">{</span><span class="s2">"basin"</span><span class="p">:</span> <span class="s2">"1423"</span><span class="p">})</span>  <span class="c1"># BAS001, overlap ("14",), fraction 1.0</span>
+</pre></div>
+</div>
+<p>A dimension may also define these optional members:</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Member</p></th>
+<th class="head"><p>Effect</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">comparable(rule,</span> <span class="pre">query)</span></code></p></td>
+<td><p>Returning False makes the finding conditional on the dimension instead of a non-match</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">build(pairs)</span></code></p></td>
+<td><p>Takes the <code class="docutils literal notranslate"><span class="pre">(position,</span> <span class="pre">rule</span> <span class="pre">value)</span></code> pairs of the rules that constrain the dimension and returns a prefilter whose <code class="docutils literal notranslate"><span class="pre">candidates(query)</span></code> gives the positions to keep, so a plugin can bring its own index</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">late</span> <span class="pre">=</span> <span class="pre">True</span></code></p></td>
+<td><p>Runs the dimension after the others; space sets it, so the costly spatial test runs last</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">always</span> <span class="pre">=</span> <span class="pre">True</span></code></p></td>
+<td><p>Calls <code class="docutils literal notranslate"><span class="pre">match(None,</span> <span class="pre">query)</span></code> when a rule leaves the dimension out, so the query is still measured</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">extent(rule)</span></code></p></td>
+<td><p>What a finding reports when the query leaves the dimension out</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">to_json(overlap)</span></code></p></td>
+<td><p>Serialises the overlap for <code class="docutils literal notranslate"><span class="pre">Finding.to_dict()</span></code></p></td>
+</tr>
+</tbody>
+</table>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="results.html" class="btn btn-neutral float-left" title="Using findings" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="example.html" class="btn btn-neutral float-right" title="The toy example" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2026, Manish Venumuddula.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

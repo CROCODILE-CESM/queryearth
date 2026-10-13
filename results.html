@@ -1,0 +1,166 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Using findings &mdash; queryearth 0.0.2.dev1</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=ab1fadd3"></script>
+      <script src="_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Extending queryearth" href="extending.html" />
+    <link rel="prev" title="Writing rules" href="rules.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            queryearth
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="concepts.html">Concepts</a></li>
+<li class="toctree-l1"><a class="reference internal" href="rules.html">Writing rules</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Using findings</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#reporting-them-emit">Reporting them: emit()</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#choosing-a-product-suitable">Choosing a product: suitable()</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#many-points-at-once-query-points">Many points at once: query_points()</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="extending.html">Extending queryearth</a></li>
+<li class="toctree-l1"><a class="reference internal" href="example.html">The toy example</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api.html">API reference</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">queryearth</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Using findings</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/results.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="using-findings">
+<h1>Using findings<a class="headerlink" href="#using-findings" title="Link to this heading"></a></h1>
+<section id="reporting-them-emit">
+<h2>Reporting them: emit()<a class="headerlink" href="#reporting-them-emit" title="Link to this heading"></a></h2>
+<p>Findings are data. <a class="reference internal" href="api.html#queryearth.emit" title="queryearth.emit"><code class="xref py py-func docutils literal notranslate"><span class="pre">emit()</span></code></a> turns them into Python warnings, log lines, an exception, or calls to a function of yours:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">qe</span><span class="o">.</span><span class="n">emit</span><span class="p">(</span><span class="n">findings</span><span class="p">)</span>  <span class="c1"># default: warnings for caveats and coverage, log lines for advice</span>
+<span class="n">qe</span><span class="o">.</span><span class="n">emit</span><span class="p">(</span><span class="n">findings</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s2">"log"</span><span class="p">)</span>
+<span class="n">qe</span><span class="o">.</span><span class="n">emit</span><span class="p">(</span><span class="n">findings</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s2">"raise"</span><span class="p">)</span>  <span class="c1"># raises AdvisoryError listing the findings</span>
+<span class="n">qe</span><span class="o">.</span><span class="n">emit</span><span class="p">(</span><span class="n">findings</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="k">lambda</span> <span class="n">finding</span><span class="p">,</span> <span class="n">text</span><span class="p">:</span> <span class="nb">print</span><span class="p">(</span><span class="n">text</span><span class="p">))</span>  <span class="c1"># a sink</span>
+</pre></div>
+</div>
+<p>Every message starts with the code in brackets, such as <code class="docutils literal notranslate"><span class="pre">[TOY002]</span></code>, so warnings can be filtered with <code class="docutils literal notranslate"><span class="pre">-W</span></code> or <code class="docutils literal notranslate"><span class="pre">warnings.filterwarnings</span></code>. The warning classes are <code class="docutils literal notranslate"><span class="pre">InfoAdvisory</span></code>, <code class="docutils literal notranslate"><span class="pre">WarningAdvisory</span></code> and <code class="docutils literal notranslate"><span class="pre">SevereAdvisory</span></code>, all subclasses of <code class="docutils literal notranslate"><span class="pre">AdvisoryWarning</span></code>.</p>
+<p><code class="docutils literal notranslate"><span class="pre">emit()</span></code> drops:</p>
+<ul class="simple">
+<li><p>conditional findings;</p></li>
+<li><p>caveats and coverage findings below <code class="docutils literal notranslate"><span class="pre">min_severity</span></code> (default <code class="docutils literal notranslate"><span class="pre">WARNING</span></code>);</p></li>
+<li><p>findings whose area fraction is below the rule’s <code class="docutils literal notranslate"><span class="pre">min_overlap</span></code>;</p></li>
+<li><p>codes or prefixes listed in <code class="docutils literal notranslate"><span class="pre">ignore</span></code>;</p></li>
+<li><p>repeats.</p></li>
+</ul>
+<p>Recommendations are logged at INFO, never warned or raised.</p>
+<p>The settings live in a <a class="reference internal" href="api.html#queryearth.Policy" title="queryearth.Policy"><code class="xref py py-class docutils literal notranslate"><span class="pre">Policy</span></code></a>. Change them for one block of code with <a class="reference internal" href="api.html#queryearth.policy" title="queryearth.policy"><code class="xref py py-func docutils literal notranslate"><span class="pre">policy()</span></code></a>:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">with</span> <span class="n">qe</span><span class="o">.</span><span class="n">policy</span><span class="p">(</span><span class="n">mode</span><span class="o">=</span><span class="s2">"log"</span><span class="p">,</span> <span class="n">raise_at</span><span class="o">=</span><span class="n">qe</span><span class="o">.</span><span class="n">Severity</span><span class="o">.</span><span class="n">SEVERE</span><span class="p">,</span> <span class="n">ignore</span><span class="o">=</span><span class="p">{</span><span class="s2">"TOY002"</span><span class="p">}):</span>
+    <span class="n">qe</span><span class="o">.</span><span class="n">emit</span><span class="p">(</span><span class="n">findings</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="choosing-a-product-suitable">
+<h2>Choosing a product: suitable()<a class="headerlink" href="#choosing-a-product-suitable" title="Link to this heading"></a></h2>
+<p><a class="reference internal" href="api.html#queryearth.Index.suitable" title="queryearth.Index.suitable"><code class="xref py py-meth docutils literal notranslate"><span class="pre">Index.suitable()</span></code></a> takes a query and a variable, and ranks the products that offer that variable:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">index</span><span class="o">.</span><span class="n">suitable</span><span class="p">(</span><span class="n">qe</span><span class="o">.</span><span class="n">Query</span><span class="p">(</span><span class="n">space</span><span class="o">=</span><span class="n">gulf</span><span class="p">,</span> <span class="n">time</span><span class="o">=</span><span class="n">year_2000</span><span class="p">),</span> <span class="s2">"so"</span><span class="p">):</span>
+    <span class="nb">print</span><span class="p">(</span><span class="n">s</span><span class="o">.</span><span class="n">product</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">s</span><span class="o">.</span><span class="n">score</span><span class="p">,</span> <span class="p">[</span><span class="n">f</span><span class="o">.</span><span class="n">code</span> <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">s</span><span class="o">.</span><span class="n">findings</span><span class="p">])</span>
+</pre></div>
+</div>
+<p>Products entirely outside their coverage are dropped, or listed last with <code class="docutils literal notranslate"><span class="pre">include_dropped=True</span></code>. The rest are ordered by their worst severity, then by severity weighted by area and time fractions, then by how well the product’s resolution fits the query.</p>
+<p>The score is not a quality ranking. A product with no findings only has no rule written about it; <code class="docutils literal notranslate"><span class="pre">index.rule_counts()</span></code> shows how many rules concern each product. Pass <code class="docutils literal notranslate"><span class="pre">score=</span></code> to rank by your own function.</p>
+</section>
+<section id="many-points-at-once-query-points">
+<h2>Many points at once: query_points()<a class="headerlink" href="#many-points-at-once-query-points" title="Link to this heading"></a></h2>
+<p><a class="reference internal" href="api.html#queryearth.Index.query_points" title="queryearth.Index.query_points"><code class="xref py py-meth docutils literal notranslate"><span class="pre">Index.query_points()</span></code></a> evaluates every rule over many points, such as every cell centre of a grid:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">result</span> <span class="o">=</span> <span class="n">index</span><span class="o">.</span><span class="n">query_points</span><span class="p">(</span>
+    <span class="n">lon</span><span class="p">,</span> <span class="n">lat</span><span class="p">,</span> <span class="n">weights</span><span class="o">=</span><span class="n">cell_area</span><span class="p">,</span> <span class="n">time</span><span class="o">=</span><span class="n">january</span><span class="p">,</span> <span class="n">requests</span><span class="o">=</span><span class="p">[</span><span class="n">qe</span><span class="o">.</span><span class="n">Request</span><span class="p">(</span><span class="s2">"toy_ocean"</span><span class="p">,</span> <span class="s2">"thetao"</span><span class="p">)]</span>
+<span class="p">)</span>
+<span class="n">mask</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">masks</span><span class="p">[(</span><span class="s2">"toy_ocean"</span><span class="p">,</span> <span class="s2">"TOY002"</span><span class="p">)]</span>  <span class="c1"># shaped like lon</span>
+<span class="n">share</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">fractions</span><span class="p">[(</span><span class="s2">"toy_ocean"</span><span class="p">,</span> <span class="s2">"TOY002"</span><span class="p">)]</span>  <span class="c1"># weighted share of the points</span>
+<span class="n">flagged</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">any</span><span class="p">(</span><span class="n">qe</span><span class="o">.</span><span class="n">Severity</span><span class="o">.</span><span class="n">WARNING</span><span class="p">)</span>  <span class="c1"># points inside any definite finding</span>
+</pre></div>
+</div>
+<p>Results are keyed by <code class="docutils literal notranslate"><span class="pre">(product,</span> <span class="pre">code)</span></code>, with product <code class="docutils literal notranslate"><span class="pre">None</span></code> for rules matched on the base query. NaN points are inside no rule. A computed rule takes part only through its <code class="docutils literal notranslate"><span class="pre">mask()</span></code> method; otherwise it is listed in <code class="docutils literal notranslate"><span class="pre">result.skipped</span></code>.</p>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="rules.html" class="btn btn-neutral float-left" title="Writing rules" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="extending.html" class="btn btn-neutral float-right" title="Extending queryearth" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2026, Manish Venumuddula.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
