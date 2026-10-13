@@ -1,3 +1,6 @@
+# Frozen on 2026-10-13 at commit e5e9d0e: this file records the API as it stood
+# then and is no longer updated or checked. The public docs in docs/source and
+# CLAUDE.md describe the current package.
 """Usage of the queryearth API (illustrative; examples/toy/play.py runs end to end).
 
 lake_geojson, outline and stn stand for the caller's own data: a lake polygon, an

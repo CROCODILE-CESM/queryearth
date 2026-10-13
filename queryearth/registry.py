@@ -1,4 +1,4 @@
-"""The Registry: declared dimensions, regions and rules, and the query.
+"""The Registry: declared dimensions and rules, loading rule files, and the query.
 
 Registry.query follows design.md section 9.1: it calls evaluate() on every
 active rule (after any plugin prefilters) and sorts the findings.
@@ -9,24 +9,25 @@ from __future__ import annotations
 import copy
 import dataclasses
 import functools
+import json
 import logging
 import os
 import re
 import threading
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 import numpy as np
-import shapely
 
-from queryearth import packs
 from queryearth import space as sp
 from queryearth.dimensions import Axis, Labels, SpaceDimension, TimeDimension, Versions
 from queryearth.objects import (
     KINDS,
     DuplicateCodeError,
     Finding,
+    LoadError,
     Query,
     Scope,
     UnknownNameError,
@@ -46,12 +47,10 @@ from queryearth.rules import (
     make_findings,
     match_scope,
 )
-from queryearth.space import Space
 
 __all__ = ["Registry", "PointResult"]
 
 _SLUG = re.compile(r"[a-z][a-z0-9_]*")
-_REGION = re.compile(r"[a-z][a-z0-9_.-]*:[A-Za-z0-9_.+-]+")
 _GROUPS = {"space": -2, "time": -1, "axes": 0, "facets": 1, "dims": 2}
 
 _default: Registry | None = None
@@ -73,7 +72,7 @@ def _strings(value: Any) -> tuple[str, ...]:
 
 
 class Registry:
-    """Declared dimensions, regions and rules; answers queries.
+    """Declared dimensions and rules; answers queries.
 
     There is no hidden global registry: a library keeps its own Registry, and
     Registry.default() is the application default for scripts and notebooks.
@@ -94,10 +93,8 @@ class Registry:
             ("space", SpaceDimension(), "space"),
             ("time", TimeDimension(), "time"),
         ]
-        self._regions: dict[str, Space] = {}  # "namespace:id" -> polygon
         self._entries: list[_Entry] = []
         self._codes: dict[str, int] = {}
-        self._packs: dict[str, tuple[str, ...]] = {}  # loaded pack -> its prefixes
         self._prefilters_cache: dict[str, Any] | None = None
         self._last: tuple[Any, Any] = (None, None)  # the last query parsed
         for axis in axes:
@@ -136,25 +133,11 @@ class Registry:
         for member in ("parse_rule", "parse_query", "match"):
             if not callable(getattr(dimension, member, None)):
                 raise TypeError(f"dimension {name!r} has no {member}() method")
-        if not isinstance(getattr(dimension, "schema", None), Mapping):
-            raise TypeError(f"dimension {name!r} has no schema mapping")
         group = "axes" if isinstance(dimension, Axis) else "dims"
         if isinstance(dimension, (Labels, Versions)):
             group = "facets"
         self._groups.append((name, dimension, group))
         self._groups.sort(key=lambda g: _GROUPS[g[2]])  # stable sort
-
-    def add_regions(self, namespace: str, regions: Mapping[str, Any]) -> None:
-        """Declare named regions, referred to as "namespace:id" in region_ref."""
-        for rid, shape in regions.items():
-            ref = f"{namespace}:{rid}"
-            if not _REGION.fullmatch(ref):
-                raise ValueError(f"{ref!r} is not a region reference")
-            space = shape if isinstance(shape, Space) else sp.polygon(shape)
-            if space.kind != "polygon":
-                raise ValueError(f"region {ref} is not an area")
-            if self._regions.setdefault(ref, space) is not space:
-                raise ValueError(f"region {ref} is already declared")
 
     def add(self, rule: Any) -> None:
         """Add a Rule, a ComputedRule instance, any RuleKind or a record mapping.
@@ -163,21 +146,65 @@ class Registry:
         at all (LoadError). A reused code raises DuplicateCodeError, except that
         redefining a computed rule with the same qualified name replaces it (Q10).
         """
-        if isinstance(rule, Mapping):
-            packs.add_mapping(self, rule)
+        if isinstance(rule, Mapping) and rule.get("type") == "FeatureCollection":
+            self._add_all(rule, "collection", "python")
+        elif isinstance(rule, Mapping):
+            self._add(Rule.from_feature(rule), "python")
         else:
             self._add(rule, "python")
 
-    def load_pack(self, path: str | os.PathLike[str]) -> list[str]:
-        """Load a data-only pack directory (section 5.4); returns the codes loaded.
+    def load(self, path: str | os.PathLike[str]) -> list[str]:
+        """Add the rules of one GeoJSON file, a FeatureCollection or a single Feature.
 
-        Raises LoadError listing every problem with its file, the feature's
-        position and its code, and then leaves the Registry as it was.
+        Returns the codes loaded; their findings have the file name as source.
+        Loading never runs code. Raises LoadError listing every problem with the
+        file, the feature's position and its code, and then leaves the Registry
+        as it was.
         """
-        return packs.load_pack(self, path)
+        path = Path(path)
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError) as err:
+            raise LoadError([f"{path.name}: {err}"]) from err
+        if isinstance(data, Mapping) and data.get("type") == "Feature":
+            data = {"type": "FeatureCollection", "features": [data]}
+        return self._add_all(data, path.name, path.name)
+
+    def _add_all(self, collection: Any, where: str, source: str) -> list[str]:
+        """Add every record of a FeatureCollection, or none of them (LoadError)."""
+        features = (
+            collection.get("features") if isinstance(collection, Mapping) else None
+        )
+        if (
+            not isinstance(features, list)
+            or collection.get("type") != "FeatureCollection"
+        ):
+            raise LoadError([f"{where}: not a GeoJSON FeatureCollection or Feature"])
+        saved = {k: copy.copy(v) for k, v in vars(self).items()}
+        codes, problems = [], []
+        try:
+            for i, feature in enumerate(features):
+                props = (
+                    feature.get("properties") if isinstance(feature, Mapping) else None
+                )
+                code = props.get("code") if isinstance(props, Mapping) else None
+                try:
+                    rule = Rule.from_feature(feature)
+                    self._add(rule, source)
+                    codes.append(rule.code)
+                except (ValueError, TypeError, KeyError) as err:
+                    text = str(err).removeprefix(f"{code}: ")
+                    problems.append(f"{where}: feature {i} ({code}): {text}")
+            if problems:
+                raise LoadError(problems)
+        except BaseException:
+            vars(self).clear()
+            vars(self).update(saved)
+            raise
+        return codes
 
     def _add(self, rule: Any, source: str) -> None:
-        """Registry.add; source names a record's pack ("python" from Python)."""
+        """Registry.add; source names a record's file ("python" from Python)."""
         if isinstance(rule, ComputedRule):
             form, get = "computed", rule.meta.get
             scope = Scope(
@@ -197,8 +224,7 @@ class Registry:
             raise TypeError(f"cannot add {rule!r}: not a Rule or a RuleKind")
         code = rule.code
         check_code(code)
-        refs, requires = _strings(get("region_ref", ())), _strings(get("requires", ()))
-        compiled = self._compile(scope, refs, requires, code)
+        compiled = self._compile(scope, _strings(get("requires", ())), code)
         qualname = rule._qualname() if form == "computed" else None
         at = self._codes.get(code)
         if at is not None and (
@@ -252,21 +278,10 @@ class Registry:
         declared = [n for n, _, _ in self._groups]
         raise UnknownNameError(f"undeclared dimension {name!r}; declared: {declared}")
 
-    def _region(self, refs: tuple[str, ...], owner: str) -> Space:
-        """The union of named regions, as region_ref names them."""
-        missing = [r for r in refs if r not in self._regions]
-        if missing:
-            raise UnknownNameError(f"{owner}: undeclared regions {missing}")
-        if len(refs) == 1:
-            return self._regions[refs[0]]
-        parts = [self._regions[r].geometry for r in refs]
-        geometry = shapely.orient_polygons(shapely.union_all(parts))
-        return Space("polygon", geometry=geometry, area_km2=sp.area_km2(geometry))
-
     def _compile(
-        self, scope: Scope, refs: tuple[str, ...], requires: tuple[str, ...], code: str
+        self, scope: Scope, requires: tuple[str, ...], code: str
     ) -> CompiledScope:
-        space = self._region(refs, code) if refs else scope.space
+        space = scope.space
         if space is not None and space.kind != "polygon":
             raise ValueError(f"{code}: a rule space is a polygon, not a point")
         values = {

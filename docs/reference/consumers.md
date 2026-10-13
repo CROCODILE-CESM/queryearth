@@ -1,5 +1,7 @@
 # Consumer integration in full
 
+> **Frozen.** This file was frozen on 2026-10-13 at commit e5e9d0e. It records the design as it stood then and is no longer updated. The public docs in `docs/source` and `CLAUDE.md` describe the current package.
+
 This is the full text behind [section 15 of design.md](../design.md#15-consumer-integration), with every line reference, both sketches in full, the changes each consumer needs outside queryearth, and the acceptance criteria. Section numbers refer to [design.md](../design.md); questions such as Q46 to Q48 are in its [section 18.2](../design.md#182-outstanding-work), and the others in [decisions.md](decisions.md#questions-decided-by-adopting-their-defaults).
 
 GLHE and CrocoDash are the first two consumers. The integrations below are **acceptance tests for the design**: if the API cannot express them simply, the design is wrong. They are not changes to make now; each would become its own pull request in the consumer's repository. Line numbers refer to CrocoDash `main` at 507f2d6b and GLHE `main` at e26898d. The sketches are illustrative; `sp` is `queryearth.space`, and `ADVISORIES` and `REGISTRY` are each consumer's own Registry, defined once in its adapter module.

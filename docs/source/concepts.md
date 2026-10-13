@@ -2,11 +2,11 @@
 
 ## Rules and their scope
 
-A **rule** has a code, an outcome (what it says) and a scope (where, when and for what it applies). A scope is a conjunction over dimensions, and a dimension the rule leaves out matches anything:
+A **rule** has a code, an outcome (what it says) and a scope (where, when and for what it applies). Rules are written in Python or as records in GeoJSON rule files, and both kinds are added to a {class}`~queryearth.Registry`, the object you query (see [Writing rules](rules.md)). A scope is a conjunction over dimensions, and a dimension the rule leaves out matches anything:
 
 | Dimension | Rule side | Query side |
 |---|---|---|
-| `space` | a polygon, or a named region | a point or a polygon |
+| `space` | a polygon | a point or a polygon |
 | `time` | intervals, optionally limited to some months of the year | an interval |
 | axes, such as `resolution` | a range: `{"gt", "ge", "lt", "le"}` in the axis's unit | a number or a range `(lo, hi)` |
 | facets: `product`, `variable`, `version`, `model`, `component` | values or glob patterns; versions as ranges | values |
@@ -41,7 +41,7 @@ registry.query(axes={"resolution": 8}, include_conditional=True)
 
 ## Products
 
-`product` is an ordinary facet, matched like `variable`: exact, case-sensitive values or glob patterns. Coverage limits and other per-product facts are ordinary rules scoped by it, and you query once per product you use. In the [toy pack](example.md), TOY004 is an ERROR for `toy_coastal` before 2010:
+`product` is an ordinary facet, matched like `variable`: exact, case-sensitive values or glob patterns. Coverage limits and other per-product facts are ordinary rules scoped by it, and you query once per product you use. In the [toy example](example.md), TOY004 is an ERROR for `toy_coastal` before 2010:
 
 ```python
 registry.query(time=("2005-01-01", "2005-12-31"), facets={"product": ["toy_coastal"]})

@@ -6,7 +6,7 @@ Rules are GeoJSON features or short Python classes. A query returns findings of 
 
 **Documentation:** https://crocodile-cesm.github.io/queryearth/
 
-**Status:** pre-alpha. To try it, run [examples/toy/play.py](examples/toy/play.py), which loads a small made-up pack and walks through queries, coverage limits written as rules, Python rules, logging the findings and `query_points()`.
+**Status:** pre-alpha. To try it, run [examples/toy/play.py](examples/toy/play.py), which loads a small made-up rule file and walks through queries, coverage limits written as rules, Python rules, logging the findings and `query_points()`.
 
 ## Install
 

@@ -294,7 +294,7 @@ class Finding(Outcome, Match):
     """The result of one rule matching one query: the outcome plus the match."""
 
     details: Mapping[str, Any] = field(default_factory=dict)
-    source: str = ""  # pack name, "computed", "builtin" or "python"
+    source: str = ""  # a loaded record's file name, "computed" or "python"
     query_label: str = ""
 
     def __post_init__(self) -> None:
@@ -406,7 +406,7 @@ class DuplicateCodeError(ValueError):
 
 
 class UnknownNameError(KeyError):
-    """An undeclared axis, facet, dimension or region name.
+    """An undeclared axis, facet or dimension name.
 
     A misspelt name would otherwise look like "no known issues", so the engine
     refuses it in rules and queries alike (sections 4.6 and 4.7).
@@ -420,7 +420,7 @@ class UnknownNameError(KeyError):
 
 
 class LoadError(ValueError):
-    """A pack or FeatureCollection failed the loader checks (section 5.3).
+    """A rule file or FeatureCollection failed the loader checks (section 5.3).
 
     .problems lists each, naming its file, the feature's position and its code.
     """

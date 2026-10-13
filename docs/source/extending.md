@@ -8,16 +8,15 @@ Everything that varies between users plugs in through a small interface, so exte
 | A rule computed from the query or from data you hold | A `ComputedRule` subclass or an `@registry.rule` function |
 | A computed rule on the bulk path | A `mask(lon, lat, query)` method on that rule |
 | A new kind of rule altogether | Any object with `code`, `scope` and `evaluate(query)` (the `RuleKind` protocol), passed to `Registry.add` |
-| Rules from another format | Build records and pass them to `Registry.add`, or `Rule.from_feature` per feature |
-| Named regions | `Registry.add_regions(namespace, regions)` |
+| Rules from another format | Convert them to GeoJSON records for `Registry.add`, or build `Rule` objects in Python; `Rule.to_feature()` writes a rule back as a record |
 
 Geometry and time semantics are not pluggable. Space and time are dimensions inside the engine, but `SpaceDimension` and `TimeDimension` are built into every Registry and cannot be replaced, so "overlaps" means the same thing for every rule.
 
 ## Dimension plugins
 
-A dimension has a `name`, a `schema` (JSON Schema for the value in records), and three methods:
+A dimension has a `name` and three methods:
 
-- `parse_rule(value)` checks and parses a rule's value when the rule is added;
+- `parse_rule(value)` checks and parses a rule's value when the rule is added, from Python or from a record, and raises `ValueError` for a bad one;
 - `parse_query(value)` does the same for a query's value;
 - `match(rule, query)` returns a `DimMatch(overlap, fraction)` when they meet, or `None` when they do not.
 
@@ -26,10 +25,11 @@ The Registry does everything else: conditional findings, unknown names and sorti
 ```python
 class Pfafstetter:
     name = "basin"
-    schema = {"type": "array", "items": {"type": "string", "pattern": "^[1-9]+$"}}
 
     def parse_rule(self, value):
-        return tuple(str(v) for v in value)
+        if isinstance(value, str):
+            raise ValueError(f"basins are a list of codes, not {value!r}")
+        return tuple(self.parse_query(v) for v in value)
 
     def parse_query(self, value):
         code = str(value)

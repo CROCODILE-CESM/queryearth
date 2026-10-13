@@ -155,10 +155,9 @@ def test_versions_reject_bad_ranges(rule):
         VERSIONS.parse_rule(rule)
 
 
-def test_built_in_plugins_carry_a_schema():
+def test_built_in_plugins_are_dimensions():
     for plugin in (AXIS, LABELS, VERSIONS):
         assert isinstance(plugin, qe.Dimension)
-        assert plugin.schema
 
 
 # ---- core objects -------------------------------------------------------------------
@@ -225,20 +224,11 @@ def test_constructors_reject_bad_values(build):
         build()
 
 
-def test_rule_requires_suggestions_for_a_suggestion_and_one_space():
+def test_rule_requires_suggestions_for_a_suggestion():
     with pytest.raises(ValueError):
         qe.Rule(code="X001", kind="suggestion", title="t", message="m")
     with pytest.raises(ValueError):
         qe.Rule(code="X001", kind="coverage", title="t", message="m")
-    with pytest.raises(ValueError):
-        qe.Rule(
-            code="X001",
-            kind="warning",
-            title="t",
-            message="m",
-            region_ref="ar6:CAF",
-            scope=qe.Scope(space=sp.box(0, 0, 1, 1)),
-        )
 
 
 def test_finding_to_dict_is_json_ready():
@@ -270,7 +260,7 @@ def test_finding_to_dict_is_json_ready():
 
 def test_rule_from_feature_needs_properties_and_a_geometry():
     with pytest.raises(ValueError, match="properties and a geometry"):
-        qe.Rule.from_feature({"type": "Feature"}, qe.Registry())
+        qe.Rule.from_feature({"type": "Feature"})
 
 
 def test_space_and_time_are_built_in_dimensions():

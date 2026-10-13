@@ -10,11 +10,17 @@ from typing import Any
 
 import numpy as np
 import pytest
+import shapely
 
 import queryearth as qe
 from queryearth import space as sp
 
 LAKE = sp.box(0.30, 0.30, 0.45, 0.45)
+
+
+def union(*spaces):
+    """One rule space covering several areas."""
+    return sp.polygon(shapely.union_all([s.geometry for s in spaces]))
 
 
 def make_registry(**kw):
@@ -116,18 +122,15 @@ def test_undecided_axis_reports_the_rule_interval():
 # ---- fixture 19: conditional findings ------------------------------------------------
 def cru_registry():
     registry = make_registry()
-    registry.add_regions(
-        "ar6", {"CAF": sp.box(10, -10, 30, 10), "WAF": sp.box(-20, 0, 10, 15)}
-    )
     registry.add(
         qe.Rule(
             code="CRU001",
             kind="warning",
             title="CRU TS precipitation falls back to climatology",
             message="m",
-            region_ref=("ar6:CAF", "ar6:WAF"),
             min_overlap=0.1,
             scope=qe.Scope(
+                space=union(sp.box(10, -10, 30, 10), sp.box(-20, 0, 10, 15)),
                 time=qe.interval("2000-01-01", ".."),
                 facets={
                     "product": ["cru_ts"],
@@ -255,7 +258,6 @@ class Pfafstetter:
     """HydroBASINS basin codes: basin 1423 lies inside basin 14 (section 4.13)."""
 
     name: str = "basin"
-    schema = {"type": "array", "items": {"type": "string", "pattern": "^[1-9]+$"}}
 
     def parse_rule(self, value: Any) -> tuple[str, ...]:
         return tuple(str(v) for v in value)
@@ -733,14 +735,20 @@ def random_time(rng):
     return qe.interval(first, last)
 
 
+REGIONS = {
+    "A": sp.box(-10, -10, 10, 10),
+    "B": sp.box(170, 50, -170, 70),
+    "C": sp.box(-180, 80, 180, 90),
+}
+
+
 def random_rule_scope(rng):
     space = time = None
-    region_ref = ()
     pick = rng.random()
     if pick < 0.45:
         space = random_box(rng)
-    elif pick < 0.52:
-        region_ref = tuple(rng.sample(["reg:A", "reg:B", "reg:C"], rng.randint(1, 2)))
+    elif pick < 0.52:  # the union of one or two fixed areas
+        space = union(*(REGIONS[n] for n in rng.sample("ABC", rng.randint(1, 2))))
     pick = rng.random()
     if pick < 0.4:
         time = random_time(rng)
@@ -776,8 +784,7 @@ def random_rule_scope(rng):
     if rng.random() < 0.3:
         facets["model"] = rng.choice([["mom6"], ["cesm", "mom6"], ["m*"]])
     dims = {"basin": rng.choice([["14"], ["2", "31"]])} if rng.random() < 0.2 else {}
-    scope = qe.Scope(space=space, time=time, axes=axes, facets=facets, dims=dims)
-    return scope, region_ref
+    return qe.Scope(space=space, time=time, axes=axes, facets=facets, dims=dims)
 
 
 def random_registry(rng):
@@ -786,24 +793,14 @@ def random_registry(rng):
         axes=[qe.Axis("resolution", "km")],
         dimensions=[IndexedPfafstetter()],
     )
-    registry.add_regions(
-        "reg",
-        {
-            "A": sp.box(-10, -10, 10, 10),
-            "B": sp.box(170, 50, -170, 70),
-            "C": sp.box(-180, 80, 180, 90),
-        },
-    )
     for k in range(120):
-        scope, region_ref = random_rule_scope(rng)
         registry.add(
             qe.Rule(
                 code=f"RND{k:03d}",
                 kind="warning",
                 title="t",
                 message="m",
-                scope=scope,
-                region_ref=region_ref,
+                scope=random_rule_scope(rng),
                 withdrawn="2026-01-01T00:00:00Z" if rng.random() < 0.05 else None,
                 supersedes=(
                     (f"RND{rng.randint(0, 119):03d}",) if rng.random() < 0.05 else ()
@@ -811,7 +808,7 @@ def random_registry(rng):
             )
         )
     for k in range(10):
-        scope, _ = random_rule_scope(rng)
+        scope = random_rule_scope(rng)
 
         class Computed(
             qe.ComputedRule,

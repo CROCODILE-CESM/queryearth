@@ -1,4 +1,4 @@
-"""Play with queryearth on a made-up pack.
+"""Play with queryearth on a made-up rule file.
 
 Run it cell by cell in VS Code (each "# %%" line starts a cell), or as a script
 from the repository root:
@@ -6,12 +6,14 @@ from the repository root:
     pip install -e .
     python examples/toy/play.py
 
-Everything in the toy pack is invented: the products the rules name (toy_ocean,
-toy_atmos, toy_coastal), the rules (TOY...) and the parameter names. Edit
-pack.toml, rules.geojson or this file and rerun to see what changes.
+Everything in rules.geojson is invented: the products the rules name (toy_ocean,
+toy_atmos, toy_coastal), the rules (TOY...) and the parameter names; nothing
+there describes real data or real model guidance. Edit rules.geojson or this
+file and rerun to see what changes.
 """
 
-# %% Set up: a Registry with a resolution axis, then load the toy pack.
+# %% Set up: a Registry with the resolution axis the rules use (the facets they
+# use, product, variable and model, are declared by default), then load the rules.
 import logging
 from pathlib import Path
 
@@ -22,8 +24,10 @@ from queryearth import space as sp
 
 HERE = Path(globals().get("__file__", "play.py")).resolve().parent
 
-registry = qe.Registry("toy", axes=[qe.Axis("resolution", "km")])
-print("loaded:", registry.load_pack(HERE))
+registry = qe.Registry(
+    "toy", axes=[qe.Axis("resolution", "km", "horizontal grid spacing")]
+)
+print("loaded:", registry.load(HERE / "rules.geojson"))
 
 
 def show(findings):

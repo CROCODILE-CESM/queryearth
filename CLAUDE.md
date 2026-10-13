@@ -6,19 +6,18 @@ Guidance for Claude Code (and anyone else) working in this repository.
 
 A small engine that matches rules to a query. A rule is scoped by any mix of space, time, numeric axes (such as grid resolution), labels (product, variable, model) and plugin dimensions. A query gives any subset of those and gets back findings of two kinds: warnings, and suggestions, which carry structured actions. A product's coverage limits are ordinary warnings scoped by the `product` facet. Each finding has a standard `logging` level, and callers log findings with `logging` themselves. It is general-purpose, not tied to earth system modelling. Its first consumers are CrocoDash (one query per forcing product, in `Case.configure_forcings`) and GLHE (lake polygons against data products).
 
-It is an engine only: the package ships no curated rules. Rule packs belong to their users. The examples in `examples/` and `docs/reference/examples/` are illustrations, marked as made up or illustrative.
+It is an engine only: the package ships no curated rules. Rule files belong to their users. The example in `examples/toy/` is made up.
 
 ## Rules
 
 - **Clean room: geostructures.** Never read, copy, paraphrase or search for code from the `geostructures` project, and do not depend on it or contribute to it. More generally, avoid dependencies on projects run by military contractors.
 - **Dependencies.** Runtime imports are the standard library, numpy and shapely (2.1 or later) only. Anything else goes in an optional extra, and test-only packages go in the `test` extra.
 - **Python.** 3.11 or later with no upper cap. Write nothing newer than the 3.11 grammar. Add each new Python release to the CI matrix in `.github/workflows/tests.yml`.
-- **Keep it small.** The author cares about code size. Prefer the simplest implementation that passes the fixtures: no speculative options, no extra layers, no single-use helpers. Features cut to keep v0.0.1 and v0.1.0 small are listed in `docs/design.md` section 17, each with its upgrade path. Re-add one only when its trigger happens, and update that row when you do.
+- **Keep it small.** The author cares about code size. Prefer the simplest implementation that passes the tests: no speculative options, no extra layers, no single-use helpers. Features cut before 2026-10-13 are listed in section 17 of the frozen `docs/design.md`, each with its upgrade path; packs (`pack.toml`), named regions (`region_ref`) and the plugin-schema checker were removed after it froze. Re-add a feature only when its trigger happens.
 - **Keep the extension hooks.** Everything that varies between users plugs in through a small interface (design.md section 12.5), and these hooks stay even where nothing uses them yet:
   - plugin `Dimension`s, with their optional `build`, `comparable`, `late`, `to_json` and `extent`;
   - third-party rule kinds (`RuleKind`, `outcomes()`);
-  - `ComputedRule` and `@registry.rule`, with `mask()` for the bulk path;
-  - named regions.
+  - `ComputedRule` and `@registry.rule`, with `mask()` for the bulk path.
 
   Geometry and time semantics are deliberately not pluggable.
 - **Codes.** A code is a prefix plus three or four digits (`CRU001`, `ERA5-014`). A hyphen is required after a prefix that ends in a digit.
@@ -33,18 +32,23 @@ It is an engine only: the package ships no curated rules. Rule packs belong to t
 | `queryearth/time.py` | `Interval`, `TimeSpec`, `interval()`, `parse_time()` for records, `overlap`, `time_fraction`, month recurrence. One calendar: proleptic Gregorian |
 | `queryearth/objects.py` | Frozen dataclasses: `Suggestion`, `Outcome`, `Match`, `Finding` (whose `str()` is the message to log), `Scope`, `Query`; and the error classes `DuplicateCodeError`, `UnknownNameError` and `LoadError` |
 | `queryearth/dimensions.py` | The `Dimension` protocol; `SpaceDimension` and `TimeDimension`, built into every Registry and not replaceable; the built-in plugins `Axis`, `Labels` and `Versions` |
-| `queryearth/rules.py` | `Rule` (a static record), `ComputedRule`, `match_scope` (one scope against one query part) and building findings |
-| `queryearth/registry.py` | `Registry`: declarations, `query`, `query_points`, `PointResult` |
-| `queryearth/packs.py` | Loading a pack (`pack.toml` plus GeoJSON FeatureCollections), with the loader checks done by hand |
-| `tests/` | One file per module, plus `test_queries.py` (bulk path) and `test_packs.py` |
-| `examples/toy/` | A made-up pack and `play.py`, a walkthrough to run cell by cell |
+| `queryearth/rules.py` | `Rule` (a static record, read with `from_feature`, which does the record checks by hand, and written with `to_feature`), `ComputedRule`, `match_scope` (one scope against one query part) and building findings |
+| `queryearth/registry.py` | `Registry`: declarations, `add`, `load` (one rule file, all or nothing), `query`, `query_points`, `PointResult` |
+| `tests/` | One file per module, plus `test_queries.py` (bulk path) and `test_records.py` (rule files, the loader checks and `to_feature` round trips) |
+| `examples/toy/` | A made-up rule file, `rules.geojson`, and `play.py`, a walkthrough to run cell by cell |
 | `docs/source/` | The public user docs (Sphinx with MyST Markdown), built and deployed to GitHub Pages by `.github/workflows/docs.yml`: one folder per release (`vX.Y.Z/`) plus `dev/` for `main`, with a version menu; `.github/docs_versions.py` keeps the version list and the root redirect. Nothing derived from the private interviews goes here |
-| `docs/design.md` | The design and the spec. "As built" notes mark where the code differs from it |
-| `docs/reference/` | `fixtures.md` (correctness fixtures, each with a test unless marked dropped), `schema.json` (record schema), `decisions.md` (the Q-numbered decisions and detailed contracts), the example pack, `usage.py` (a usage example), and background, consumer and glossary notes |
+| `docs/design.md` | Frozen: the design and the spec as they stood at commit e5e9d0e, with "As built" notes where the code then differed |
+| `docs/reference/` | Frozen: `fixtures.md` (correctness fixtures), `decisions.md` (the Q-numbered decisions and detailed contracts), `usage.py` (a usage example), and background, consumer and glossary notes |
+
+## Docs: maintained and frozen
+
+- **Maintained:** `docs/source/` (the public docs), `README.md` and this file. They describe the current package, and every future change updates them, and only them, as needed.
+- **Frozen:** everything else under `docs/`: `docs/design.md` and all of `docs/reference/`. They were frozen on 2026-10-13 at commit e5e9d0e, carry a banner saying so, and record the design as it stood then. Do not update them, apart from turning a link into plain text when its target is deleted. Design section numbers cited in docstrings refer to them.
 
 ## Concepts worth knowing before changing the engine
 
-- A **pack** is a file format: a directory with `pack.toml` (identity, owned code prefixes, axes, facets, regions) and GeoJSON rule records. A **Registry** is the in-memory object that packs and Python rules are loaded into, and the thing you query. One Registry can hold several packs.
+- There are **rules**, **rule files** and the **Registry**. A rule is a static `Rule` (built in Python, or read from a GeoJSON record with `Rule.from_feature`), a computed rule, or a third-party rule kind; every rule carries its own geometry. A rule file is one GeoJSON file of records, a FeatureCollection or a single Feature. The Registry is the in-memory object you add rules to and query: `Registry.add` takes a rule or a record mapping, and `Registry.load(path)` adds one file's records, all or nothing. `Rule.to_feature()` writes a static rule back as a record; computed rules are code and have none.
+- The axes, facets and plugin dimensions that rules use are declared on the Registry, in Python. A plugin dimension checks its own values in `parse_rule`, for records too.
 - A rule's scope is a conjunction: a dimension the rule leaves out matches anything. Space and time are dimensions too. `match_scope` runs one loop over every dimension of the Registry, and the `late` ones (space) run last.
 - When a query omits a dimension that a rule constrains, the finding is **conditional** (`conditional_on` names what is missing). Conditional findings are hidden unless `include_conditional=True`.
 - `product` is a plain facet, like `variable`. A caller makes one query per product, and nothing fills an omitted time or version.
@@ -67,5 +71,5 @@ pip install -e ".[docs]" && sphinx-build -W -b html docs/source docs/_build
 - **Versions** come from git tags through setuptools-scm.
 - **Builds and releases.** Every push to `main` builds the package. A GitHub release tagged `vX.Y.Z` publishes to PyPI through trusted publishing; there is no TestPyPI job.
 - **Style.** Match the existing code: frozen dataclasses, error messages that name the rule code, short comments only where the reason is not obvious, and docstrings that cite the design section.
-- **Fixtures.** When behaviour changes, update the fixture in `docs/reference/fixtures.md` and its test together. If it changes `docs/design.md`, add or update its "As built" note or section 17 row.
+- **Behaviour changes.** Update the tests, and `docs/source/`, `README.md` and this file as needed. The frozen docs are not updated.
 - **NCAR GLADE.** The `dev_cd` conda env has numpy and shapely, so you can run against the checkout without installing: `PYTHONPATH=$PWD conda run -n dev_cd python examples/toy/play.py`.

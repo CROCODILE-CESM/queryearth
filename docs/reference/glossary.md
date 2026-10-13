@@ -1,5 +1,7 @@
 # Glossary
 
+> **Frozen.** This file was frozen on 2026-10-13 at commit e5e9d0e. It records the design as it stood then and is no longer updated. The public docs in `docs/source` and `CLAUDE.md` describe the current package.
+
 [Section 4.1 of design.md](../design.md#41-terms) defines queryearth's own terms. This file defines the other names the design document and its reference files use, for readers outside earth-system science.
 
 **Geometry and software terms**

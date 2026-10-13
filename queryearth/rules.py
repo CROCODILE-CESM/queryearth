@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import dataclasses
 import inspect
+import logging
 import re
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
@@ -17,10 +18,11 @@ from functools import cached_property
 from typing import TYPE_CHECKING, Any, ClassVar, Protocol
 
 import numpy as np
+import shapely
 
 from queryearth import space as sp
-from queryearth.dimensions import DimMatch, schema_problem
-from queryearth.objects import Finding, Match, Outcome, Query, Scope
+from queryearth.dimensions import DimMatch
+from queryearth.objects import LEVELS, Finding, Match, Outcome, Query, Scope, _jsonable
 from queryearth.space import Space
 from queryearth.time import Interval, TimeSpec, overlap, parse_time, time_fraction
 
@@ -45,11 +47,6 @@ def check_code(code: Any) -> None:
             "digits, such as CRU001, with a hyphen after a prefix that ends in a "
             "digit (ERA5-014)"
         )
-
-
-def code_prefix(code: str) -> str:
-    """The prefix a valid code belongs to: CRU for CRU001, ERA5 for ERA5-014."""
-    return code.rsplit("-", 1)[0] if "-" in code else code.rstrip("0123456789")
 
 
 class RuleKind(Protocol):
@@ -230,7 +227,7 @@ _FEATURE_KEYS = set(
     "type id geometry time place bbox properties featureType coordRefSys conformsTo".split()
 )
 _RULE_KEYS = tuple(f.name for f in dataclasses.fields(Outcome)) + tuple(
-    "region_ref created updated withdrawn supersedes aliases".split()
+    "created updated withdrawn supersedes aliases".split()
 )
 _RECORD_KEYS = set(_RULE_KEYS) | set(
     "facets axes dimensions box periods recurrence time_start time_end".split()
@@ -239,7 +236,7 @@ _EXTENSION = re.compile(r"x_[a-z0-9_]+")
 
 
 def box_of(box: Any) -> Space:
-    """The box() of a record's or a pack's {west, width, south, north}."""
+    """The box() of a record's {west, width, south, north}."""
     if (
         not isinstance(box, Mapping)
         or set(box) != {"west", "width", "south", "north"}
@@ -255,12 +252,12 @@ def box_of(box: Any) -> Space:
 class Rule(Outcome):
     """A static record: one GeoJSON Feature (Rule.from_feature) or built in Python.
 
-    Registry.add checks its names and resolves region_ref; evaluate() then runs
-    against that Registry (a rule added to a second Registry is added as a copy).
+    Registry.add checks its names; evaluate() then runs against that Registry
+    (a rule added to a second Registry is added as a copy). to_feature() writes
+    it back as a record.
     """
 
     scope: Scope = field(default_factory=Scope)
-    region_ref: tuple[str, ...] = ()  # resolved into a space by Registry.add
     created: str | None = None  # record lifecycle time, not data time
     updated: str | None = None
     withdrawn: str | None = None  # kept for history, never matched
@@ -274,33 +271,30 @@ class Rule(Outcome):
             raise ValueError(f"{self.code}: a suggestion lists one or more suggestions")
         if not isinstance(self.scope, Scope):
             raise TypeError(f"{self.code}: scope is a Scope")
-        for name in ("region_ref", "supersedes", "aliases"):
+        for name in ("supersedes", "aliases"):
             value = getattr(self, name)
             object.__setattr__(
                 self, name, (value,) if isinstance(value, str) else tuple(value)
             )
-        if self.region_ref and self.scope.space is not None:
-            raise ValueError(f"{self.code}: give region_ref or a space, not both")
         object.__setattr__(self, "extensions", dict(self.extensions))
 
     @classmethod
-    def from_feature(cls, feature: Mapping[str, Any], registry: Registry) -> Rule:
-        """Read one GeoJSON record (section 5); Registry.add then checks its names.
+    def from_feature(cls, feature: Mapping[str, Any]) -> Rule:
+        """Read one GeoJSON record (section 5); errors name the record's code.
 
-        Checks by hand what reference/schema.json states, and plugin dimension
-        values against their schemas; errors name the record's code.
+        Registry.add then checks its names, and plugin dimensions their values.
         """
         props = feature.get("properties") if isinstance(feature, Mapping) else None
         code = props.get("code") if isinstance(props, Mapping) else None
         try:
-            return cls._read(feature, props, registry)
+            return cls._read(feature, props)
         except (ValueError, TypeError, KeyError) as err:
             if not isinstance(code, str) or str(err).startswith(f"{code}:"):
                 raise
             raise type(err)(f"{code}: {err}") from err
 
     @classmethod
-    def _read(cls, feature: Any, props: Any, registry: Registry) -> Rule:
+    def _read(cls, feature: Any, props: Any) -> Rule:
         if not isinstance(feature, Mapping) or feature.get("type") != "Feature":
             raise ValueError("a record is a GeoJSON Feature")
         if not isinstance(props, Mapping) or "geometry" not in feature:
@@ -325,10 +319,8 @@ class Rule(Outcome):
         if props.get("status") == "reviewed" and not props.get("references"):
             raise ValueError("a reviewed record cites at least one reference (Q54)")
         box, geometry = props.get("box"), feature["geometry"]
-        if (box is not None or "region_ref" in props) and geometry is not None:
-            raise ValueError("a record with a box or a region_ref has a null geometry")
-        if box is not None and "region_ref" in props:
-            raise ValueError("give a box or a region_ref, not both")
+        if box is not None and geometry is not None:
+            raise ValueError("a record with a box has a null geometry")
         space = None if geometry is None else sp.polygon(geometry)
         if box is not None:
             space = box_of(box)
@@ -338,10 +330,6 @@ class Rule(Outcome):
         for name, value in props.get("facets", {}).items():
             if not isinstance(value, (list, Mapping)):  # no bare strings in records
                 raise ValueError(f"facet {name!r} is a list of patterns or an object")
-        for name, value in props.get("dimensions", {}).items():
-            problem = schema_problem(value, registry._dimension(name, "dims")[0].schema)
-            if problem:
-                raise ValueError(f"dimension {name!r}: {problem}")
         scope = Scope(
             space,
             parse_time(feature.get("time"), **props),
@@ -352,6 +340,45 @@ class Rule(Outcome):
         fields = {k: props[k] for k in _RULE_KEYS if k in props}
         extensions = {k: v for k, v in props.items() if k.startswith("x_")}
         return cls(**fields, scope=scope, extensions=extensions)
+
+    def to_feature(self) -> dict[str, Any]:
+        """This rule as a GeoJSON record, the inverse of from_feature.
+
+        Fields at their defaults are left out, a box is written as its polygon,
+        and time goes in the JSON-FG time member with periods and recurrence.
+        """
+        if self.scope.space is not None and self.scope.space.kind != "polygon":
+            raise ValueError(f"{self.code}: a record's space is a polygon, not a point")
+        level = logging.getLevelName(self.level).lower()
+        if level not in ("info", "warning", "error"):
+            raise ValueError(f"{self.code}: a record's level is info, warning or error")
+        props = {k: getattr(self, k) for k in _RULE_KEYS}
+        props["level"] = level if self.level != LEVELS[self.kind] else None
+        props["facets"] = {
+            k: [v] if isinstance(v, str) else v for k, v in self.scope.facets.items()
+        }
+        props |= {"axes": self.scope.axes, "dimensions": self.scope.dims}
+        defaults = {f.name: f.default for f in dataclasses.fields(Rule)}
+        props = {k: v for k, v in props.items() if v != defaults.get(k, {})}
+        time, geometry, spec = None, None, self.scope.time
+        if spec is not None:
+            precision = max(iv.precision for iv in spec.intervals)
+            extent = Interval(*spec.extent, precision).to_wire()
+            if len(spec.intervals) > 1:
+                props["periods"] = spec.to_wire()
+            if extent != ("..", "..") or "periods" in props:
+                time = {"interval": extent}
+            if spec.months is not None:
+                props["recurrence"] = {"months": sorted(spec.months)}
+        if self.scope.space is not None:
+            # Split edges longer than 180 degrees, which a reader would take the
+            # short way round; normalising makes the output the same every time.
+            shape = shapely.segmentize(self.scope.space.geometry, 180.0)
+            shape = shapely.orient_polygons(shapely.normalize(shape))
+            geometry = shapely.geometry.mapping(shape)
+        feature = {"type": "Feature", "id": self.code, "geometry": geometry}
+        feature |= {"time": time, "properties": props | dict(self.extensions)}
+        return _jsonable(feature)
 
     def evaluate(self, query: Query) -> list[Finding]:
         """Findings for one query (section 4.3)."""

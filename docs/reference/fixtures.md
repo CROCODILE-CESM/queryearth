@@ -1,5 +1,7 @@
 # Correctness fixtures
 
+> **Frozen.** This file was frozen on 2026-10-13 at commit e5e9d0e. It records the design as it stood then and is no longer updated. The public docs in `docs/source` and `CLAUDE.md` describe the current package.
+
 This is the full fixture suite behind [section 14 of design.md](../design.md#14-correctness-fixture-suite). Section numbers refer to [design.md](../design.md), and the code behind fixtures 1, 2, 7 and 22 is in [queryearth/space.py](../../queryearth/space.py).
 
 Fixtures marked "dropped in v0.0.1" or "dropped in v0.1.0" test features cut from that version, which [section 17 of design.md](../design.md#17-non-goals-for-v1-and-upgrade-paths) lists with their upgrade paths; they have no tests until a feature returns. Every other fixture must pass in every implementation, and every consumer adapter must also pass the ones marked "adapter", building the query with its own code. Each fixture is data (records, a query and the expected findings), so other implementations can reuse it. Areas use R = 6,371.0088 km, and every rule has only the scope shown and kind and level `warning` unless stated. All numbers were computed while drafting or revising (Python 3.11, shapely 2.1.2, pyproj 3.7.2); fixtures 22 to 26 were added in the revision, and 27 and 28 with the extension points of section [12.5](../design.md#125-extension-points).

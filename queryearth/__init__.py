@@ -3,7 +3,7 @@
 queryearth.time holds time keys, intervals and their measures, and
 queryearth.space points, polygons and closed-set measures (imported as
 ``from queryearth import space as sp``). The rule engine is at the top level:
-a Registry of dimensions, regions and rules answers queries with Finding
+a Registry of dimensions and rules answers queries with Finding
 objects, which callers log with the logging module. See docs/design.md for the
 design.
 """

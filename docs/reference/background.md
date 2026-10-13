@@ -1,5 +1,7 @@
 # Background and evidence
 
+> **Frozen.** This file was frozen on 2026-10-13 at commit e5e9d0e. It records the design as it stood then and is no longer updated. The public docs in `docs/source` and `CLAUDE.md` describe the current package.
+
 This file holds the evidence behind [design.md](../design.md): the full prior-art survey, each requirement with its evidence, and the measurements the design cites. Section numbers refer to design.md. "Design research" means the research that preceded the first draft; "this document's benchmark" means measurements made while drafting and revising, with the set-up given under [Engine measurements](#engine-measurements).
 
 ## Prior art in full

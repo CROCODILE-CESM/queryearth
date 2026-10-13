@@ -14,7 +14,7 @@ import re
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from fnmatch import fnmatchcase
-from typing import Any, ClassVar, Protocol, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
 
 import numpy as np
 
@@ -65,7 +65,6 @@ class Dimension(Protocol):
     """
 
     name: str  # key in scopes, queries, records and conditional_on
-    schema: Mapping[str, Any]  # JSON Schema for the rule-side value in records
 
     def parse_rule(self, value: Any) -> Any: ...  # at load; ValueError if invalid
 
@@ -85,12 +84,10 @@ class SpaceDimension:
     """Space: closed-set meeting, then the area fraction and overlap in km².
 
     It runs late, after the cheaper dimensions, and also measures the query
-    against a rule that leaves space unconstrained. Records carry space in the
-    GeoJSON geometry, so it has no properties schema.
+    against a rule that leaves space unconstrained.
     """
 
     name = "space"
-    schema: ClassVar[Mapping[str, Any]] = {}
     late = True
     always = True
 
@@ -110,12 +107,10 @@ class TimeDimension:
     """Time: the overlapping periods and the share of the query they cover.
 
     It also measures the query against a rule that leaves time unconstrained,
-    and an undecided rule reports its own periods. Records carry time in the
-    JSON-FG time member, so it has no properties schema.
+    and an undecided rule reports its own periods.
     """
 
     name = "time"
-    schema: ClassVar[Mapping[str, Any]] = {}
     always = True
 
     def parse_rule(self, value: TimeSpec) -> TimeSpec:
@@ -132,67 +127,6 @@ class TimeDimension:
     def extent(self, rule: TimeSpec) -> tuple[tuple[str, str], ...]:
         """The rule's own periods, reported when the query gives no time."""
         return () if rule.extent == (None, None) else rule.to_wire()
-
-
-# ---- plugin schemas -------------------------------------------------------------
-_TYPES = dict(object=Mapping, array=(list, tuple), string=str, boolean=bool)
-_TYPES |= {"number": (int, float), "integer": int, "null": type(None)}
-_KEYWORDS = set(
-    "type enum pattern minLength minimum maximum items minItems maxItems properties "
-    "required additionalProperties anyOf oneOf not title description $comment".split()
-)
-
-
-def schema_problem(value: Any, schema: Any) -> str | None:
-    """Why a record's value fails a plugin dimension's schema, or None.
-
-    Implements the JSON Schema keywords in _KEYWORDS, which plugin schemas are
-    limited to; any other keyword raises ValueError rather than pass silently.
-    """
-    if isinstance(schema, bool):
-        return None if schema else f"{value!r} is not allowed here"
-    if set(schema) - _KEYWORDS:
-        raise ValueError(f"unsupported schema keywords {set(schema) - _KEYWORDS}")
-    kinds = schema.get("type", list(_TYPES))
-    kinds = [kinds] if isinstance(kinds, str) else kinds
-    number = isinstance(value, (int, float)) and not isinstance(value, bool)
-    numeric = ("number", "integer")
-    if not any(
-        isinstance(value, _TYPES[k]) for k in kinds if number or k not in numeric
-    ):
-        return f"{value!r} is not of type {kinds}"
-    if "enum" in schema and value not in schema["enum"]:
-        return f"{value!r} is not one of {schema['enum']}"
-    if isinstance(value, str) and (
-        len(value) < schema.get("minLength", 0)
-        or not re.search(schema.get("pattern", ""), value)
-    ):
-        return f"{value!r} does not match {schema}"
-    if number and not (
-        schema.get("minimum", -math.inf) <= value <= schema.get("maximum", math.inf)
-    ):
-        return f"{value!r} is out of range"
-    nested: list[tuple[Any, Any]] = []
-    if isinstance(value, (list, tuple)):
-        if not schema.get("minItems", 0) <= len(value) <= schema.get("maxItems", 1e9):
-            return f"{value!r} has the wrong number of items"
-        nested += [(v, schema.get("items", True)) for v in value]
-    if isinstance(value, Mapping):
-        if [k for k in schema.get("required", ()) if k not in value]:
-            return f"{dict(value)!r} lacks one of {schema['required']}"
-        props = schema.get("properties", {})
-        extra = schema.get("additionalProperties", True)
-        nested += [(v, props.get(k, extra)) for k, v in value.items()]
-    problem = next(filter(None, (schema_problem(v, sub) for v, sub in nested)), None)
-    if problem:
-        return problem
-    if not any(schema_problem(value, s) is None for s in schema.get("anyOf", [True])):
-        return f"{value!r} matches none of anyOf"
-    if sum(schema_problem(value, s) is None for s in schema.get("oneOf", [True])) != 1:
-        return f"{value!r} does not match exactly one of oneOf"
-    if "not" in schema and schema_problem(value, schema["not"]) is None:
-        return f"{value!r} matches a schema it must not"
-    return None
 
 
 def _number(value: Any, what: str) -> float:
@@ -216,26 +150,6 @@ def _string_list(value: Any, what: str) -> tuple[str, ...]:
 
 
 # ---- Axis: a named ordered dimension in one unit ----------------------------------
-_AXIS_SCHEMA: Mapping[str, Any] = {
-    "type": "object",
-    "properties": {
-        "gt": {"type": "number"},
-        "ge": {"type": "number"},
-        "lt": {"type": "number"},
-        "le": {"type": "number"},
-        "unit": {"type": "string", "minLength": 1},
-    },
-    "additionalProperties": False,
-    "anyOf": [
-        {"required": ["gt"]},
-        {"required": ["ge"]},
-        {"required": ["lt"]},
-        {"required": ["le"]},
-    ],
-    "not": {"anyOf": [{"required": ["gt", "ge"]}, {"required": ["lt", "le"]}]},
-}
-
-
 def axis_intersection(rule: AxisOverlap, lo: float, hi: float) -> AxisOverlap | None:
     """The intersection of a rule interval with the closed range [lo, hi]."""
     start = max(rule.lo, lo)
@@ -258,7 +172,6 @@ class Axis:
     name: str
     unit: str
     description: str = ""
-    schema: ClassVar[Mapping[str, Any]] = _AXIS_SCHEMA
 
     def __post_init__(self) -> None:
         if not isinstance(self.unit, str) or not self.unit:
@@ -319,24 +232,6 @@ class Axis:
 
 
 # ---- Labels: a facet matched by case-sensitive fnmatch globs ----------------------
-_PATTERNS = {
-    "type": "array",
-    "minItems": 1,
-    "items": {"type": "string", "minLength": 1},
-}
-_LABELS_SCHEMA: Mapping[str, Any] = {
-    "oneOf": [
-        _PATTERNS,
-        {
-            "type": "object",
-            "properties": {"any_of": _PATTERNS, "none_of": _PATTERNS},
-            "additionalProperties": False,
-            "minProperties": 1,
-        },
-    ]
-}
-
-
 @dataclass(frozen=True)
 class Patterns:
     """A parsed facet rule: values must match some any_of and no none_of."""
@@ -356,7 +251,6 @@ class Labels:
 
     name: str
     description: str = ""
-    schema: ClassVar[Mapping[str, Any]] = _LABELS_SCHEMA
 
     def parse_rule(self, value: Any) -> Patterns:
         if isinstance(value, Patterns):
@@ -389,25 +283,6 @@ class Labels:
 
 # ---- Versions: OSV-style ranges ----------------------------------------------------
 _DOTTED = re.compile(r"[0-9]+(?:\.[0-9]+)*")
-_RANGE = {
-    "type": "object",
-    "properties": {
-        "introduced": {"type": "string", "minLength": 1},
-        "fixed": {"type": "string", "minLength": 1},
-        "last_affected": {"type": "string", "minLength": 1},
-        "versions": {
-            "type": "array",
-            "minItems": 1,
-            "items": {"type": "string", "minLength": 1},
-        },
-    },
-    "additionalProperties": False,
-    "minProperties": 1,
-    "not": {"required": ["fixed", "last_affected"]},
-}
-_VERSIONS_SCHEMA: Mapping[str, Any] = {
-    "oneOf": [_RANGE, {"type": "array", "minItems": 1, "items": _RANGE}]
-}
 
 
 def dotted(version: str) -> tuple[int, ...] | None:
@@ -485,7 +360,6 @@ class Versions:
     """The version facet: a union of OSV-style ranges (section 4.8)."""
 
     name: str = "version"
-    schema: ClassVar[Mapping[str, Any]] = _VERSIONS_SCHEMA
 
     def parse_rule(self, value: Any) -> tuple[VersionRange, ...]:
         if isinstance(value, Mapping):

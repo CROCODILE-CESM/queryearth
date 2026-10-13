@@ -8,6 +8,7 @@ import random
 
 import numpy as np
 import pytest
+import shapely
 
 import queryearth as qe
 from queryearth import space as sp
@@ -110,15 +111,14 @@ def random_space(rng):
 
 def random_bulk_registry(rng):
     registry = qe.Registry("property", axes=[qe.Axis("resolution", "km")])
-    registry.add_regions(
-        "reg", {"A": sp.box(-20, -20, 20, 20), "B": sp.box(170, 50, -170, 80)}
-    )
+    regions = {"A": sp.box(-20, -20, 20, 20), "B": sp.box(170, 50, -170, 80)}
     for k in range(80):
-        scope, refs = {}, ()
+        scope = {}
         if rng.random() < 0.8:
             scope["space"] = random_space(rng)
-        elif rng.random() < 0.5:
-            refs = tuple(rng.sample(["reg:A", "reg:B"], rng.randint(1, 2)))
+        elif rng.random() < 0.5:  # the union of one or two fixed areas
+            parts = [regions[n].geometry for n in rng.sample("AB", rng.randint(1, 2))]
+            scope["space"] = sp.polygon(shapely.union_all(parts))
         if rng.random() < 0.3:
             scope["time"] = qe.interval(f"{rng.randint(1980, 2010)}-01-01", "..")
         if rng.random() < 0.3:
@@ -133,7 +133,6 @@ def random_bulk_registry(rng):
                 title="t",
                 message="m",
                 level=level,
-                region_ref=refs,
                 scope=qe.Scope(**scope),
             )
         )
