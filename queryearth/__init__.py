@@ -1,8 +1,9 @@
 """queryearth: match rules scoped by area, time and other dimensions to a request.
 
-queryearth.time holds time keys, intervals and their measures, and
+queryearth.time holds time keys, intervals and their measures,
 queryearth.space points, polygons and closed-set measures (imported as
-``from queryearth import space as sp``). The rule engine is at the top level:
+``from queryearth import space as sp``), and queryearth.converters turns other
+descriptions of a place, such as a model grid, into spaces. The rule engine is at the top level:
 a Registry of dimensions and rules answers queries with Finding
 objects, which callers log with the logging module. See docs/design.md for the
 design.
@@ -13,7 +14,7 @@ try:
 except ImportError:  # running from a source tree that was never built or installed
     __version__ = "0.0.0"
 
-from queryearth import space
+from queryearth import converters, space
 from queryearth.dimensions import (
     Axis,
     AxisOverlap,

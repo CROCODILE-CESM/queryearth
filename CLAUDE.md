@@ -29,6 +29,7 @@ It is an engine only: the package ships no curated rules. Rule files belong to t
 | Path | What it holds |
 |---|---|
 | `queryearth/space.py` | `Space` (point or polygon) and its helpers `point`, `box`, `polygon`. Antimeridian splitting, closed-set `meets`, `measure` (area fraction and km²), spherical `area_km2`, the points mask for the bulk path |
+| `queryearth/converters.py` | Turn other descriptions of a place into a `Space`: `grid_outline(lon, lat)` from a curvilinear grid's cell corners (a pole-containing grid becomes the polar cap). Numpy only; never import a model package here |
 | `queryearth/time.py` | `Interval`, `TimeSpec`, `interval()`, `parse_time()` for records, `overlap`, `time_fraction`, month recurrence. One calendar: proleptic Gregorian |
 | `queryearth/objects.py` | Frozen dataclasses: `Suggestion`, `Outcome`, `Match`, `Finding` (whose `str()` is the message to log), `Scope`, `Query`; and the error classes `DuplicateCodeError`, `UnknownNameError` and `LoadError` |
 | `queryearth/dimensions.py` | The `Dimension` protocol and `DimMatch`; `SpaceDimension` and `TimeDimension`, built into every Registry and not replaceable; the built-in plugins `Axis` (with `AxisOverlap`), `Labels` and `Versions` |
