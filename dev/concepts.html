@@ -6,14 +6,14 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Concepts &mdash; queryearth 0.1.1.dev6</title>
+  <title>Concepts &mdash; queryearth 0.2.1.dev1</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
 
   
       <script src="_static/jquery.js?v=5d32c60e"></script>
       <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="_static/documentation_options.js?v=66ec2c7e"></script>
+      <script src="_static/documentation_options.js?v=28304322"></script>
       <script src="_static/doctools.js?v=fd6eb6e6"></script>
       <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="_static/versions.js?v=58ec1786"></script>
@@ -161,6 +161,7 @@
 </pre></div>
 </div>
 <p>Scopes and queries give space and time as <code class="docutils literal notranslate"><span class="pre">space=</span></code> and <code class="docutils literal notranslate"><span class="pre">time=</span></code>, and the other dimensions in one mapping, such as <code class="docutils literal notranslate"><span class="pre">dimensions={&quot;resolution&quot;:</span> <span class="pre">8,</span> <span class="pre">&quot;product&quot;:</span> <span class="pre">&quot;era5&quot;}</span></code>. A name the Registry has not declared raises <code class="docutils literal notranslate"><span class="pre">UnknownNameError</span></code>, so a misspelt name never looks like “no rule applies”. <a class="reference internal" href="extending.html#dimension-plugins"><span class="std std-ref">Extending queryearth</span></a> shows how to write your own kind.</p>
+<p>A rule file can declare its dimensions itself, so that <a class="reference internal" href="api.html#queryearth.Registry.from_file" title="queryearth.Registry.from_file"><code class="xref py py-meth docutils literal notranslate"><span class="pre">Registry.from_file()</span></code></a> reads it with no Python declarations (see <a class="reference internal" href="rules.html#rule-files"><span class="std std-ref">Rule files</span></a>). <a class="reference internal" href="api.html#queryearth.Registry.describe" title="queryearth.Registry.describe"><code class="xref py py-meth docutils literal notranslate"><span class="pre">Registry.describe()</span></code></a> tells a person or a program what a Registry can answer: its dimensions, the values its rules give on each (<a class="reference internal" href="api.html#queryearth.Registry.values" title="queryearth.Registry.values"><code class="xref py py-meth docutils literal notranslate"><span class="pre">Registry.values()</span></code></a>) and its rules, as JSON.</p>
 </section>
 <section id="queries-and-findings">
 <h2>Queries and findings<a class="headerlink" href="#queries-and-findings" title="Link to this heading"></a></h2>

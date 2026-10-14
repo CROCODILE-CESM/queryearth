@@ -5,14 +5,14 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>queryearth.dimensions &mdash; queryearth 0.1.1.dev6</title>
+  <title>queryearth.dimensions &mdash; queryearth 0.2.1.dev1</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
 
   
       <script src="../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../_static/documentation_options.js?v=66ec2c7e"></script>
+      <script src="../../_static/documentation_options.js?v=28304322"></script>
       <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../_static/versions.js?v=58ec1786"></script>
@@ -111,6 +111,8 @@
     <span class="s2">"TimeDimension"</span><span class="p">,</span>
     <span class="s2">"VersionRange"</span><span class="p">,</span>
     <span class="s2">"Versions"</span><span class="p">,</span>
+    <span class="s2">"describe_dimension"</span><span class="p">,</span>
+    <span class="s2">"dimension_from"</span><span class="p">,</span>
 <span class="p">]</span>
 
 
@@ -572,6 +574,7 @@
 <span class="w">    </span><span class="sd">"""A version dimension: rules give a union of OSV-style ranges (section 4.8)."""</span>
 
     <span class="n">name</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">description</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">""</span>
 
 <div class="viewcode-block" id="Versions.parse_rule">
 <a class="viewcode-back" href="../../api.html#queryearth.Versions.parse_rule">[docs]</a>
@@ -619,6 +622,51 @@
         <span class="k">return</span> <span class="n">DimMatch</span><span class="p">(</span><span class="n">hits</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">hits</span><span class="p">)</span> <span class="o">/</span> <span class="nb">len</span><span class="p">(</span><span class="n">query</span><span class="p">))</span></div>
 </div>
 
+
+
+<span class="c1"># ---- plain descriptions: a rule file's "dimensions" member -------------------------</span>
+<span class="n">_KINDS</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"axis"</span><span class="p">:</span> <span class="n">Axis</span><span class="p">,</span> <span class="s2">"labels"</span><span class="p">:</span> <span class="n">Labels</span><span class="p">,</span> <span class="s2">"versions"</span><span class="p">:</span> <span class="n">Versions</span><span class="p">}</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">describe_dimension</span><span class="p">(</span><span class="n">dimension</span><span class="p">:</span> <span class="n">Dimension</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">"""A dimension in the plain form a rule file's "dimensions" member uses, such</span>
+<span class="sd">    as {"name": "resolution", "kind": "axis", "unit": "km"}. A plugin's kind is</span>
+<span class="sd">    its class name; only axis, labels and versions can be made back from it."""</span>
+    <span class="n">kind</span> <span class="o">=</span> <span class="nb">next</span><span class="p">((</span><span class="n">k</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="bp">cls</span> <span class="ow">in</span> <span class="n">_KINDS</span><span class="o">.</span><span class="n">items</span><span class="p">()</span> <span class="k">if</span> <span class="nb">type</span><span class="p">(</span><span class="n">dimension</span><span class="p">)</span> <span class="ow">is</span> <span class="bp">cls</span><span class="p">),</span> <span class="kc">None</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">kind</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="p">{</span><span class="s2">"name"</span><span class="p">:</span> <span class="n">dimension</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="s2">"kind"</span><span class="p">:</span> <span class="nb">type</span><span class="p">(</span><span class="n">dimension</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="p">}</span>
+    <span class="n">described</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"name"</span><span class="p">:</span> <span class="n">dimension</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="s2">"kind"</span><span class="p">:</span> <span class="n">kind</span><span class="p">}</span>
+    <span class="k">if</span> <span class="n">kind</span> <span class="o">==</span> <span class="s2">"axis"</span><span class="p">:</span>
+        <span class="n">described</span><span class="p">[</span><span class="s2">"unit"</span><span class="p">]</span> <span class="o">=</span> <span class="n">dimension</span><span class="o">.</span><span class="n">unit</span>
+    <span class="k">if</span> <span class="n">dimension</span><span class="o">.</span><span class="n">description</span><span class="p">:</span>
+        <span class="n">described</span><span class="p">[</span><span class="s2">"description"</span><span class="p">]</span> <span class="o">=</span> <span class="n">dimension</span><span class="o">.</span><span class="n">description</span>
+    <span class="k">return</span> <span class="n">described</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">dimension_from</span><span class="p">(</span><span class="n">described</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dimension</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""The dimension a plain description declares: the inverse of describe_dimension."""</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">described</span><span class="p">,</span> <span class="n">Mapping</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">"a dimension is a mapping of name, kind and unit, not </span><span class="si">{</span><span class="n">described</span><span class="si">!r}</span><span class="s2">"</span>
+        <span class="p">)</span>
+    <span class="n">unknown</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">described</span><span class="p">)</span> <span class="o">-</span> <span class="p">{</span><span class="s2">"name"</span><span class="p">,</span> <span class="s2">"kind"</span><span class="p">,</span> <span class="s2">"unit"</span><span class="p">,</span> <span class="s2">"description"</span><span class="p">}</span>
+    <span class="k">if</span> <span class="n">unknown</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"unknown dimension keys </span><span class="si">{</span><span class="nb">sorted</span><span class="p">(</span><span class="n">unknown</span><span class="p">)</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+    <span class="n">kind</span> <span class="o">=</span> <span class="n">described</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"kind"</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">kind</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">_KINDS</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">"a dimension's kind is axis, labels or versions, not </span><span class="si">{</span><span class="n">kind</span><span class="si">!r}</span><span class="s2">; "</span>
+            <span class="s2">"declare a plugin dimension in Python"</span>
+        <span class="p">)</span>
+    <span class="n">fields</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s2">"name"</span><span class="p">:</span> <span class="n">described</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"name"</span><span class="p">),</span>
+        <span class="s2">"description"</span><span class="p">:</span> <span class="n">described</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"description"</span><span class="p">,</span> <span class="s2">""</span><span class="p">),</span>
+    <span class="p">}</span>
+    <span class="k">if</span> <span class="n">kind</span> <span class="o">==</span> <span class="s2">"axis"</span><span class="p">:</span>
+        <span class="n">fields</span><span class="p">[</span><span class="s2">"unit"</span><span class="p">]</span> <span class="o">=</span> <span class="n">described</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"unit"</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="s2">"unit"</span> <span class="ow">in</span> <span class="n">described</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"only an axis has a unit, not </span><span class="si">{</span><span class="n">kind</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">fields</span><span class="p">[</span><span class="s1">'name'</span><span class="p">]</span><span class="si">!r}</span><span class="s2">"</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">_KINDS</span><span class="p">[</span><span class="n">kind</span><span class="p">](</span><span class="o">**</span><span class="n">fields</span><span class="p">)</span>
 </pre></div>
 
            </div>

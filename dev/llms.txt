@@ -1,0 +1,151 @@
+# queryearth
+
+> queryearth matches rules, scoped by space, time and other dimensions, to queries, and returns findings: which rules apply, how much of the query each covers, and what each suggests changing. Python 3.11 or later, numpy and shapely. Install with `pip install queryearth`. Source: https://github.com/CROCODILE-CESM/queryearth. Docs: https://crocodile-cesm.github.io/queryearth/
+
+This page is for language models and other programs that write rules, check them and query them. Its rule file and its Python run as written: the package's tests run them.
+
+## The model
+
+- A rule has a `code`, a `title`, a `message`, a `level` and optional `changes`. A code is capitals and digits followed by three or four digits, such as `CROC001`; a prefix that ends in a digit takes a hyphen, such as `ERA5-014`. The level is `info`, `warning` or `error`, and defaults to warning for a rule without changes and info for a rule with changes. A change is `{target, key, value, rationale}`; queryearth never applies changes, the program using it does.
+- A rule's scope picks values on dimensions. Space and time are built in. Every other dimension is declared: an axis (numbers in one unit), labels (names) or versions.
+- Within one dimension, a rule's values are alternatives: several polygons, periods, ranges, names or versions mean any of them. Across dimensions, all must hold. A dimension the rule leaves out matches anything. "Or" across dimensions, such as "the Arctic in northern winter, or the Antarctic in southern winter", is two rules.
+- A query gives values on any subset of the dimensions. A rule applies when its scope and the query overlap on every dimension the rule constrains. When the query leaves out a dimension the rule constrains, the finding is conditional: it is hidden unless the query passes `include_conditional=True`, and its `conditional_on` names what is missing.
+
+## A rule file
+
+A rule file is a GeoJSON FeatureCollection. Its `dimensions` member declares the dimensions its rules use; each Feature is one rule.
+
+```json
+{
+  "type": "FeatureCollection",
+  "dimensions": [
+    {"name": "resolution", "kind": "axis", "unit": "km"},
+    {"name": "product", "kind": "labels"}
+  ],
+  "features": [
+    {
+      "type": "Feature",
+      "id": "MINE001",
+      "geometry": null,
+      "time": null,
+      "properties": {
+        "code": "MINE001",
+        "title": "Fine grid: turn off the eddy parametrization",
+        "message": "Below 10 km the model starts to resolve eddies itself.",
+        "changes": [{"target": "MOM_input", "key": "THICKNESSDIFFUSE", "value": false}],
+        "dimensions": {"resolution": {"lt": 10}}
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "MINE002",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[-92, 27], [-87, 27], [-87, 30.5], [-92, 30.5], [-92, 27]]]
+      },
+      "time": {"interval": ["1993-01-01", ".."]},
+      "properties": {
+        "code": "MINE002",
+        "title": "glorys is too fresh off the Mississippi",
+        "message": "Near the Mississippi delta, glorys surface salinity runs low.",
+        "level": "warning",
+        "dimensions": {"product": ["glorys"]},
+        "references": [{"title": "Where this comes from", "url": "https://example.org/source"}],
+        "evidence": [{"quote": "The words the rule rests on."}]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "MINE003",
+      "geometry": null,
+      "time": null,
+      "properties": {
+        "code": "MINE003",
+        "title": "Consider active sea ice in the Arctic winter",
+        "message": "Sea ice forms north of 66.5 degrees from December to March.",
+        "box": {"west": -180, "width": 360, "south": 66.5, "north": 90},
+        "recurrence": {"months": [12, 1, 2, 3]},
+        "changes": [{"target": "compset", "key": "ice", "value": "CICE"}]
+      }
+    }
+  ]
+}
+```
+
+- `geometry` is a Polygon or MultiPolygon in longitude and latitude degrees, or null for everywhere. Edges are straight lines in longitude and latitude. A ring that crosses ±180 is split there, so write a shape across the date line as it runs, for example from 170 to -170. A ring that goes all the way around a pole is refused: close it along latitude 90 or -90, or use a box.
+- `box` in properties is `{west, width, south, north}`, with the width in degrees eastward (more than 0, at most 360); `geometry` must then be null. `{"west": -180, "width": 360, "south": 60, "north": 90}` is everything north of 60°N.
+- `time` is the Feature's top-level member: `{"interval": [start, end]}` with ISO 8601 dates and `".."` for an open end, `{"date": ...}`, `{"timestamp": ...}`, or null for always. An end date covers its whole day. In properties, `recurrence` (`{"months": [12, 1, 2]}`) limits a rule to those months every year, and `periods` (a list of `[start, end]`) to several intervals inside `time`.
+- `dimensions` in properties gives a value on each other dimension by name, in the forms below.
+- Other properties: `instruction` (what to do, in words), `confidence` (`observed`, `likely`, `possible` or `unknown`), `action` (`can_be_used`, `use_with_caution`, `do_not_use` or `replaced`), `references` and `evidence` (lists of objects, such as `{"title", "url"}` and `{"quote"}`), `status` (`draft`, `reviewed` or `deprecated`), `min_overlap`, `aliases`, `created`, `updated`, `withdrawn`, `supersedes`, and `x_*` for your own fields. Any other property is refused.
+
+## Dimension values
+
+| Kind | A rule gives | A query gives |
+|---|---|---|
+| axis | a range: `{"lt": 10}`, with any of `gt`, `ge`, `lt`, `le` (and optionally `"unit"`); or a list of ranges that do not overlap: `[{"lt": 5}, {"gt": 50}]` | a number, or `[lo, hi]` |
+| labels | names, with `*` and `?` wildcards: `["glorys", "era5*"]`; or `{"any_of": [...], "none_of": [...]}` | one or more names |
+| versions | `{"introduced": "4.00", "fixed": "4.09"}` (or `last_affected`), `{"versions": ["ERA5T"]}`, or a list of these | one or more versions |
+
+Names are case-sensitive. An axis's unit, when a rule gives one, must equal the declared unit: queryearth converts nothing.
+
+## Check and query a rule file
+
+```python
+import queryearth as qe
+from queryearth import space as sp
+
+registry = qe.Registry.from_file("rules.geojson")  # qe.LoadError lists every problem
+described = registry.describe()  # its dimensions, the values its rules give, its rules
+
+findings = registry.query(
+    space=sp.box(-98, 18, -80, 31),  # west, south, east, north
+    time=qe.interval("2020-01-01", "2020-12-31"),
+    dimensions={"resolution": 8, "product": "glorys"},
+)
+text = qe.report(findings)  # for people: level, code, title, message, changes
+data = [finding.to_dict() for finding in findings]  # for programs: JSON-ready
+```
+
+A `qe.LoadError` has `problems`, a tuple of strings that each name the file, the feature's position and its code. A failed load adds nothing, so fix every problem and load again. A query that names an undeclared dimension raises `qe.UnknownNameError`.
+
+## Write rules in Python
+
+```python
+import json
+
+mine = qe.Registry("mine", dimensions=[qe.Axis("resolution", "km"), qe.Labels("product")])
+rule = qe.Rule(
+    code="MINE010",
+    title="Fine grid: turn off the eddy parametrization",
+    message="Below 10 km the model starts to resolve eddies itself.",
+    changes=[qe.Change("MOM_input", "THICKNESSDIFFUSE", False)],
+    scope=qe.Scope(dimensions={"resolution": {"lt": 10}}),
+)
+mine.add(rule)
+
+
+@mine.rule("MINE011", dimensions={"resolution": {"gt": 0}})
+def time_step(query, match):
+    """Set the time step from the smallest cells"""
+    smallest_km = match.dimensions["resolution"].overlap[0].lo
+    return {"changes": [qe.Change("settings", "dt", 30.0 * smallest_km)]}  # illustrative
+
+
+collection = {
+    "type": "FeatureCollection",
+    "dimensions": mine.describe()["dimensions"],
+    "features": [rule.to_feature()],  # a computed rule is code: it has no record
+}
+with open("mine.geojson", "w") as f:
+    json.dump(collection, f, indent=2)
+```
+
+`qe.Scope` takes `space=` (from `queryearth.space`: `box(west, south, east, north)`, `polygon(geojson_or_shapely)` or `point(lon, lat)` for queries), `time=` (`qe.interval(start, end)`, or `qe.parse_time(None, recurrence={"months": [...]})`) and `dimensions=`. A computed rule's function returns True for one finding, False or None for none, or a mapping of finding fields to override.
+
+## Findings
+
+Findings come sorted: highest level first, then those without changes, then by code. Each has the rule's `code`, `title`, `message`, `level` (a `logging` level number), `changes`, `instruction`, `confidence`, `action`, `status`, `references` and `evidence`, and how it matched: `area_fraction` and `overlap_km2` (how much of the query's area the rule covers), `time_overlap` and `time_fraction`, `dimensions` (for each other dimension, an object with `overlap` and `fraction`), and `conditional_on`. `str(finding)` is a one-line summary to log, such as `[MINE002] glorys is too fresh off the Mississippi (area 7%; 2020-01-01..2020-12-31; draft)`.
+
+## Spaces from model grids
+
+`queryearth.converters.grid_outline(lon, lat)` turns the corners of a curvilinear grid's cells (2-D arrays shaped `(ny + 1, nx + 1)`) into the polygon of its outline, split at ±180; a grid around a pole becomes the polar cap beyond its outline.

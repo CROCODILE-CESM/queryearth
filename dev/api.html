@@ -6,14 +6,14 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>API reference &mdash; queryearth 0.1.1.dev6</title>
+  <title>API reference &mdash; queryearth 0.2.1.dev1</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
 
   
       <script src="_static/jquery.js?v=5d32c60e"></script>
       <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="_static/documentation_options.js?v=66ec2c7e"></script>
+      <script src="_static/documentation_options.js?v=28304322"></script>
       <script src="_static/doctools.js?v=fd6eb6e6"></script>
       <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="_static/versions.js?v=58ec1786"></script>
@@ -88,8 +88,11 @@
 <li class="toctree-l3"><a class="reference internal" href="#queryearth.Registry.default"><code class="docutils literal notranslate"><span class="pre">Registry.default()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#queryearth.Registry.add_dimension"><code class="docutils literal notranslate"><span class="pre">Registry.add_dimension()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#queryearth.Registry.add"><code class="docutils literal notranslate"><span class="pre">Registry.add()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#queryearth.Registry.from_file"><code class="docutils literal notranslate"><span class="pre">Registry.from_file()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#queryearth.Registry.load"><code class="docutils literal notranslate"><span class="pre">Registry.load()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#queryearth.Registry.rule"><code class="docutils literal notranslate"><span class="pre">Registry.rule()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#queryearth.Registry.values"><code class="docutils literal notranslate"><span class="pre">Registry.values()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#queryearth.Registry.describe"><code class="docutils literal notranslate"><span class="pre">Registry.describe()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#queryearth.Registry.query"><code class="docutils literal notranslate"><span class="pre">Registry.query()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#queryearth.Registry.query_points"><code class="docutils literal notranslate"><span class="pre">Registry.query_points()</span></code></a></li>
 </ul>
@@ -395,13 +398,24 @@ redefining a computed rule with the same qualified name replaces it (Q10).</p>
 </dd></dl>
 
 <dl class="py method">
+<dt class="sig sig-object py" id="queryearth.Registry.from_file">
+<span class="property"><span class="k"><span class="pre">classmethod</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">from_file</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">PathLike</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#queryearth.Registry" title="queryearth.registry.Registry"><span class="pre">Registry</span></a></span></span><a class="reference internal" href="_modules/queryearth/registry.html#Registry.from_file"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#queryearth.Registry.from_file" title="Link to this definition"></a></dt>
+<dd><p>A Registry made for one rule file, with its rules loaded.</p>
+<p>The file declares the dimensions its rules use in its “dimensions”
+member, in the form describe() gives: [{“name”: “resolution”, “kind”:
+“axis”, “unit”: “km”}, {“name”: “product”, “kind”: “labels”}]. Space and
+time need no declaring. Raises LoadError as load() does.</p>
+</dd></dl>
+
+<dl class="py method">
 <dt class="sig sig-object py" id="queryearth.Registry.load">
 <span class="sig-name descname"><span class="pre">load</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">PathLike</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="_modules/queryearth/registry.html#Registry.load"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#queryearth.Registry.load" title="Link to this definition"></a></dt>
 <dd><p>Add the rules of one GeoJSON file, a FeatureCollection or a single Feature.</p>
 <p>Returns the codes loaded; their findings have the file name as source.
 Loading never runs code. Raises LoadError listing every problem with the
 file, the feature’s position and its code, and then leaves the Registry
-as it was.</p>
+as it was. A file that declares its dimensions must declare them as this
+Registry does.</p>
 </dd></dl>
 
 <dl class="py method">
@@ -409,6 +423,24 @@ as it was.</p>
 <span class="sig-name descname"><span class="pre">rule</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">code</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">meta</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Callable</span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">[</span></span><span class="pre">Callable</span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#queryearth.Query" title="queryearth.objects.Query"><span class="pre">Query</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="#queryearth.Match" title="queryearth.objects.Match"><span class="pre">Match</span></a><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">bool</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Mapping</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Iterable</span><span class="p"><span class="pre">[</span></span><span class="pre">Mapping</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Callable</span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#queryearth.Query" title="queryearth.objects.Query"><span class="pre">Query</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="#queryearth.Match" title="queryearth.objects.Match"><span class="pre">Match</span></a><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">bool</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Mapping</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Iterable</span><span class="p"><span class="pre">[</span></span><span class="pre">Mapping</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="_modules/queryearth/registry.html#Registry.rule"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#queryearth.Registry.rule" title="Link to this definition"></a></dt>
 <dd><p>Register a function (query, match) -&gt; CheckResult as a computed rule.</p>
 <p>Takes the keywords of ComputedRule; the title comes from the docstring.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="queryearth.Registry.values">
+<span class="sig-name descname"><span class="pre">values</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="_modules/queryearth/registry.html#Registry.values"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#queryearth.Registry.values" title="Link to this definition"></a></dt>
+<dd><p>Every distinct value the rules give on one declared dimension, as they
+give it and in the order the rules were added. A list means any of its
+items, so a list is split into its items: [“glorys”, “era5*”] gives
+“glorys” and “era5*”.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="queryearth.Registry.describe">
+<span class="sig-name descname"><span class="pre">describe</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="_modules/queryearth/registry.html#Registry.describe"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#queryearth.Registry.describe" title="Link to this definition"></a></dt>
+<dd><p>What this Registry can answer, as a JSON-ready dict: its declared
+dimensions in the form of a rule file’s “dimensions” member, the values its
+rules give on each (values()), and each rule’s code, title and level.
+Space and time are always there and are not listed.</p>
 </dd></dl>
 
 <dl class="py method">
@@ -606,7 +638,7 @@ refuses it in rules and queries alike (sections 4.6 and 4.7).</p>
 
 <dl class="py class">
 <dt class="sig sig-object py" id="queryearth.Versions">
-<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">queryearth.</span></span><span class="sig-name descname"><span class="pre">Versions</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/queryearth/dimensions.html#Versions"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#queryearth.Versions" title="Link to this definition"></a></dt>
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">queryearth.</span></span><span class="sig-name descname"><span class="pre">Versions</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">description</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">''</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/queryearth/dimensions.html#Versions"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#queryearth.Versions" title="Link to this definition"></a></dt>
 <dd><p>A version dimension: rules give a union of OSV-style ranges (section 4.8).</p>
 <dl class="py method">
 <dt class="sig sig-object py" id="queryearth.Versions.parse_rule">
