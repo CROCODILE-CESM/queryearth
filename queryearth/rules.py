@@ -87,9 +87,6 @@ def binding_of(rule: Any) -> Binding:
     return found
 
 
-_GROUP_NAMES = ("space", "time", "axes", "facets", "dims")
-
-
 def match_scope(
     registry: Registry,
     scope: CompiledScope,
@@ -100,16 +97,16 @@ def match_scope(
 
     Returns None when some dimension fails; otherwise the Match, whose
     conditional_on names the undecided dimensions in the Registry's order (space,
-    time, axes, facets, other plugins, then context keys), and details that
-    hold recurrence_months when time is undecided. Dimensions marked late run
-    after the others, so the costly spatial test runs last.
+    time, the declared dimensions, then context keys), and details that hold
+    recurrence_months when time is undecided. Dimensions marked late run after
+    the others, so the costly spatial test runs last.
     """
     if parsed is None:
         parsed = registry._parse_query(query)
     undecided: set[str] = set()
     found: dict[str, DimMatch] = {}
     for late in (False, True):
-        for name, dimension, _ in registry._groups:
+        for name, dimension in registry._dimensions.items():
             if getattr(dimension, "late", False) != late:
                 continue
             rule, value = scope.values.get(name), parsed.get(name)
@@ -124,30 +121,26 @@ def match_scope(
             found[name] = dimension.match(rule, value)
             if found[name] is None:
                 return None
-    groups: dict[str, dict[str, Any]] = {g: {} for g in _GROUP_NAMES}
-    for name, dimension, group in registry._groups:
+    hits: dict[str, DimMatch] = {}
+    for name, dimension in registry._dimensions.items():
         if name in found:
-            hit = found[name]
-            if group == "dims" and hasattr(dimension, "to_json"):
-                hit = dataclasses.replace(hit, to_json=dimension.to_json)
-            groups[group][name] = hit if group == "dims" else hit.overlap
+            hits[name] = found[name]
+            if hasattr(dimension, "to_json"):
+                hits[name] = dataclasses.replace(hits[name], to_json=dimension.to_json)
         elif name in undecided and hasattr(dimension, "extent"):  # the rule's own
-            extent = dimension.extent(scope.values[name])
-            groups[group][name] = DimMatch(extent) if group == "dims" else extent
+            hits[name] = DimMatch(dimension.extent(scope.values[name]))
     details: dict[str, Any] = {}
     if "time" in undecided and scope.values["time"].months is not None:
         details["recurrence_months"] = sorted(scope.values["time"].months)
-    space, time = found.get("space"), found.get("time")
-    conditional = [name for name, _, _ in registry._groups if name in undecided]
+    space, time = hits.pop("space", None), hits.pop("time", None)
+    conditional = [name for name in registry._dimensions if name in undecided]
     conditional += [f"context:{k}" for k in scope.requires if k not in query.context]
     match = Match(
         area_fraction=None if space is None else space.fraction,
         overlap_km2=None if space is None else space.overlap,
-        time_overlap=groups["time"].get("time", ()),
+        time_overlap=() if time is None else time.overlap,
         time_fraction=None if time is None else time.fraction,
-        axes=groups["axes"],
-        matched_facets=groups["facets"],
-        dims=groups["dims"],
+        dimensions=hits,
         conditional_on=tuple(conditional),
     )
     return match, details
@@ -230,7 +223,7 @@ _RULE_KEYS = tuple(f.name for f in dataclasses.fields(Outcome)) + tuple(
     "created updated withdrawn supersedes aliases".split()
 )
 _RECORD_KEYS = set(_RULE_KEYS) | set(
-    "facets axes dimensions box periods recurrence time_start time_end".split()
+    "dimensions box periods recurrence time_start time_end".split()
 )
 _EXTENSION = re.compile(r"x_[a-z0-9_]+")
 
@@ -282,7 +275,7 @@ class Rule(Outcome):
     def from_feature(cls, feature: Mapping[str, Any]) -> Rule:
         """Read one GeoJSON record (section 5); errors name the record's code.
 
-        Registry.add then checks its names, and plugin dimensions their values.
+        Registry.add then checks its names, and each dimension its values.
         """
         props = feature.get("properties") if isinstance(feature, Mapping) else None
         code = props.get("code") if isinstance(props, Mapping) else None
@@ -324,19 +317,8 @@ class Rule(Outcome):
         space = None if geometry is None else sp.polygon(geometry)
         if box is not None:
             space = box_of(box)
-        for key in ("facets", "axes", "dimensions"):
-            if not isinstance(props.get(key, {}), Mapping):
-                raise ValueError(f"{key} is an object")
-        for name, value in props.get("facets", {}).items():
-            if not isinstance(value, (list, Mapping)):  # no bare strings in records
-                raise ValueError(f"facet {name!r} is a list of patterns or an object")
-        scope = Scope(
-            space,
-            parse_time(feature.get("time"), **props),
-            props.get("axes", {}),
-            props.get("facets", {}),
-            props.get("dimensions", {}),
-        )
+        time = parse_time(feature.get("time"), **props)
+        scope = Scope(space, time, props.get("dimensions", {}))
         fields = {k: props[k] for k in _RULE_KEYS if k in props}
         extensions = {k: v for k, v in props.items() if k.startswith("x_")}
         return cls(**fields, scope=scope, extensions=extensions)
@@ -354,10 +336,7 @@ class Rule(Outcome):
             raise ValueError(f"{self.code}: a record's level is info, warning or error")
         props = {k: getattr(self, k) for k in _RULE_KEYS}
         props["level"] = level if self.level != LEVELS[self.kind] else None
-        props["facets"] = {
-            k: [v] if isinstance(v, str) else v for k, v in self.scope.facets.items()
-        }
-        props |= {"axes": self.scope.axes, "dimensions": self.scope.dims}
+        props["dimensions"] = self.scope.dimensions
         defaults = {f.name: f.default for f in dataclasses.fields(Rule)}
         props = {k: v for k, v in props.items() if v != defaults.get(k, {})}
         time, geometry, spec = None, None, self.scope.time
@@ -394,7 +373,7 @@ class Rule(Outcome):
 OUTCOME_KEYS = tuple(f.name for f in dataclasses.fields(Outcome) if f.name != "code")
 META_KEYS = frozenset(
     OUTCOME_KEYS
-    + ("facets", "axes", "dims", "space", "time", "requires")
+    + ("dimensions", "space", "time", "requires")
     + ("supersedes", "withdrawn")
 )
 
@@ -410,8 +389,8 @@ class ComputedRule:
 
     Class keywords give its identity and scope: code, registry (default
     Registry.default()), abstract, the Outcome fields (kind defaults to warning,
-    level to the kind's default, title and message to the docstring), facets,
-    axes, dims, space (a Space), time and requires (keys of Query.context).
+    level to the kind's default, title and message to the docstring), space (a
+    Space), time, dimensions and requires (keys of Query.context).
     Defining a subclass registers one instance; a subclass inherits its bases'
     keywords, merged, with its own winning (Q9).
 

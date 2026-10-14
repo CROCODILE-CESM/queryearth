@@ -1,8 +1,9 @@
 """Dimensions: every kind of scope, through one interface (section 4.13).
 
 A dimension decides only whether one rule value meets one query value; the
-Registry does everything else (conditional findings, unknown names, sorting). Space and time are built in on every Registry and cannot be replaced.
-Axis (numeric ranges), Labels (facets matched by glob patterns) and Versions
+Registry does everything else (conditional findings, unknown names, sorting).
+Space and time are built in on every Registry and cannot be replaced. Axis
+(numeric ranges), Labels (names matched by glob patterns) and Versions
 (OSV-style version ranges) are the built-in plugins, and a user plugin
 implements the same four members.
 """
@@ -19,11 +20,11 @@ from typing import Any, Protocol, runtime_checkable
 import numpy as np
 
 from queryearth import space as sp
-from queryearth.objects import AxisOverlap
 from queryearth.time import TimeSpec, overlap, time_fraction
 
 __all__ = [
     "Axis",
+    "AxisOverlap",
     "DimMatch",
     "Dimension",
     "Labels",
@@ -150,6 +151,27 @@ def _string_list(value: Any, what: str) -> tuple[str, ...]:
 
 
 # ---- Axis: a named ordered dimension in one unit ----------------------------------
+@dataclass(frozen=True)
+class AxisOverlap:
+    """An interval on one axis that keeps its open ends, such as [8, 10).
+
+    An open end at infinity has its closed flag False.
+    """
+
+    lo: float
+    hi: float
+    lo_closed: bool = True
+    hi_closed: bool = True
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "lo", float(self.lo))
+        object.__setattr__(self, "hi", float(self.hi))
+        if math.isnan(self.lo) or math.isnan(self.hi) or self.lo > self.hi:
+            raise ValueError(
+                f"an axis interval needs lo <= hi, got {self.lo}, {self.hi}"
+            )
+
+
 def axis_intersection(rule: AxisOverlap, lo: float, hi: float) -> AxisOverlap | None:
     """The intersection of a rule interval with the closed range [lo, hi]."""
     start = max(rule.lo, lo)
@@ -231,10 +253,10 @@ class Axis:
         return rule
 
 
-# ---- Labels: a facet matched by case-sensitive fnmatch globs ----------------------
+# ---- Labels: names matched by case-sensitive fnmatch globs -------------------------
 @dataclass(frozen=True)
 class Patterns:
-    """A parsed facet rule: values must match some any_of and no none_of."""
+    """A parsed label rule: values must match some any_of and no none_of."""
 
     any_of: tuple[str, ...] | None  # None: any value not excluded
     none_of: tuple[str, ...] = ()
@@ -247,32 +269,34 @@ class Patterns:
 
 @dataclass(frozen=True)
 class Labels:
-    """A categorical facet: rule patterns against query values (section 4.7)."""
+    """A label dimension: names, which rules match with glob patterns (section 4.7)."""
 
     name: str
     description: str = ""
 
     def parse_rule(self, value: Any) -> Patterns:
+        what = f"label dimension {self.name!r}"
         if isinstance(value, Patterns):
             return value
         if not isinstance(value, Mapping):
-            return Patterns(_string_list(value, f"facet {self.name!r}"))
+            return Patterns(_string_list(value, what))
         unknown = set(value) - {"any_of", "none_of"}
         if unknown or not value:
             raise ValueError(
-                f"facet {self.name!r} takes a list of patterns or "
+                f"{what} takes a list of patterns or "
                 f"{{'any_of': [...], 'none_of': [...]}}, got {dict(value)!r}"
             )
         any_of = None
         if "any_of" in value:
-            any_of = _string_list(value["any_of"], f"facet {self.name!r} any_of")
+            any_of = _string_list(value["any_of"], f"{what} any_of")
         none_of = ()
         if "none_of" in value:
-            none_of = _string_list(value["none_of"], f"facet {self.name!r} none_of")
+            none_of = _string_list(value["none_of"], f"{what} none_of")
         return Patterns(any_of, none_of)
 
     def parse_query(self, value: Any) -> tuple[str, ...]:
-        return tuple(dict.fromkeys(_string_list(value, f"facet {self.name!r}")))
+        what = f"label dimension {self.name!r}"
+        return tuple(dict.fromkeys(_string_list(value, what)))
 
     def match(self, rule: Patterns, query: tuple[str, ...]) -> DimMatch | None:
         hits = tuple(v for v in query if rule.admits(v))
@@ -357,17 +381,17 @@ class VersionRange:
 
 @dataclass(frozen=True)
 class Versions:
-    """The version facet: a union of OSV-style ranges (section 4.8)."""
+    """A version dimension: rules give a union of OSV-style ranges (section 4.8)."""
 
-    name: str = "version"
+    name: str
 
     def parse_rule(self, value: Any) -> tuple[VersionRange, ...]:
         if isinstance(value, Mapping):
             value = [value]
         if isinstance(value, str) or not isinstance(value, Iterable):
             raise ValueError(
-                f"facet {self.name!r} takes a version range or a list of them, "
-                f"not {value!r}"
+                f"dimension {self.name!r} takes a version range or a list of "
+                f"them, not {value!r}"
             )
         ranges = []
         for item in value:
@@ -384,11 +408,11 @@ class Versions:
                 fields["versions"] = _string_list(fields["versions"], "versions")
             ranges.append(VersionRange(**fields))
         if not ranges:
-            raise ValueError(f"facet {self.name!r} needs at least one range")
+            raise ValueError(f"dimension {self.name!r} needs at least one range")
         return tuple(ranges)
 
     def parse_query(self, value: Any) -> tuple[str, ...]:
-        return tuple(dict.fromkeys(_string_list(value, f"facet {self.name!r}")))
+        return tuple(dict.fromkeys(_string_list(value, f"dimension {self.name!r}")))
 
     def match(
         self, rule: tuple[VersionRange, ...], query: tuple[str, ...]

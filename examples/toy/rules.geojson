@@ -21,7 +21,7 @@
         "message": "Few salinity profiles went into toy_ocean before 2004, so its salinity drifts in that period.",
         "instruction": "Start after 2004 if you can.",
         "action": "use_with_caution",
-        "facets": {
+        "dimensions": {
           "product": [
             "toy_ocean"
           ],
@@ -68,7 +68,7 @@
         "kind": "warning",
         "title": "toy_ocean is too warm in the Bering Sea in winter",
         "message": "From December to March, toy_ocean sea temperature in the Bering Sea runs about 1 K too warm.",
-        "facets": {
+        "dimensions": {
           "product": [
             "toy_ocean"
           ],
@@ -104,7 +104,7 @@
         "message": "toy_atmos precipitation from June to August 2015 was produced with a faulty input file.",
         "level": "error",
         "action": "do_not_use",
-        "facets": {
+        "dimensions": {
           "product": [
             "toy_atmos"
           ],
@@ -132,7 +132,7 @@
         "message": "toy_coastal has no data before 2010.",
         "level": "error",
         "action": "do_not_use",
-        "facets": {
+        "dimensions": {
           "product": [
             "toy_coastal"
           ]
@@ -157,7 +157,7 @@
         "message": "toy_coastal has no data after 2023.",
         "level": "error",
         "action": "do_not_use",
-        "facets": {
+        "dimensions": {
           "product": [
             "toy_coastal"
           ]
@@ -225,7 +225,7 @@
         "message": "toy_coastal has data only in one box, roughly the Gulf of Mexico.",
         "level": "error",
         "action": "do_not_use",
-        "facets": {
+        "dimensions": {
           "product": [
             "toy_coastal"
           ]
@@ -249,7 +249,7 @@
           "south": 66.5,
           "north": 90
         },
-        "facets": {
+        "dimensions": {
           "model": [
             "mom6"
           ]
@@ -275,7 +275,7 @@
         "kind": "suggestion",
         "title": "Fine grid: turn off the coarse-grid eddy scheme",
         "message": "Below 10 km the model starts to resolve eddies itself.",
-        "axes": {
+        "dimensions": {
           "resolution": {
             "lt": 10,
             "unit": "km"
@@ -302,7 +302,7 @@
         "kind": "suggestion",
         "title": "Coarse grid: raise the toy viscosity",
         "message": "At 50 km or coarser, the toy model needs more viscosity to stay stable.",
-        "axes": {
+        "dimensions": {
           "resolution": {
             "ge": 50,
             "unit": "km"

@@ -8,7 +8,15 @@ There are three ways to write a rule: a {class}`~queryearth.Rule` built in Pytho
 import queryearth as qe
 from queryearth import space as sp
 
-registry = qe.Registry("mine", axes=[qe.Axis("resolution", "km")])
+registry = qe.Registry(
+    "mine",
+    dimensions=[
+        qe.Axis("resolution", "km"),
+        qe.Labels("product"),
+        qe.Labels("variable"),
+        qe.Labels("model"),
+    ],
+)
 rule = qe.Rule(
     code="MINE001",
     kind="warning",
@@ -17,23 +25,23 @@ rule = qe.Rule(
     action="use_with_caution",
     scope=qe.Scope(
         space=sp.box(-98, 18, -80, 31),
-        facets={"variable": ["thetao", "so"]},
+        dimensions={"variable": ["thetao", "so"]},
     ),
 )
 registry.add(rule)
 ```
 
-`kind` is `"warning"` or `"suggestion"`, and a suggestion lists at least one {class}`~queryearth.Suggestion`. `level` defaults to `logging.WARNING` for a warning and `logging.INFO` for a suggestion; give another `logging` level, or its name such as `"error"`, to change it. Adding a code that is already on the Registry raises `DuplicateCodeError`.
+A {class}`~queryearth.Scope` takes `space`, `time` and, in `dimensions`, a value for each other [dimension](concepts.md#dimensions) the rule constrains, by its declared name. `kind` is `"warning"` or `"suggestion"`, and a suggestion lists at least one {class}`~queryearth.Suggestion`. `level` defaults to `logging.WARNING` for a warning and `logging.INFO` for a suggestion; give another `logging` level, or its name such as `"error"`, to change it. Adding a code that is already on the Registry raises `DuplicateCodeError`.
 
 ## Computed rules
 
 A computed rule decides its outcome from the query, or from data the caller passes in `Query.context`. Register a function with `@registry.rule`; its docstring is the title:
 
 ```python
-@registry.rule("MINE102", kind="suggestion", axes={"resolution": {"gt": 0}})
+@registry.rule("MINE102", kind="suggestion", dimensions={"resolution": {"gt": 0}})
 def time_step(query, match):
     """Set the time step from the finest cells"""
-    finest_km = match.axes["resolution"].lo
+    finest_km = match.dimensions["resolution"].overlap.lo
     return {"suggestions": [qe.Suggestion("settings", "dt", 30.0 * finest_km)]}
 ```
 
@@ -47,7 +55,7 @@ A rule file is a GeoJSON file holding a FeatureCollection of records, or a singl
 codes = registry.load("examples/toy/rules.geojson")
 ```
 
-Loading never runs code. Every problem is reported at once in a `LoadError` that names the file, the feature's position and its code, and the Registry is left unchanged. The axes, facets and plugin dimensions the records use must be declared on the Registry first; products need no declaration, since records name them in the `product` facet. A finding from a loaded rule has the file name as its `source`. A Feature or FeatureCollection mapping can also be added directly with `Registry.add(mapping)`.
+Loading never runs code. Every problem is reported at once in a `LoadError` that names the file, the feature's position and its code, and the Registry is left unchanged. The [dimensions](concepts.md#dimensions) the records use must be declared on the Registry first. Products need no declaration of their own: records name them as values of a `product` label dimension. A finding from a loaded rule has the file name as its `source`. A Feature or FeatureCollection mapping can also be added directly with `Registry.add(mapping)`.
 
 ### Records
 
@@ -57,7 +65,7 @@ Each rule is one GeoJSON Feature. Its `geometry` is a Polygon, a MultiPolygon or
 |---|---|
 | Identity and outcome | `code`, `kind` (`warning` or `suggestion`), `title` and `message`, all required; `level` (`info`, `warning` or `error`; by default `warning` for a warning and `info` for a suggestion) |
 | Advice | `instruction`, `confidence`, `action`, and `suggestions` (required for a suggestion) |
-| Scope | `facets`, `axes`, `dimensions` (for plugin dimensions), `box` (`{west, width, south, north}`, a shorthand for a polygon; geometry must then be null), `periods` (intervals inside `time`), `recurrence` (`{"months": [12, 1, 2]}`), and the fallback `time_start` and `time_end` |
+| Scope | `dimensions` (the value on each other dimension, by name), `box` (`{west, width, south, north}`, a shorthand for a polygon; geometry must then be null), `periods` (intervals inside `time`), `recurrence` (`{"months": [12, 1, 2]}`), and the fallback `time_start` and `time_end` |
 | Overlap | `min_overlap`, an area fraction from 0 to 1 below which the finding is too small to count, which you can filter on |
 | Provenance | `evidence`, `references`, `aliases` |
 | Lifecycle | `status` (`draft`, `reviewed` or `deprecated`; a reviewed record cites a reference), `created`, `updated`, `withdrawn` (kept for history, never matched), `supersedes` |
@@ -79,7 +87,7 @@ A record from the toy rule file:
     "kind": "warning",
     "title": "toy_ocean is too warm in the Bering Sea in winter",
     "message": "From December to March, toy_ocean sea temperature in the Bering Sea runs about 1 K too warm.",
-    "facets": {"product": ["toy_ocean"], "variable": ["thetao"]},
+    "dimensions": {"product": ["toy_ocean"], "variable": ["thetao"]},
     "recurrence": {"months": [12, 1, 2, 3]},
     "status": "draft"
   }
@@ -88,9 +96,11 @@ A record from the toy rule file:
 
 Its ring crosses the antimeridian the way most tools write it, from 165 to -160, and queryearth splits it at ±180.
 
+The values in `dimensions` take the forms in the [table of dimensions](concepts.md#dimensions).
+
 ### Writing records
 
-{meth}`Rule.to_feature() <queryearth.Rule.to_feature>` turns a rule back into a record, leaving out the fields at their defaults, so that `Rule.from_feature(rule.to_feature())` gives the same rule. A `box` is written as its polygon, split at ±180, and time as the `time` member plus `periods` and `recurrence` where needed. A rule whose space is a point, or whose level is not info, warning or error, has no record form and raises `ValueError`. A computed rule is code, so it has no record form either. To write rules to a file:
+{meth}`Rule.to_feature() <queryearth.Rule.to_feature>` turns a rule back into a record, leaving out the fields at their defaults and writing the scope's `dimensions` as given, so that `Rule.from_feature(rule.to_feature())` gives the same rule. A `box` is written as its polygon, split at ±180, and time as the `time` member plus `periods` and `recurrence` where needed. A rule whose space is a point, or whose level is not info, warning or error, has no record form and raises `ValueError`. A computed rule is code, so it has no record form either. To write rules to a file:
 
 ```python
 import json

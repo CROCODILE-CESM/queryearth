@@ -23,9 +23,18 @@ def union(*spaces):
     return sp.polygon(shapely.union_all([s.geometry for s in spaces]))
 
 
-def make_registry(**kw):
-    """A resolution axis and the default facets."""
-    return qe.Registry("test", axes=[qe.Axis("resolution", "km")], **kw)
+DIMENSIONS = [
+    qe.Axis("resolution", "km"),
+    qe.Labels("product"),
+    qe.Labels("variable"),
+    qe.Versions("version"),
+    qe.Labels("model"),
+]
+
+
+def make_registry(*extra):
+    """A resolution axis, labels for product, variable and model, and versions."""
+    return qe.Registry("test", dimensions=[*DIMENSIONS, *extra])
 
 
 def warning_rule(code, **scope):
@@ -47,7 +56,7 @@ def test_fixture_12_untimed_rules_and_queries():
         warning_rule(
             "TST003",
             time=qe.interval("2000-01-01", "2006-12-31"),
-            facets={"product": "cru_ts"},
+            dimensions={"product": "cru_ts"},
         )
     )
     (a,) = registry.query()
@@ -58,7 +67,9 @@ def test_fixture_12_untimed_rules_and_queries():
     assert c["TST002"].conditional_on == ("time",)
     assert c["TST002"].time_overlap == (("2000-01-01", "2006-12-31"),)
     cru_ts = ("1901-01-01", "2022-12-31")
-    d = {f.code: f for f in registry.query(facets={"product": "cru_ts"}, time=cru_ts)}
+    d = {
+        f.code: f for f in registry.query(dimensions={"product": "cru_ts"}, time=cru_ts)
+    }
     assert d["TST003"].conditional_on == ()
     assert d["TST003"].time_fraction == pytest.approx(2557 / 44560)
     assert round(d["TST003"].time_fraction, 4) == 0.0574
@@ -73,7 +84,9 @@ def croc_registry():
             kind="suggestion",
             title="Arctic domain: consider active sea ice",
             message="m",
-            scope=qe.Scope(space=sp.box(-180, 66.5, 180, 90), facets={"model": "mom6"}),
+            scope=qe.Scope(
+                space=sp.box(-180, 66.5, 180, 90), dimensions={"model": "mom6"}
+            ),
             suggestions=(qe.Suggestion("compset", "ice_component", "CICE"),),
         )
     )
@@ -83,7 +96,7 @@ def croc_registry():
             kind="suggestion",
             title="Eddy-resolving grid",
             message="m",
-            scope=qe.Scope(axes={"resolution": {"lt": 10.0}}),
+            scope=qe.Scope(dimensions={"resolution": {"lt": 10.0}}),
             suggestions=(qe.Suggestion("MOM_input", "THICKNESSDIFFUSE", False),),
         )
     )
@@ -92,22 +105,26 @@ def croc_registry():
 
 def test_fixture_17_resolution_only():
     registry = croc_registry()
-    (only,) = registry.query(axes={"resolution": 8.0})
+    (only,) = registry.query(dimensions={"resolution": 8.0})
     assert only.code == "CROC102" and only.conditional_on == ()
-    assert only.axes == {"resolution": qe.AxisOverlap(8.0, 8.0, True, True)}
-    found = registry.query(axes={"resolution": 8.0}, include_conditional=True)
+    eight = qe.AxisOverlap(8.0, 8.0, True, True)
+    assert only.dimensions == {"resolution": qe.DimMatch(eight, 1.0)}
+    found = registry.query(dimensions={"resolution": 8.0}, include_conditional=True)
     assert [(f.code, f.conditional_on) for f in found] == [
         ("CROC101", ("space", "model")),
         ("CROC102", ()),
     ]
-    (ranged,) = registry.query(axes={"resolution": (8.0, 12.0)})
-    assert ranged.axes["resolution"] == qe.AxisOverlap(8.0, 10.0, True, False)
-    assert registry.query(axes={"resolution": 10.0}) == []
+    (ranged,) = registry.query(dimensions={"resolution": (8.0, 12.0)})
+    below_ten = qe.AxisOverlap(8.0, 10.0, True, False)
+    assert ranged.dimensions["resolution"] == qe.DimMatch(below_ten, 0.5)
+    assert registry.query(dimensions={"resolution": 10.0}) == []
     with pytest.raises(qe.UnknownNameError):
-        registry.query(axes={"resolutoin": 8.0})
+        registry.query(dimensions={"resolutoin": 8.0})
     with pytest.raises(ValueError, match="unit"):
         registry.add(
-            warning_rule("CROC109", axes={"resolution": {"lt": 10, "unit": "deg"}})
+            warning_rule(
+                "CROC109", dimensions={"resolution": {"lt": 10, "unit": "deg"}}
+            )
         )
 
 
@@ -116,7 +133,8 @@ def test_undecided_axis_reports_the_rule_interval():
     found = registry.query(include_conditional=True)
     croc102 = next(f for f in found if f.code == "CROC102")
     assert croc102.conditional_on == ("resolution",)
-    assert croc102.axes["resolution"].hi == 10.0
+    assert croc102.dimensions["resolution"].overlap.hi == 10.0
+    assert croc102.dimensions["resolution"].fraction is None
 
 
 # ---- fixture 19: conditional findings ------------------------------------------------
@@ -132,7 +150,7 @@ def cru_registry():
             scope=qe.Scope(
                 space=union(sp.box(10, -10, 30, 10), sp.box(-20, 0, 10, 15)),
                 time=qe.interval("2000-01-01", ".."),
-                facets={
+                dimensions={
                     "product": ["cru_ts"],
                     "variable": ["pre"],
                     "version": {"versions": ["4.07"]},
@@ -145,7 +163,7 @@ def cru_registry():
         qe.ComputedRule,
         code="CRU002",
         registry=registry,
-        facets={"product": "cru_ts", "variable": "pre"},
+        dimensions={"product": "cru_ts", "variable": "pre"},
         requires=["cru_ts.stn"],
     ):
         """CRU TS value from few or no stations"""
@@ -162,8 +180,8 @@ def cru_registry():
 
 def test_fixture_19_conditional_findings():
     registry = cru_registry()
-    assert registry.query(axes={"resolution": 8.0}) == []
-    found = registry.query(axes={"resolution": 8.0}, include_conditional=True)
+    assert registry.query(dimensions={"resolution": 8.0}) == []
+    found = registry.query(dimensions={"resolution": 8.0}, include_conditional=True)
     cru001 = next(f for f in found if f.code == "CRU001")
     assert cru001.conditional_on == ("space", "time", "product", "variable", "version")
     assert cru001.area_fraction is None and cru001.time_fraction is None
@@ -172,22 +190,22 @@ def test_fixture_19_conditional_findings():
         registry.query(space=sp.point(0, 60), include_conditional=True)
     )
     cru_pre = {"product": "cru_ts", "variable": "pre"}
-    found = registry.query(facets=cru_pre, include_conditional=True)
+    found = registry.query(dimensions=cru_pre, include_conditional=True)
     cru002 = next(f for f in found if f.code == "CRU002")
     assert cru002.conditional_on == ("context:cru_ts.stn",) and cru002.details == {}
-    assert "CRU002" not in codes(registry.query(facets=cru_pre))
+    assert "CRU002" not in codes(registry.query(dimensions=cru_pre))
 
 
 def test_computed_rule_check_runs_for_definite_matches_only():
     registry = cru_registry()
     cru_pre = {"product": "cru_ts", "variable": "pre"}
     stn = np.array([0, 3, 4])
-    found = registry.query(facets=cru_pre, context={"cru_ts.stn": stn})
+    found = registry.query(dimensions=cru_pre, context={"cru_ts.stn": stn})
     (cru002,) = [f for f in found if f.code == "CRU002"]
     assert cru002.level == logging.ERROR and cru002.source == "computed"
     assert cru002.details == {"stn0_fraction": pytest.approx(1 / 3)}
     thick = {"cru_ts.stn": np.array([5, 6])}
-    found = registry.query(facets=cru_pre, context=thick)
+    found = registry.query(dimensions=cru_pre, context=thick)
     assert "CRU002" not in codes(found)  # check() returned False
 
 
@@ -196,60 +214,62 @@ def test_glhe_lake_query():
     (cru001,) = registry.query(
         space=sp.box(20, 0, 20.1, 0.1),
         time=("1901-01-01", "2022-12-31"),
-        facets={"product": "cru_ts", "variable": "pre", "version": "4.07"},
+        dimensions={"product": "cru_ts", "variable": "pre", "version": "4.07"},
     )
     assert cru001.area_fraction == 1.0
     assert cru001.time_overlap == (("2000-01-01", "2022-12-31"),)
     assert round(cru001.time_fraction, 3) == 0.189  # section 7.3
 
 
-# ---- fixture 20: facet wildcards ------------------------------------------------------
-def test_product_is_a_plain_facet():
+# ---- fixture 20: label wildcards ------------------------------------------------------
+def test_product_is_a_plain_label_dimension():
     registry = make_registry()
-    registry.add(warning_rule("TST010", facets={"product": ["era5*"]}))
-    registry.add(warning_rule("TST011", facets={"product": ["CRUTS"]}))
-    (found,) = registry.query(facets={"product": ("era5_land", "cru_ts")})
+    registry.add(warning_rule("TST010", dimensions={"product": ["era5*"]}))
+    registry.add(warning_rule("TST011", dimensions={"product": ["CRUTS"]}))
+    (found,) = registry.query(dimensions={"product": ("era5_land", "cru_ts")})
     assert found.code == "TST010"
-    assert found.matched_facets == {"product": ("era5_land",)}
-    assert registry.query(facets={"product": "cruts"}) == []  # exact, no aliases
+    assert found.dimensions == {"product": qe.DimMatch(("era5_land",), 0.5)}
+    assert registry.query(dimensions={"product": "cruts"}) == []  # exact, no aliases
 
 
-def test_fixture_20_wildcard_is_not_an_omitted_facet():
+def test_fixture_20_wildcard_is_not_an_omitted_dimension():
     registry = make_registry()
-    registry.add(warning_rule("TST020", facets={"product": ["*"]}))
+    registry.add(warning_rule("TST020", dimensions={"product": ["*"]}))
     (found,) = registry.query(include_conditional=True)
     assert found.conditional_on == ("product",)
-    (found,) = registry.query(facets={"product": "era5"})
-    assert found.conditional_on == () and found.matched_facets == {"product": ("era5",)}
+    (found,) = registry.query(dimensions={"product": "era5"})
+    assert found.conditional_on == ()
+    assert found.dimensions == {"product": qe.DimMatch(("era5",), 1.0)}
 
 
 def test_fixture_20_none_of_and_case():
     registry = make_registry()
-    registry.add(warning_rule("TST030", facets={"variable": {"none_of": ["tp"]}}))
-    registry.add(warning_rule("TST031", facets={"variable": ["Pre"]}))
-    assert registry.query(facets={"variable": "tp"}) == []
-    (found,) = registry.query(facets={"variable": ("tp", "t2m")})
-    assert found.code == "TST030" and found.matched_facets == {"variable": ("t2m",)}
-    assert codes(registry.query(facets={"variable": "pre"})) == ["TST030"]
+    registry.add(warning_rule("TST030", dimensions={"variable": {"none_of": ["tp"]}}))
+    registry.add(warning_rule("TST031", dimensions={"variable": ["Pre"]}))
+    assert registry.query(dimensions={"variable": "tp"}) == []
+    (found,) = registry.query(dimensions={"variable": ("tp", "t2m")})
+    assert found.code == "TST030"
+    assert found.dimensions == {"variable": qe.DimMatch(("t2m",), 0.5)}
+    assert codes(registry.query(dimensions={"variable": "pre"})) == ["TST030"]
 
 
 # ---- fixture 21: version ranges on the Registry -----------------------------------------
-def test_fixture_21_version_facet():
+def test_fixture_21_version_dimension():
     registry = make_registry()
     with pytest.raises(ValueError):
         registry.add(
-            warning_rule("TST040", facets={"version": {"introduced": "4.07a"}})
+            warning_rule("TST040", dimensions={"version": {"introduced": "4.07a"}})
         )
     registry.add(
         warning_rule(
-            "TST041", facets={"version": {"introduced": "4.00", "fixed": "4.09"}}
+            "TST041", dimensions={"version": {"introduced": "4.00", "fixed": "4.09"}}
         )
     )
-    (found,) = registry.query(facets={"product": "cru_ts", "version": "4.07"})
-    assert found.matched_facets == {"version": ("4.07",)}
-    (found,) = registry.query(facets={"version": ("4.9", "4.07")})
-    assert found.matched_facets == {"version": ("4.07",)}
-    assert registry.query(facets={"product": "cru_ts", "version": "4.9"}) == []
+    (found,) = registry.query(dimensions={"product": "cru_ts", "version": "4.07"})
+    assert found.dimensions == {"version": qe.DimMatch(("4.07",), 1.0)}
+    (found,) = registry.query(dimensions={"version": ("4.9", "4.07")})
+    assert found.dimensions == {"version": qe.DimMatch(("4.07",), 0.5)}
+    assert registry.query(dimensions={"product": "cru_ts", "version": "4.9"}) == []
 
 
 # ---- fixture 27: a plugin dimension --------------------------------------------------
@@ -295,22 +315,23 @@ class IndexedPfafstetter(Pfafstetter):
 @pytest.mark.parametrize("plugin", [Pfafstetter(), IndexedPfafstetter()])
 def test_fixture_27_plugin_dimension(plugin):
     registry = qe.Registry("glhe", dimensions=[plugin])
-    registry.add(warning_rule("BAS001", dims={"basin": ["14", "62"]}))
-    (nested,) = registry.query(dims={"basin": "1423"})
-    assert nested.dims == {"basin": qe.DimMatch(("14",), 1.0)}
-    (partial,) = registry.query(dims={"basin": "1"})
-    assert partial.dims == {"basin": qe.DimMatch(("14",), None)}
-    assert registry.query(dims={"basin": "31"}) == []
+    registry.add(warning_rule("BAS001", dimensions={"basin": ["14", "62"]}))
+    (nested,) = registry.query(dimensions={"basin": "1423"})
+    assert nested.dimensions == {"basin": qe.DimMatch(("14",), 1.0)}
+    (partial,) = registry.query(dimensions={"basin": "1"})
+    assert partial.dimensions == {"basin": qe.DimMatch(("14",), None)}
+    assert registry.query(dimensions={"basin": "31"}) == []
     assert registry.query() == []
     (undecided,) = registry.query(include_conditional=True)
-    assert undecided.conditional_on == ("basin",) and undecided.dims == {}
+    assert undecided.conditional_on == ("basin",) and undecided.dimensions == {}
     with pytest.raises(ValueError, match="Pfafstetter"):
-        registry.query(dims={"basin": "1203"})
+        registry.query(dimensions={"basin": "1203"})
     with pytest.raises(qe.UnknownNameError):
-        registry.add(warning_rule("BAS002", dims={"basins": ["14"]}))
-    with pytest.raises(qe.UnknownNameError):
-        registry.query(facets={"basin": "14"})  # declared as a dimension, not a facet
-    assert nested.to_dict()["dims"] == {"basin": {"overlap": ["14"], "fraction": 1.0}}
+        registry.add(warning_rule("BAS002", dimensions={"basins": ["14"]}))
+    with pytest.raises(qe.UnknownNameError):  # time has its own field
+        registry.query(dimensions={"time": ("2000-01-01", "2000-12-31")})
+    as_dict = nested.to_dict()["dimensions"]
+    assert as_dict == {"basin": {"overlap": ["14"], "fraction": 1.0}}
 
 
 class DescribedPfafstetter(Pfafstetter):
@@ -325,12 +346,13 @@ class DescribedPfafstetter(Pfafstetter):
 
 def test_plugin_to_json_and_extent():
     registry = qe.Registry("glhe", dimensions=[DescribedPfafstetter()])
-    registry.add(warning_rule("BAS001", dims={"basin": ["14", "62"]}))
-    (nested,) = registry.query(dims={"basin": "1423"})
-    assert nested.dims == {"basin": qe.DimMatch(("14",), 1.0)}
-    assert nested.to_dict()["dims"] == {"basin": {"overlap": "14", "fraction": 1.0}}
+    registry.add(warning_rule("BAS001", dimensions={"basin": ["14", "62"]}))
+    (nested,) = registry.query(dimensions={"basin": "1423"})
+    assert nested.dimensions == {"basin": qe.DimMatch(("14",), 1.0)}
+    as_dict = nested.to_dict()["dimensions"]
+    assert as_dict == {"basin": {"overlap": "14", "fraction": 1.0}}
     (undecided,) = registry.query(include_conditional=True)
-    assert undecided.dims == {"basin": qe.DimMatch(("14", "62"))}
+    assert undecided.dimensions == {"basin": qe.DimMatch(("14", "62"))}
 
 
 def test_dimensions_are_declared_before_rules_with_unique_names():
@@ -341,7 +363,7 @@ def test_dimensions_are_declared_before_rules_with_unique_names():
     with pytest.raises(ValueError):
         qe.Registry("x", dimensions=[Pfafstetter(), Pfafstetter()])
     with pytest.raises(ValueError):
-        qe.Registry("x", axes=[qe.Axis("time", "s")])
+        qe.Registry("x", dimensions=[qe.Axis("time", "s")])
 
 
 # ---- fixtures 2, 6, 9 and 13 as queries ------------------------------------------------
@@ -430,29 +452,30 @@ def test_function_rule_croc104_suggests_a_time_step():
         "CROC104",
         kind="suggestion",
         space=sp.box(-180, 66.5, 180, 90),
-        facets={"model": "mom6"},
-        axes={"resolution": {"gt": 0.0}},
+        dimensions={"resolution": {"gt": 0.0}, "model": "mom6"},
     )
     def arctic_time_step(query, match):
         """High-latitude domain: set the time step from the smallest cells"""
-        seconds = 30.0 * match.axes["resolution"].lo
+        seconds = 30.0 * match.dimensions["resolution"].overlap.lo
         return {"suggestions": (qe.Suggestion("MOM_input", "DT", seconds, "why"),)}
 
     found = registry.query(
         space=sp.box(-180, 70.6, 180, 90),
         time=("2020-01-01", "2020-12-31"),
-        axes={"resolution": (8.0, 12.0)},
-        facets={"model": "mom6"},
+        dimensions={"resolution": (8.0, 12.0), "model": "mom6"},
     )
     assert codes(found) == ["CROC101", "CROC102", "CROC104"]
     croc104 = found[-1]
     assert croc104.level == logging.INFO and croc104.title.startswith("High-latitude")
     assert croc104.suggestions == (qe.Suggestion("MOM_input", "DT", 240.0, "why"),)
-    assert croc104.axes["resolution"] == qe.AxisOverlap(8.0, 12.0, True, True)
-    assert found[1].axes["resolution"] == qe.AxisOverlap(8.0, 10.0, True, False)
+    resolution = [f.dimensions["resolution"].overlap for f in found[1:]]
+    assert resolution == [
+        qe.AxisOverlap(8.0, 10.0, True, False),
+        qe.AxisOverlap(8.0, 12.0, True, True),
+    ]
     without = registry.query(
         space=sp.box(-180, 70.6, 180, 90),
-        facets={"model": "mom6"},
+        dimensions={"model": "mom6"},
         include_conditional=True,
     )
     assert next(f for f in without if f.code == "CROC104").conditional_on == (
@@ -466,7 +489,7 @@ def test_gen001_compares_the_caller_area_with_the_support():
     @registry.rule(
         "GEN001",
         level="info",
-        facets={"product": ["*"]},
+        dimensions={"product": ["*"]},
         requires=["request_km2"],
     )
     def coarse_support(query, match):
@@ -475,11 +498,11 @@ def test_gen001_compares_the_caller_area_with_the_support():
         return {"details": {"request_to_support": ratio}} if ratio < 0.1 else None
 
     cru = {"product": "cru_ts"}
-    (found,) = registry.query(space=LAKE, facets=cru, include_conditional=True)
+    (found,) = registry.query(space=LAKE, dimensions=cru, include_conditional=True)
     assert found.conditional_on == ("context:request_km2",)
     cell = sp.box(0, 0, 0.5, 0.5)  # the product cell the lake lies in
     context = {"request_km2": LAKE.area_km2}
-    (found,) = registry.query(space=cell, facets=cru, context=context)
+    (found,) = registry.query(space=cell, dimensions=cru, context=context)
     assert found.details["request_to_support"] == pytest.approx(0.09, rel=0.01)
 
 
@@ -515,13 +538,13 @@ def test_check_may_return_several_findings_and_override_time():
 
 
 def test_computed_rule_keywords_inherit_from_an_abstract_base():  # Q9
-    registry = qe.Registry("family", facets=("model",))
+    registry = qe.Registry("family", dimensions=[qe.Labels("model")])
 
     class Family(
         qe.ComputedRule,
         abstract=True,
         registry=registry,
-        facets={"model": "mom6"},
+        dimensions={"model": "mom6"},
         kind="suggestion",
     ):
         pass
@@ -529,12 +552,12 @@ def test_computed_rule_keywords_inherit_from_an_abstract_base():  # Q9
     class Child(Family, code="FAM001"):
         """Inherits the registry, the scope and the kind"""
 
-    class Other(Family, code="FAM002", facets={"model": "cesm"}):
-        """Its own facets win"""
+    class Other(Family, code="FAM002", dimensions={"model": "cesm"}):
+        """Its own dimensions win"""
 
-    (child,) = registry.query(facets={"model": "mom6"})
+    (child,) = registry.query(dimensions={"model": "mom6"})
     assert (child.code, child.kind, child.level) == ("FAM001", "suggestion", 20)
-    assert codes(registry.query(facets={"model": "cesm"})) == ["FAM002"]
+    assert codes(registry.query(dimensions={"model": "cesm"})) == ["FAM002"]
     with pytest.raises(TypeError):
 
         class NoCode(qe.ComputedRule, registry=registry):
@@ -543,13 +566,13 @@ def test_computed_rule_keywords_inherit_from_an_abstract_base():  # Q9
     with pytest.raises(TypeError):
 
         class Typo(
-            qe.ComputedRule, code="FAM003", registry=registry, facet={"model": "x"}
+            qe.ComputedRule, code="FAM003", registry=registry, dimension={"model": "x"}
         ):
             """An unknown keyword"""
 
 
 def test_duplicate_codes_and_the_q10_replacement():
-    registry = qe.Registry("dup", facets=("model",))
+    registry = qe.Registry("dup", dimensions=[qe.Labels("model")])
     registry.add(warning_rule("DUP001"))
     with pytest.raises(qe.DuplicateCodeError):
         registry.add(warning_rule("DUP001"))
@@ -637,7 +660,7 @@ def test_findings_are_sorted_by_level_kind_and_code():
             title="t",
             message="m",
             level="info",
-            scope=qe.Scope(facets={"product": ["*"]}),
+            scope=qe.Scope(dimensions={"product": ["*"]}),
         )
     )
     registry.add(
@@ -653,7 +676,7 @@ def test_findings_are_sorted_by_level_kind_and_code():
     registry.add(
         qe.Rule(code="SRT003", kind="warning", title="t", message="m", level="error")
     )
-    found = registry.query(space=sp.point(0, 0), facets={"product": "era5"})
+    found = registry.query(space=sp.point(0, 0), dimensions={"product": "era5"})
     assert codes(found) == ["SRT003", "SRT002", "SRT001"]
 
 
@@ -662,12 +685,12 @@ def test_the_default_registry_is_made_once():
 
 
 def test_rule_added_to_a_second_registry_is_bound_as_a_copy():
-    rule = warning_rule("CPY001", facets={"model": "a"})
-    first, second = qe.Registry("one"), qe.Registry("two")
+    rule = warning_rule("CPY001", dimensions={"model": "a"})
+    first, second = (qe.Registry(n, dimensions=[qe.Labels("model")]) for n in "ab")
     first.add(rule)
     second.add(rule)
-    assert rule.evaluate(qe.Query(facets={"model": "a"}))[0].code == "CPY001"
-    assert codes(second.query(facets={"model": "a"})) == ["CPY001"]
+    assert rule.evaluate(qe.Query(dimensions={"model": "a"}))[0].code == "CPY001"
+    assert codes(second.query(dimensions={"model": "a"})) == ["CPY001"]
     with pytest.raises(TypeError):
         warning_rule("CPY002").evaluate(qe.Query())  # not on a Registry
 
@@ -675,38 +698,99 @@ def test_rule_added_to_a_second_registry_is_bound_as_a_copy():
 def test_third_party_rule_kinds():
     class Foreign:  # its own evaluate() is final; the scope is only a prefilter
         code = "FOR001"
-        scope = qe.Scope(facets={"model": "mom6"})
+        scope = qe.Scope(dimensions={"model": "mom6"})
 
         def evaluate(self, query):
             return [qe.Finding(code=self.code, kind="warning", title="f", message="f")]
 
     class Hooked:  # outcomes() runs after the Registry matches the scope (Q5)
         code = "HOK001"
-        scope = qe.Scope(axes={"resolution": {"le": 5}})
+        scope = qe.Scope(dimensions={"resolution": {"le": 5}})
         outcome = qe.Outcome(code="HOK001", kind="warning", title="h", message="h")
 
         def outcomes(self, query, match):
-            return {"details": {"lo": match.axes["resolution"].lo}}
+            return {"details": {"lo": match.dimensions["resolution"].overlap.lo}}
 
         def evaluate(self, query):
             raise AssertionError("the Registry calls outcomes() instead")
 
-    registry = qe.Registry("kinds", axes=[qe.Axis("resolution", "km")])
+    dimensions = [qe.Axis("resolution", "km"), qe.Labels("model")]
+    registry = qe.Registry("kinds", dimensions=dimensions)
     registry.add(Foreign())
     registry.add(Hooked())
-    found = registry.query(facets={"model": "mom6"}, axes={"resolution": 3})
+    found = registry.query(dimensions={"model": "mom6", "resolution": 3})
     assert [(f.code, dict(f.details)) for f in found] == [
         ("FOR001", {}),
         ("HOK001", {"lo": 3.0}),
     ]
-    assert registry.query(facets={"model": "cesm"}, axes={"resolution": 9}) == []
+    assert registry.query(dimensions={"model": "cesm", "resolution": 9}) == []
     assert codes(registry.query()) == ["FOR001"]  # the foreign kind decides for itself
 
 
-def test_queries_need_declared_names():
-    registry = make_registry(facets=("product",))
-    with pytest.raises(qe.UnknownNameError):
-        registry.query(facets={"product": "cru_ts", "variable": "pre"})
+def test_every_kind_of_dimension_is_declared_in_one_list():
+    registry = qe.Registry(
+        "all",
+        dimensions=[
+            qe.Labels("product"),
+            Pfafstetter(),
+            qe.Versions("version"),
+            qe.Axis("resolution", "km"),
+        ],
+    )
+    names = ["product", "basin", "version", "resolution"]
+    assert list(registry._dimensions) == ["space", "time", *names]
+    scope = {
+        "resolution": {"lt": 10},
+        "version": {"introduced": "1.0"},
+        "basin": ["14"],
+        "product": ["era5*"],
+    }
+    registry.add(warning_rule("ALL001", space=sp.box(0, 0, 10, 10), dimensions=scope))
+    query = {
+        "product": "era5",
+        "basin": "1423",
+        "version": "1.2",
+        "resolution": (5, 15),
+    }
+    (found,) = registry.query(space=sp.point(5, 5), dimensions=query)
+    assert list(found.dimensions) == names  # in the declared order
+    assert found.dimensions == {
+        "product": qe.DimMatch(("era5",), 1.0),
+        "basin": qe.DimMatch(("14",), 1.0),
+        "version": qe.DimMatch(("1.2",), 1.0),
+        "resolution": qe.DimMatch(qe.AxisOverlap(5.0, 10.0, True, False), 0.5),
+    }
+    (undecided,) = registry.query(include_conditional=True)
+    assert undecided.conditional_on == ("space", *names)
+    below_ten = qe.AxisOverlap(-np.inf, 10.0, False, False)  # Axis reports its extent
+    assert undecided.dimensions == {"resolution": qe.DimMatch(below_ten)}
+
+
+def test_undeclared_names_raise():
+    registry = qe.Registry("bare")  # space and time only
+    assert list(registry._dimensions) == ["space", "time"]
+
+    def computed():
+        class Computed(
+            qe.ComputedRule, code="UND003", registry=registry, dimensions={"model": "x"}
+        ):
+            """Undeclared"""
+
+    for call in [
+        lambda: registry.add(warning_rule("UND001", dimensions={"product": ["x"]})),
+        lambda: registry.rule("UND002", dimensions={"model": "x"})(lambda q, m: True),
+        computed,
+        lambda: registry.add(warning_rule("UND004", dimensions={"space": "x"})),
+        lambda: registry.query(dimensions={"product": "x"}),
+        lambda: registry.query_points([0.0], [0.0], dimensions={"product": "x"}),
+    ]:
+        with pytest.raises(qe.UnknownNameError, match="undeclared dimension"):
+            call()
+    assert not registry._entries
+    dimensions = [qe.Axis("resolution", "km"), qe.Labels("product")]
+    registry = qe.Registry("test", dimensions=dimensions)
+    with pytest.raises(qe.UnknownNameError, match="'variable'; declared: \\['res"):
+        registry.query(dimensions={"product": "cru_ts", "variable": "pre"})
 
 
 # ---- the fast path against the reference path ----------------------------------------
@@ -758,23 +842,22 @@ def random_rule_scope(rng):
             rng.choice([None, {"interval": ["2000-01-01", ".."]}]),
             recurrence={"months": months},
         )
-    axes = {}
+    values = {}
     if rng.random() < 0.35:
         bound = rng.choice(
             [{"lt": 10.0}, {"ge": 25.0}, {"gt": 5.0, "le": 12.0}, {"le": 8.0}]
         )
-        axes["resolution"] = bound
-    facets = {}
+        values["resolution"] = bound
     if rng.random() < 0.4:
-        facets["product"] = rng.choice(
+        values["product"] = rng.choice(
             [["cru_ts"], ["CRUTS", "era5"], ["era5*"], ["*"], {"none_of": ["glorys"]}]
         )
     if rng.random() < 0.3:
-        facets["variable"] = rng.choice(
+        values["variable"] = rng.choice(
             [["pre"], ["t*"], {"none_of": ["tp"]}, ["pre", "tas"]]
         )
     if rng.random() < 0.15:
-        facets["version"] = rng.choice(
+        values["version"] = rng.choice(
             [
                 {"introduced": "4.00", "fixed": "4.09"},
                 {"versions": ["ERA5"]},
@@ -782,17 +865,14 @@ def random_rule_scope(rng):
             ]
         )
     if rng.random() < 0.3:
-        facets["model"] = rng.choice([["mom6"], ["cesm", "mom6"], ["m*"]])
-    dims = {"basin": rng.choice([["14"], ["2", "31"]])} if rng.random() < 0.2 else {}
-    return qe.Scope(space=space, time=time, axes=axes, facets=facets, dims=dims)
+        values["model"] = rng.choice([["mom6"], ["cesm", "mom6"], ["m*"]])
+    if rng.random() < 0.2:
+        values["basin"] = rng.choice([["14"], ["2", "31"]])
+    return qe.Scope(space=space, time=time, dimensions=values)
 
 
 def random_registry(rng):
-    registry = qe.Registry(
-        "property",
-        axes=[qe.Axis("resolution", "km")],
-        dimensions=[IndexedPfafstetter()],
-    )
+    registry = make_registry(IndexedPfafstetter())
     for k in range(120):
         registry.add(
             qe.Rule(
@@ -816,8 +896,7 @@ def random_registry(rng):
             registry=registry,
             space=scope.space,
             time=scope.time,
-            axes=scope.axes,
-            facets=scope.facets,
+            dimensions=scope.dimensions,
             requires=["stn"] if k % 2 else [],
         ):
             """A computed rule"""
@@ -841,21 +920,18 @@ def random_query(rng):
     fields = {"space": space}
     if rng.random() < 0.6:
         fields["time"] = random_time(rng)
+    values = fields["dimensions"] = {}
     if rng.random() < 0.5:
-        fields["axes"] = {
-            "resolution": rng.choice([8.0, 30.0, (8.0, 12.0), (1.0, 50.0)])
-        }
-    facets = {}
+        values["resolution"] = rng.choice([8.0, 30.0, (8.0, 12.0), (1.0, 50.0)])
     if rng.random() < 0.5:
-        facets["model"] = rng.choice(["mom6", "cesm", ("mom6", "x")])
+        values["model"] = rng.choice(["mom6", "cesm", ("mom6", "x")])
     if rng.random() < 0.5:
-        facets["product"] = rng.sample(PRODUCTS, rng.randint(1, 2))
-        facets["variable"] = rng.choice(["pre", ("tp", "t2m")])
+        values["product"] = rng.sample(PRODUCTS, rng.randint(1, 2))
+        values["variable"] = rng.choice(["pre", ("tp", "t2m")])
     if rng.random() < 0.3:
-        facets["version"] = rng.choice(["4.07", "ERA5", "4.10"])
-    fields["facets"] = facets
+        values["version"] = rng.choice(["4.07", "ERA5", "4.10"])
     if rng.random() < 0.3:
-        fields["dims"] = {"basin": rng.choice(["1423", "1", "31", "2"])}
+        values["basin"] = rng.choice(["1423", "1", "31", "2"])
     if rng.random() < 0.5:
         fields["context"] = {"stn": 1}
     return qe.Query(**fields)
@@ -872,3 +948,8 @@ def test_random_queries_hide_only_conditional_findings():
         assert definite == [f for f in every if not f.conditional_on], f"query {i}"
         seen += len(every)
     assert seen > 1000  # the queries reach the rules
+
+
+def test_a_bare_name_is_not_a_dimension():
+    with pytest.raises(TypeError, match=r"qe.Labels\('product'\)"):
+        qe.Registry("x", dimensions=["product"])

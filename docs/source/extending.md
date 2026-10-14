@@ -4,7 +4,7 @@ Everything that varies between users plugs in through a small interface, so exte
 
 | To add | Write |
 |---|---|
-| A new kind of scope: a hierarchy, a taxonomy, a network | A `Dimension` plugin, passed to `Registry(dimensions=...)` |
+| A new kind of scope: a hierarchy, a taxonomy, a network | A `Dimension` plugin, declared with the others in `Registry(dimensions=[...])` |
 | A rule computed from the query or from data you hold | A `ComputedRule` subclass or an `@registry.rule` function |
 | A computed rule on the bulk path | A `mask(lon, lat, query)` method on that rule |
 | A new kind of rule altogether | Any object with `code`, `scope` and `evaluate(query)` (the `RuleKind` protocol), passed to `Registry.add` |
@@ -14,7 +14,7 @@ Geometry and time semantics are not pluggable. Space and time are dimensions ins
 
 ## Dimension plugins
 
-A dimension has a `name` and three methods:
+[Dimensions](concepts.md#dimensions) lists the kinds that come with queryearth; `Axis`, `Labels` and `Versions` are written the same way as your own. A dimension has a `name` and three methods:
 
 - `parse_rule(value)` checks and parses a rule's value when the rule is added, from Python or from a record, and raises `ValueError` for a bad one;
 - `parse_query(value)` does the same for a query's value;
@@ -52,10 +52,10 @@ registry.add(
         kind="warning",
         title="Gauges sparse in basins 14 and 62",
         message="Few gauges report in these basins.",
-        scope=qe.Scope(dims={"basin": ["14", "62"]}),
+        scope=qe.Scope(dimensions={"basin": ["14", "62"]}),
     )
 )
-registry.query(dims={"basin": "1423"})  # BAS001, overlap ("14",), fraction 1.0
+registry.query(dimensions={"basin": "1423"})  # BAS001, overlap ("14",), fraction 1.0
 ```
 
 A dimension may also define these optional members:

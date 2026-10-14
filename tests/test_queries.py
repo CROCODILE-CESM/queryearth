@@ -36,11 +36,12 @@ def test_fixture_6_closed_edges_on_the_bulk_path():
 
 # ---- the bulk path in detail -----------------------------------------------------------
 def bulk_registry():
-    registry = qe.Registry("bulk", axes=[qe.Axis("resolution", "km")])
+    dimensions = [qe.Axis("resolution", "km"), qe.Labels("product")]
+    registry = qe.Registry("bulk", dimensions=dimensions)
     registry.add(warning_rule("ALL001"))
     registry.add(warning_rule("BOX001", "error", space=sp.box(0, 0, 10, 10)))
-    registry.add(warning_rule("RES001", axes={"resolution": {"lt": 10}}))
-    registry.add(warning_rule("ERA001", facets={"product": ["era5"]}))
+    registry.add(warning_rule("RES001", dimensions={"resolution": {"lt": 10}}))
+    registry.add(warning_rule("ERA001", dimensions={"product": ["era5"]}))
 
     class Wet(qe.ComputedRule, code="WET001", registry=registry, requires=["stn"]):
         """Points east of 5E, by a mask hook"""
@@ -63,7 +64,7 @@ def test_query_points_keys_masks_and_skipped_rules_by_code():
         lon,
         lat,
         weights,
-        facets={"product": "era5"},
+        dimensions={"product": "era5"},
         time=("1990-01-01", "1999-12-31"),
     )
     assert set(result.masks) == {"ALL001", "BOX001", "WET001", "ERA001"}
@@ -110,7 +111,8 @@ def random_space(rng):
 
 
 def random_bulk_registry(rng):
-    registry = qe.Registry("property", axes=[qe.Axis("resolution", "km")])
+    dimensions = [qe.Axis("resolution", "km"), qe.Labels("product")]
+    registry = qe.Registry("property", dimensions=dimensions)
     regions = {"A": sp.box(-20, -20, 20, 20), "B": sp.box(170, 50, -170, 80)}
     for k in range(80):
         scope = {}
@@ -121,10 +123,11 @@ def random_bulk_registry(rng):
             scope["space"] = sp.polygon(shapely.union_all(parts))
         if rng.random() < 0.3:
             scope["time"] = qe.interval(f"{rng.randint(1980, 2010)}-01-01", "..")
+        values = scope["dimensions"] = {}
         if rng.random() < 0.3:
-            scope["axes"] = {"resolution": rng.choice([{"lt": 10}, {"ge": 25}])}
+            values["resolution"] = rng.choice([{"lt": 10}, {"ge": 25}])
         if rng.random() < 0.4:
-            scope["facets"] = {"product": rng.choice([["cru_ts"], ["era5", "glorys"]])}
+            values["product"] = rng.choice([["cru_ts"], ["era5", "glorys"]])
         level = rng.choice(["info", "warning", "error"])
         registry.add(
             qe.Rule(
@@ -156,13 +159,14 @@ def test_query_points_agrees_with_registry_query_point_by_point():
     seen = 0
     for _ in range(6):
         lon, lat = random_points(rng)
-        fields = {}
+        fields = {"dimensions": {}}
         if rng.random() < 0.5:
             fields["time"] = (f"{rng.randint(1985, 2015)}-01-01", "2020-12-31")
         if rng.random() < 0.5:
-            fields["axes"] = {"resolution": rng.choice([8.0, 30.0, (8.0, 12.0)])}
+            fields["dimensions"]["resolution"] = rng.choice([8.0, 30.0, (8.0, 12.0)])
         if rng.random() < 0.6:
-            fields["facets"] = {"product": rng.sample(["cru_ts", "era5", "glorys"], 2)}
+            products = rng.sample(["cru_ts", "era5", "glorys"], 2)
+            fields["dimensions"]["product"] = products
         result = registry.query_points(lon, lat, **fields)
         assert all(not m[-1] for m in result.masks.values())  # the NaN point
         for j in range(lon.size - 1):

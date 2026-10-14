@@ -16,6 +16,7 @@ except ImportError:  # running from a source tree that was never built or instal
 from queryearth import space
 from queryearth.dimensions import (
     Axis,
+    AxisOverlap,
     DimMatch,
     Dimension,
     Labels,
@@ -25,7 +26,6 @@ from queryearth.dimensions import (
 from queryearth.registry import Registry, PointResult
 from queryearth.objects import (
     Action,
-    AxisOverlap,
     Confidence,
     DuplicateCodeError,
     Finding,

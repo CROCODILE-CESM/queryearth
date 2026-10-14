@@ -33,7 +33,10 @@ def write(path, data):
 
 
 def toy_registry():
-    return qe.Registry("toy", axes=[qe.Axis("resolution", "km")])
+    """The dimensions the toy rules use."""
+    names = ("product", "variable", "model")
+    labels = [qe.Labels(name) for name in names]
+    return qe.Registry("toy", dimensions=[qe.Axis("resolution", "km"), *labels])
 
 
 # ---- Registry.load ------------------------------------------------------------------
@@ -41,7 +44,7 @@ def test_load_adds_the_rules_of_one_file(tmp_path):
     registry = toy_registry()
     codes = registry.load(TOY)
     assert codes == [f["properties"]["code"] for f in TOY_FEATURES]
-    (found,) = registry.query(axes={"resolution": 60.0})
+    (found,) = registry.query(dimensions={"resolution": 60.0})
     assert found.code == "TOY103" and found.source == "rules.geojson"
     single = write(tmp_path / "one.geojson", record("TST001"))  # a lone Feature
     assert registry.load(single) == ["TST001"]
@@ -51,13 +54,14 @@ def test_load_adds_the_rules_of_one_file(tmp_path):
 
 
 def test_load_reports_every_problem_and_leaves_the_registry_unchanged(tmp_path):
-    registry = qe.Registry("x", axes=[qe.Axis("resolution", "km")])
+    registry = qe.Registry("x", dimensions=[qe.Axis("resolution", "km")])
     registry.add(qe.Rule(code="OLD001", kind="warning", title="t", message="m"))
+    deg = {"resolution": {"lt": 10, "unit": "deg"}}  # fixture 17
     features = [
         record("TST001"),
-        record("TST002", facets={"colour": ["red"]}),
+        record("TST002", dimensions={"colour": ["red"]}),
         record("TST003"),
-        record("TST004", axes={"resolution": {"lt": 10, "unit": "deg"}}),  # 17
+        record("TST004", dimensions=deg),
         record("TST001"),
         record("TST006", region_ref="ar6:CAF"),
         "not a feature",
@@ -142,10 +146,11 @@ def test_a_ring_around_a_pole_is_a_load_error():
 
 
 def test_fixture_17_axis_unit_in_a_record():
-    registry = qe.Registry("x", axes=[qe.Axis("resolution", "km")])
+    registry = qe.Registry("x", dimensions=[qe.Axis("resolution", "km")])
     with pytest.raises(ValueError, match="TST001: resolution: unit 'deg'"):
-        registry.add(record(axes={"resolution": {"lt": 10, "unit": "deg"}}))
-    registry.add(record("TST002", axes={"resolution": {"lt": 10, "unit": "km"}}))
+        registry.add(record(dimensions={"resolution": {"lt": 10, "unit": "deg"}}))
+    km = {"resolution": {"lt": 10, "unit": "km"}}
+    registry.add(record("TST002", dimensions=km))
 
 
 class Pfafstetter:
@@ -178,8 +183,8 @@ def test_fixture_27_plugin_values_in_records_are_checked_by_the_plugin():
     with pytest.raises(qe.UnknownNameError, match="basins"):
         registry.add(record(dimensions={"basins": ["14"]}))
     registry.add(record(dimensions={"basin": ["14", "62"]}))
-    (found,) = registry.query(dims={"basin": "1423"})
-    assert found.dims == {"basin": qe.DimMatch(("14",), 1.0)}
+    (found,) = registry.query(dimensions={"basin": "1423"})
+    assert found.dimensions == {"basin": qe.DimMatch(("14",), 1.0)}
 
 
 # ---- the loader refuses broken records ------------------------------------------------
@@ -191,10 +196,11 @@ BAD = {
     "reviewed without references": {"status": "reviewed"},
     "box west out of range": {"box": {"west": 180, "width": 1, "south": 0, "north": 1}},
     "fixed and last_affected": {
-        "facets": {"version": {"fixed": "2", "last_affected": "1"}}
+        "dimensions": {"version": {"fixed": "2", "last_affected": "1"}}
     },
-    "facet as a bare string": {"facets": {"variable": "pre"}},
-    "axis with lt and le": {"axes": {"resolution": {"lt": 1, "le": 2}}},
+    "label any_of empty": {"dimensions": {"variable": {"any_of": []}}},
+    "axis with lt and le": {"dimensions": {"resolution": {"lt": 1, "le": 2}}},
+    "dimensions not an object": {"dimensions": [["variable", "pre"]]},
     "periods without time": {"periods": [["2000-01-01", "2000-12-31"]]},
     "supersedes a bad code": {"supersedes": ["cru001"]},
     "a calendar": {"calendar": "noleap"},
@@ -218,9 +224,18 @@ BROKEN = {name: record(**props) for name, props in BAD.items()} | BAD_FEATURES
 
 @pytest.mark.parametrize("name", list(BROKEN))
 def test_loader_rejects_broken_records(name):
-    registry = qe.Registry("x", axes=[qe.Axis("resolution", "km")])
+    dimensions = [qe.Axis("resolution", "km"), qe.Labels("variable")]
+    registry = qe.Registry("x", dimensions=[*dimensions, qe.Versions("version")])
     with pytest.raises((ValueError, KeyError, TypeError)):
         registry.add(copy.deepcopy(BROKEN[name]))
+
+
+@pytest.mark.parametrize("member", ["facets", "axes"])  # the members of 0.1.0
+def test_old_scope_members_are_unknown_members(member):
+    """Every dimension's value goes under "dimensions"."""
+    registry = qe.Registry("x", dimensions=[qe.Labels("variable")])
+    with pytest.raises(ValueError, match=rf"TST001: unknown members \['{member}'\]"):
+        registry.add(record(**{member: {"variable": ["pre"]}}))
 
 
 # ---- Rule.to_feature ----------------------------------------------------------------
@@ -305,7 +320,7 @@ EDGES = {
     },
     "time_start and time_end": {"time_start": "2000-01-01", "time_end": "2001-06-30"},
     "version ranges": {
-        "facets": {
+        "dimensions": {
             "product": {"any_of": ["era5*"], "none_of": ["era5_land"]},
             "version": [{"introduced": "4.00", "fixed": "4.09"}, {"versions": ["X"]}],
         }
@@ -330,8 +345,7 @@ EDGES = {
     "suggestion with an axis and a plugin dimension": {
         "kind": "suggestion",
         "suggestions": [{"target": "a", "key": "b", "value": [1, None]}],
-        "axes": {"resolution": {"lt": 10, "unit": "km"}},
-        "dimensions": {"basin": ["14"]},
+        "dimensions": {"resolution": {"lt": 10, "unit": "km"}, "basin": ["14"]},
     },
 }
 
@@ -352,7 +366,7 @@ def test_to_feature_round_trips(name):
 
 def test_to_feature_leaves_out_defaults():
     feature = {
-        **record(status="draft", level="warning", confidence="unknown", facets={}),
+        **record(status="draft", level="warning", confidence="unknown", dimensions={}),
         "time": None,
     }
     assert qe.Rule.from_feature(feature).to_feature() == {
@@ -379,22 +393,68 @@ def test_to_feature_of_a_rule_built_in_python():
         scope=qe.Scope(
             space=sp.box(-60, -10, -50, 0),
             time=qe.interval("2000-01-01", "2000-12-31"),
-            facets={"product": "cru_ts"},  # the Python shorthand for one pattern
+            dimensions={"product": "cru_ts"},  # the shorthand for one pattern
         ),
     )
     feature = rule.to_feature()
-    assert feature["properties"]["facets"] == {"product": ["cru_ts"]}
+    assert feature["properties"]["dimensions"] == {"product": "cru_ts"}  # as given
     assert feature["properties"]["level"] == "info"
     assert feature["time"] == {"interval": ["2000-01-01", "2000-12-31"]}
-    registry = qe.Registry("x")
+    registry = qe.Registry("x", dimensions=[qe.Labels("product")])
     registry.add(feature)
     found = registry.query(
         space=sp.point(-55, -5),
         time=("2000-06-01", "2000-06-30"),
-        facets={"product": "cru_ts"},
+        dimensions={"product": "cru_ts"},
     )
     assert [f.code for f in found] == ["PY001"]
     assert assert_round_trip(qe.Rule.from_feature(feature)) == feature
+
+
+def test_to_feature_and_from_feature_round_trip_every_kind_of_dimension():
+    dimensions = {
+        "resolution": {"ge": 4, "lt": 10, "unit": "km"},
+        "product": {"any_of": ["era5*"], "none_of": ["era5_land"]},
+        "variable": ["t?s", "pre"],
+        "version": [{"introduced": "4.00", "fixed": "4.09"}, {"versions": ["X"]}],
+        "basin": ["14", "62"],
+    }
+    rule = qe.Rule(
+        code="ALL001",
+        kind="warning",
+        title="t",
+        message="m",
+        scope=qe.Scope(dimensions=dimensions),
+    )
+    feature = assert_round_trip(rule)
+    assert feature["properties"]["dimensions"] == dimensions
+    registry = qe.Registry(
+        "all",
+        dimensions=[
+            qe.Axis("resolution", "km"),
+            qe.Labels("product"),
+            qe.Labels("variable"),
+            qe.Versions("version"),
+            Pfafstetter(),
+        ],
+    )
+    registry.add(feature)
+    query = {
+        "resolution": 8,
+        "product": "era5",
+        "variable": ("tas", "t2m"),
+        "version": "4.07",
+        "basin": "1423",
+    }
+    (found,) = registry.query(dimensions=query)
+    assert {name: m.fraction for name, m in found.dimensions.items()} == {
+        "resolution": 1.0,
+        "product": 1.0,
+        "variable": 0.5,
+        "version": 1.0,
+        "basin": 1.0,
+    }
+    assert registry.query(dimensions={**query, "product": "era5_land"}) == []
 
 
 def test_to_feature_refuses_what_a_record_cannot_hold():

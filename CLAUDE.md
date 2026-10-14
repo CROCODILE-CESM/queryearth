@@ -4,7 +4,7 @@ Guidance for Claude Code (and anyone else) working in this repository.
 
 ## What queryearth is
 
-A small engine that matches rules to a query. A rule is scoped by any mix of space, time, numeric axes (such as grid resolution), labels (product, variable, model) and plugin dimensions. A query gives any subset of those and gets back findings of two kinds: warnings, and suggestions, which carry structured actions. A product's coverage limits are ordinary warnings scoped by the `product` facet. Each finding has a standard `logging` level, and callers log findings with `logging` themselves. It is general-purpose, not tied to earth system modelling. Its first consumers are CrocoDash (one query per forcing product, in `Case.configure_forcings`) and GLHE (lake polygons against data products).
+A small engine that matches rules to a query. A rule is scoped by any mix of dimensions: space and time, which are built in, and the ones a Registry declares, such as an `Axis` (grid resolution), `Labels` (product, variable, model), `Versions` or a plugin. A query gives values on any subset of those and gets back findings of two kinds: warnings, and suggestions, which carry structured actions. A product's coverage limits are ordinary warnings scoped by a `product` label dimension. Each finding has a standard `logging` level, and callers log findings with `logging` themselves. It is general-purpose, not tied to earth system modelling. Its first consumers are CrocoDash (one query per forcing product, in `Case.configure_forcings`) and GLHE (lake polygons against data products).
 
 It is an engine only: the package ships no curated rules. Rule files belong to their users. The example in `examples/toy/` is made up.
 
@@ -31,7 +31,7 @@ It is an engine only: the package ships no curated rules. Rule files belong to t
 | `queryearth/space.py` | `Space` (point or polygon) and its helpers `point`, `box`, `polygon`. Antimeridian splitting, closed-set `meets`, `measure` (area fraction and km²), spherical `area_km2`, the points mask for the bulk path |
 | `queryearth/time.py` | `Interval`, `TimeSpec`, `interval()`, `parse_time()` for records, `overlap`, `time_fraction`, month recurrence. One calendar: proleptic Gregorian |
 | `queryearth/objects.py` | Frozen dataclasses: `Suggestion`, `Outcome`, `Match`, `Finding` (whose `str()` is the message to log), `Scope`, `Query`; and the error classes `DuplicateCodeError`, `UnknownNameError` and `LoadError` |
-| `queryearth/dimensions.py` | The `Dimension` protocol; `SpaceDimension` and `TimeDimension`, built into every Registry and not replaceable; the built-in plugins `Axis`, `Labels` and `Versions` |
+| `queryearth/dimensions.py` | The `Dimension` protocol and `DimMatch`; `SpaceDimension` and `TimeDimension`, built into every Registry and not replaceable; the built-in plugins `Axis` (with `AxisOverlap`), `Labels` and `Versions` |
 | `queryearth/rules.py` | `Rule` (a static record, read with `from_feature`, which does the record checks by hand, and written with `to_feature`), `ComputedRule`, `match_scope` (one scope against one query part) and building findings |
 | `queryearth/registry.py` | `Registry`: declarations, `add`, `load` (one rule file, all or nothing), `query`, `query_points`, `PointResult` |
 | `tests/` | One file per module, plus `test_queries.py` (bulk path) and `test_records.py` (rule files, the loader checks and `to_feature` round trips) |
@@ -48,10 +48,10 @@ It is an engine only: the package ships no curated rules. Rule files belong to t
 ## Concepts worth knowing before changing the engine
 
 - There are **rules**, **rule files** and the **Registry**. A rule is a static `Rule` (built in Python, or read from a GeoJSON record with `Rule.from_feature`), a computed rule, or a third-party rule kind; every rule carries its own geometry. A rule file is one GeoJSON file of records, a FeatureCollection or a single Feature. The Registry is the in-memory object you add rules to and query: `Registry.add` takes a rule or a record mapping, and `Registry.load(path)` adds one file's records, all or nothing. `Rule.to_feature()` writes a static rule back as a record; computed rules are code and have none.
-- The axes, facets and plugin dimensions that rules use are declared on the Registry, in Python. A plugin dimension checks its own values in `parse_rule`, for records too.
+- Every dimension but space and time is declared on the Registry, in Python, in one list: `Registry(name, dimensions=[...])`. Scopes, queries and computed rules give their values in one `dimensions` mapping, records in one `dimensions` member, and `Match.dimensions` holds a `DimMatch` for each. A dimension checks its own values in `parse_rule`, for records too. `docs/source/concepts.md` has the one table that explains the kinds; the other pages link to it.
 - A rule's scope is a conjunction: a dimension the rule leaves out matches anything. Space and time are dimensions too. `match_scope` runs one loop over every dimension of the Registry, and the `late` ones (space) run last.
 - When a query omits a dimension that a rule constrains, the finding is **conditional** (`conditional_on` names what is missing). Conditional findings are hidden unless `include_conditional=True`.
-- `product` is a plain facet, like `variable`. A caller makes one query per product, and nothing fills an omitted time or version.
+- `product` is a plain label dimension, like `variable`. A caller makes one query per product, and nothing fills an omitted time or version.
 - `Registry.query` calls `evaluate()` on every active rule, after any plugin prefilters. There are no vectorised tables (design.md section 9.1).
 - Rings are normalised once, at load: longitudes wrapped, rings split at ±180, `make_valid`, oriented. Matching uses closed sets, so a point on an edge is inside.
 - On the wire, time intervals are closed, and an end date covers its whole day.

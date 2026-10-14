@@ -22,7 +22,7 @@ from typing import Any
 import numpy as np
 
 from queryearth import space as sp
-from queryearth.dimensions import Axis, Labels, SpaceDimension, TimeDimension, Versions
+from queryearth.dimensions import SpaceDimension, TimeDimension
 from queryearth.objects import (
     KINDS,
     DuplicateCodeError,
@@ -51,7 +51,6 @@ from queryearth.rules import (
 __all__ = ["Registry", "PointResult"]
 
 _SLUG = re.compile(r"[a-z][a-z0-9_]*")
-_GROUPS = {"space": -2, "time": -1, "axes": 0, "facets": 1, "dims": 2}
 
 _default: Registry | None = None
 _default_lock = threading.Lock()
@@ -74,37 +73,23 @@ def _strings(value: Any) -> tuple[str, ...]:
 class Registry:
     """Declared dimensions and rules; answers queries.
 
-    There is no hidden global registry: a library keeps its own Registry, and
-    Registry.default() is the application default for scripts and notebooks.
+    Space and time are built in; dimensions lists every other dimension, such
+    as Axis, Labels and Versions objects and plugins, in the order that
+    conditional_on names them. There is no hidden global registry: a library
+    keeps its own Registry, and Registry.default() is the application default
+    for scripts and notebooks.
     """
 
-    FACETS = ("product", "variable", "version", "model", "component")
-
-    def __init__(
-        self,
-        name: str = "",
-        *,
-        axes: Iterable[Axis] = (),
-        facets: Iterable[str] = FACETS,  # "version" becomes Versions(), others Labels
-        dimensions: Iterable[Any] = (),  # any other plugin dimensions
-    ) -> None:
+    def __init__(self, name: str = "", *, dimensions: Iterable[Any] = ()) -> None:
         self.name = name
-        self._groups: list[tuple[str, Any, str]] = [  # then axes, facets, others
-            ("space", SpaceDimension(), "space"),
-            ("time", TimeDimension(), "time"),
-        ]
+        self._dimensions: dict[str, Any] = {
+            "space": SpaceDimension(),
+            "time": TimeDimension(),
+        }
         self._entries: list[_Entry] = []
         self._codes: dict[str, int] = {}
         self._prefilters_cache: dict[str, Any] | None = None
         self._last: tuple[Any, Any] = (None, None)  # the last query parsed
-        for axis in axes:
-            if not isinstance(axis, Axis):
-                raise TypeError(f"axes holds Axis objects, not {axis!r}")
-            self.add_dimension(axis)
-        for facet in facets:
-            if isinstance(facet, str):
-                facet = Versions() if facet == "version" else Labels(facet)
-            self.add_dimension(facet)
         for dimension in dimensions:
             self.add_dimension(dimension)
 
@@ -122,22 +107,23 @@ class Registry:
 
     # ---- declarations -------------------------------------------------------------
     def add_dimension(self, dimension: Any) -> None:
-        """Declare a plugin dimension (section 4.13), before any rule is added."""
+        """Declare a dimension (section 4.13), before any rule is added."""
         if self._entries:
             raise ValueError("declare dimensions before adding rules")
+        if isinstance(dimension, str):
+            raise TypeError(
+                f"declare a dimension with an object such as qe.Labels({dimension!r}),"
+                f" not the bare name {dimension!r}"
+            )
         name = getattr(dimension, "name", None)
         if not isinstance(name, str) or not _SLUG.fullmatch(name):
             raise ValueError(f"a dimension name is a lowercase slug, not {name!r}")
-        if any(n == name for n, _, _ in self._groups):
+        if name in self._dimensions:
             raise ValueError(f"dimension name {name!r} is reserved or already declared")
         for member in ("parse_rule", "parse_query", "match"):
             if not callable(getattr(dimension, member, None)):
                 raise TypeError(f"dimension {name!r} has no {member}() method")
-        group = "axes" if isinstance(dimension, Axis) else "dims"
-        if isinstance(dimension, (Labels, Versions)):
-            group = "facets"
-        self._groups.append((name, dimension, group))
-        self._groups.sort(key=lambda g: _GROUPS[g[2]])  # stable sort
+        self._dimensions[name] = dimension
 
     def add(self, rule: Any) -> None:
         """Add a Rule, a ComputedRule instance, any RuleKind or a record mapping.
@@ -207,13 +193,7 @@ class Registry:
         """Registry.add; source names a record's file ("python" from Python)."""
         if isinstance(rule, ComputedRule):
             form, get = "computed", rule.meta.get
-            scope = Scope(
-                get("space"),
-                time_of(get("time")),
-                get("axes", {}),
-                get("facets", {}),
-                get("dims", {}),
-            )
+            scope = Scope(get("space"), time_of(get("time")), get("dimensions", {}))
         elif isinstance(getattr(rule, "scope", None), Scope) and hasattr(
             rule, "evaluate"
         ):
@@ -267,16 +247,14 @@ class Registry:
         return register
 
     # ---- names --------------------------------------------------------------------
-    def _dimension(self, name: str, group: str | None = None) -> tuple[Any, str]:
-        for declared, dimension, kind in self._groups:
-            if declared == name:
-                if group is not None and kind != group:
-                    raise UnknownNameError(
-                        f"{name!r} is declared in {kind}, not {group}"
-                    )
-                return dimension, kind
-        declared = [n for n, _, _ in self._groups]
-        raise UnknownNameError(f"undeclared dimension {name!r}; declared: {declared}")
+    def _dimension(self, name: str) -> Any:
+        """A declared dimension; space and time have their own fields instead."""
+        if name in ("space", "time") or name not in self._dimensions:
+            declared = list(self._dimensions)[2:]
+            raise UnknownNameError(
+                f"undeclared dimension {name!r}; declared: {declared}"
+            )
+        return self._dimensions[name]
 
     def _compile(
         self, scope: Scope, requires: tuple[str, ...], code: str
@@ -287,17 +265,15 @@ class Registry:
         values = {
             k: v for k, v in (("space", space), ("time", scope.time)) if v is not None
         }
-        for group in ("axes", "facets", "dims"):
-            for name, value in getattr(scope, group).items():
-                dimension, _ = self._dimension(name, group)
-                try:
-                    values[name] = dimension.parse_rule(value)
-                except ValueError as err:
-                    raise ValueError(f"{code}: {name}: {err}") from err
+        for name, value in scope.dimensions.items():
+            try:
+                values[name] = self._dimension(name).parse_rule(value)
+            except ValueError as err:
+                raise ValueError(f"{code}: {name}: {err}") from err
         return CompiledScope(values, requires)
 
     def _parse_query(self, query: Query) -> dict[str, Any]:
-        """The query's values, parsed by their plugins."""
+        """The query's values, parsed by their dimensions."""
         if self._last[0] is query:
             return self._last[1]
         parsed = {
@@ -305,10 +281,8 @@ class Registry:
             for k, v in (("space", query.space), ("time", query.time))
             if v is not None
         }
-        for group in ("axes", "facets", "dims"):
-            for name, value in getattr(query, group).items():
-                dimension, _ = self._dimension(name, group)
-                parsed[name] = dimension.parse_query(value)
+        for name, value in query.dimensions.items():
+            parsed[name] = self._dimension(name).parse_query(value)
         self._last = (query, parsed)
         return parsed
 
@@ -363,9 +337,8 @@ class Registry:
                         if name in e.scope.values
                     ]
                 )
-                for name, dimension, _ in self._groups
-                if type(dimension) not in (Axis, Labels)
-                and callable(getattr(dimension, "build", None))
+                for name, dimension in self._dimensions.items()
+                if callable(getattr(dimension, "build", None))
                 and not hasattr(dimension, "comparable")
             }
         return self._prefilters_cache

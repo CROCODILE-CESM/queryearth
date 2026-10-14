@@ -1,10 +1,9 @@
 """Core objects: outcomes, matches, findings, scopes, queries, and the error classes.
 
-All are frozen dataclasses (design.md section 4.11). Constructors accept the
-Python shorthands the design allows (a bare string for a one-item tuple, a
-number for a one-point axis range, a pair of wire strings for a time) and store
-the normalised form. Objects that hold mappings compare by value but are not
-hashable.
+All are frozen dataclasses (design.md section 4.11). A time may be given as a
+pair of wire strings, and is stored as a TimeSpec; a value on any other
+dimension is kept as given, and the Registry parses it with its dimension.
+Objects that hold mappings compare by value but are not hashable.
 """
 
 from __future__ import annotations
@@ -26,7 +25,6 @@ if TYPE_CHECKING:
 
 __all__ = [
     "Action",
-    "AxisOverlap",
     "Confidence",
     "DuplicateCodeError",
     "Finding",
@@ -66,20 +64,6 @@ def level_of(value: Any) -> int:
     raise ValueError(
         f"a level is a logging level such as logging.INFO or 'info', not {value!r}"
     )
-
-
-def _strings(value: Any, what: str) -> tuple[str, ...]:
-    """A non-empty tuple of strings from one string or an iterable of them."""
-    if isinstance(value, str):
-        value = (value,)
-    elif not isinstance(value, Iterable) or isinstance(value, Mapping):
-        raise TypeError(f"{what} must be a string or strings, not {value!r}")
-    items = tuple(value)
-    if not all(isinstance(v, str) and v for v in items):
-        raise TypeError(f"{what} must be non-empty strings, got {items!r}")
-    if not items:
-        raise ValueError(f"{what} needs at least one value")
-    return items
 
 
 def _choice(value: Any, allowed: Sequence[str], what: str) -> str:
@@ -184,27 +168,6 @@ def suggestion_of(value: Any) -> Suggestion:
     raise TypeError(f"a suggestion is a Suggestion or a mapping, not {value!r}")
 
 
-@dataclass(frozen=True)
-class AxisOverlap:
-    """An interval on one axis that keeps its open ends, such as [8, 10).
-
-    An open end at infinity has its closed flag False.
-    """
-
-    lo: float
-    hi: float
-    lo_closed: bool = True
-    hi_closed: bool = True
-
-    def __post_init__(self) -> None:
-        _set(self, "lo", float(self.lo))
-        _set(self, "hi", float(self.hi))
-        if math.isnan(self.lo) or math.isnan(self.hi) or self.lo > self.hi:
-            raise ValueError(
-                f"an axis interval needs lo <= hi, got {self.lo}, {self.hi}"
-            )
-
-
 def _outcome_post_init(o: Any) -> None:
     if not isinstance(o.code, str) or not o.code:
         raise ValueError("a code is a non-empty string")
@@ -258,9 +221,7 @@ def _match_post_init(m: Any) -> None:
     if not all(len(p) == 2 and all(isinstance(e, str) for e in p) for p in pairs):
         raise TypeError("time_overlap holds closed wire intervals (start, end)")
     _set(m, "time_overlap", pairs)
-    _set(m, "axes", dict(m.axes))
-    _set(m, "matched_facets", {k: tuple(v) for k, v in m.matched_facets.items()})
-    _set(m, "dims", dict(m.dims))
+    _set(m, "dimensions", dict(m.dimensions))
     _set(m, "conditional_on", tuple(m.conditional_on))
 
 
@@ -268,17 +229,17 @@ def _match_post_init(m: Any) -> None:
 class Match:
     """How a scope met a query.
 
-    Measures of decided dimensions are filled; an undecided dimension is named
-    in conditional_on and reports the rule's own extent or nothing (section 4.3).
+    Space and time have their own fields; dimensions holds a DimMatch for each
+    other dimension, by name. Measures of decided dimensions are filled; an
+    undecided dimension is named in conditional_on and reports the rule's own
+    extent or nothing (section 4.3).
     """
 
     area_fraction: float | None = None
     overlap_km2: float | None = None
     time_overlap: tuple[tuple[str, str], ...] = ()  # closed, wire form
     time_fraction: float | None = None
-    axes: Mapping[str, AxisOverlap] = field(default_factory=dict)
-    matched_facets: Mapping[str, tuple[str, ...]] = field(default_factory=dict)
-    dims: Mapping[str, DimMatch] = field(default_factory=dict)  # plugin dimensions
+    dimensions: Mapping[str, DimMatch] = field(default_factory=dict)
     conditional_on: tuple[str, ...] = ()  # e.g. ("space", "product")
 
     def __post_init__(self) -> None:
@@ -334,34 +295,20 @@ def _mapping(value: Any, what: str) -> dict[str, Any]:
 class Scope:
     """A conjunction; an unconstrained dimension matches anything.
 
-    axes, facets and dims hold the rule-side values in record form; the Registry
-    checks every name and parses each value with its dimension plugin.
+    dimensions maps the name of each other dimension the rule constrains to
+    its value in record form; the Registry checks every name and parses each
+    value with its dimension.
     """
 
     space: Space | None = None
     time: TimeSpec | None = None
-    axes: Mapping[str, Mapping[str, float]] = field(default_factory=dict)
-    facets: Mapping[str, Any] = field(default_factory=dict)
-    dims: Mapping[str, Any] = field(default_factory=dict)  # other plugin dimensions
+    dimensions: Mapping[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         _space_of(self.space, "a scope's space")
         if self.time is not None and not isinstance(self.time, TimeSpec):
             raise TypeError("a scope's time is a TimeSpec or None")
-        for name in ("axes", "facets", "dims"):
-            _set(self, name, _mapping(getattr(self, name), f"scope {name}"))
-
-
-def _axis_range(name: str, value: Any) -> tuple[float, float]:
-    if isinstance(value, (str, bytes)) or not isinstance(value, Sequence):
-        v = _number(value, f"axis {name!r}")
-        return v, v
-    if len(value) != 2:
-        raise ValueError(f"axis {name!r} takes a number or a range (lo, hi)")
-    lo, hi = (_number(v, f"axis {name!r}") for v in value)
-    if lo > hi:
-        raise ValueError(f"axis {name!r} range needs lo <= hi, got ({lo}, {hi})")
-    return lo, hi
+        _set(self, "dimensions", _mapping(self.dimensions, "scope dimensions"))
 
 
 @dataclass(frozen=True)
@@ -374,24 +321,14 @@ class Query:
 
     space: Space | None = None
     time: TimeSpec | None = None
-    axes: Mapping[str, tuple[float, float]] = field(default_factory=dict)
-    facets: Mapping[str, tuple[str, ...]] = field(default_factory=dict)
-    dims: Mapping[str, Any] = field(default_factory=dict)  # other plugin dimensions
+    dimensions: Mapping[str, Any] = field(default_factory=dict)
     context: Mapping[str, Any] = field(default_factory=dict, compare=False)
     label: str = ""  # the caller's name for the query, used in messages
 
     def __post_init__(self) -> None:
         _space_of(self.space, "a query's space")
         _set(self, "time", time_of(self.time))
-        axes = _mapping(self.axes, "query axes")
-        _set(self, "axes", {k: _axis_range(k, v) for k, v in axes.items()})
-        facets = _mapping(self.facets, "query facets")
-        _set(
-            self,
-            "facets",
-            {k: _strings(v, f"facet {k!r}") for k, v in facets.items()},
-        )
-        _set(self, "dims", _mapping(self.dims, "query dims"))
+        _set(self, "dimensions", _mapping(self.dimensions, "query dimensions"))
         _set(self, "context", _mapping(self.context, "query context"))
         if not isinstance(self.label, str):
             raise TypeError("a query label is a string")
@@ -406,7 +343,7 @@ class DuplicateCodeError(ValueError):
 
 
 class UnknownNameError(KeyError):
-    """An undeclared axis, facet or dimension name.
+    """An undeclared dimension name.
 
     A misspelt name would otherwise look like "no known issues", so the engine
     refuses it in rules and queries alike (sections 4.6 and 4.7).

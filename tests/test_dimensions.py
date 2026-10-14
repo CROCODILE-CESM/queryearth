@@ -100,7 +100,7 @@ def test_labels_query_values_are_deduplicated_in_order():
 
 
 # ---- Versions (fixture 21) ----------------------------------------------------------
-VERSIONS = qe.Versions()
+VERSIONS = qe.Versions("version")
 
 
 def matches(rule, version):
@@ -191,11 +191,11 @@ def test_finding_str_is_the_text_to_log():
 def test_query_accepts_shorthands():
     query = qe.Query(
         time=("2020-01-01", "2020-12-31"),
-        axes={"resolution": 8},
-        facets={"model": "mom6"},
+        dimensions={"resolution": 8, "variable": "pre"},
     )
-    assert query.axes == {"resolution": (8.0, 8.0)}
-    assert query.facets == {"model": ("mom6",)}
+    assert query.dimensions == {"resolution": 8, "variable": "pre"}  # kept as given
+    assert AXIS.parse_query(8) == (8.0, 8.0)  # and parsed by the dimension
+    assert LABELS.parse_query("pre") == ("pre",)
     assert query.time.to_wire() == (("2020-01-01", "2020-12-31"),)
     assert qe.Query(time={"date": "2007-01-01"}).time.to_wire() == (
         ("2007-01-01", "2007-01-01"),
@@ -203,7 +203,9 @@ def test_query_accepts_shorthands():
 
 
 def test_objects_with_mappings_compare_by_value_but_do_not_hash():
-    assert qe.Query(facets={"model": "mom6"}) == qe.Query(facets={"model": ("mom6",)})
+    assert qe.Query(dimensions={"model": ["mom6"]}) == qe.Query(
+        dimensions={"model": ["mom6"]}
+    )
     with pytest.raises(TypeError):
         hash(qe.Query())
     with pytest.raises(TypeError):
@@ -239,8 +241,10 @@ def test_finding_to_dict_is_json_ready():
         message="m",
         suggestions=({"target": "MOM_input", "key": "DT", "value": 240.0},),
         time_overlap=[("2020-01-01", "..")],
-        axes={"resolution": qe.AxisOverlap(-math.inf, 10.0, False, False)},
-        dims={"basin": qe.DimMatch(("14",), 1.0)},
+        dimensions={
+            "resolution": qe.DimMatch(qe.AxisOverlap(-math.inf, 10.0, False, False)),
+            "basin": qe.DimMatch(("14",), 1.0),
+        },
     )
     out = finding.to_dict()
     assert out["level"] == logging.INFO
@@ -248,13 +252,11 @@ def test_finding_to_dict_is_json_ready():
         {"target": "MOM_input", "key": "DT", "value": 240.0, "rationale": ""}
     ]
     assert out["time_overlap"] == [["2020-01-01", ".."]]
-    assert out["axes"]["resolution"] == {
-        "lo": None,
-        "hi": 10.0,
-        "lo_closed": False,
-        "hi_closed": False,
+    assert out["dimensions"]["resolution"] == {
+        "overlap": {"lo": None, "hi": 10.0, "lo_closed": False, "hi_closed": False},
+        "fraction": None,
     }
-    assert out["dims"] == {"basin": {"overlap": ["14"], "fraction": 1.0}}
+    assert out["dimensions"]["basin"] == {"overlap": ["14"], "fraction": 1.0}
     assert out["code"] == "CROC102"
 
 
@@ -266,10 +268,7 @@ def test_rule_from_feature_needs_properties_and_a_geometry():
 def test_space_and_time_are_built_in_dimensions():
     from queryearth.dimensions import SpaceDimension, TimeDimension
 
-    assert [name for name, _, _ in qe.Registry("x")._groups] == [
-        "space",
-        "time",
-    ] + list(qe.Registry.FACETS)
+    assert list(qe.Registry("x")._dimensions) == ["space", "time"]
     space, time = SpaceDimension(), TimeDimension()
     square = sp.box(0, 0, 2, 2)
     assert space.match(None, square).fraction == 1.0  # unconstrained: measured only
