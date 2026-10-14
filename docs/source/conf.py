@@ -1,7 +1,7 @@
-"""Sphinx configuration for the public queryearth user docs.
+"""Sphinx configuration for the queryearth user docs.
 
-Only docs/source is published. The design documents in docs/ (design.md and
-docs/reference/) stay private, because parts paraphrase private interviews.
+Only docs/source is built. The frozen design documents in docs/ (design.md and
+docs/reference/) are not part of the site.
 """
 
 import os

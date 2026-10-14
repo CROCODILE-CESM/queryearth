@@ -22,7 +22,7 @@ It is an engine only: the package ships no curated rules. Rule files belong to t
   Geometry and time semantics are deliberately not pluggable.
 - **Codes.** A code is a prefix plus three or four digits (`CRU001`, `ERA5-014`). A hyphen is required after a prefix that ends in a digit.
 - **Git.** Ask before committing or pushing. Never add a `Co-Authored-By` line. Never @-mention people on GitHub. Branch names are plain and descriptive, with no personal names. The author does releases.
-- **Privacy.** The repository is private, but the user docs site and the PyPI package are public. Parts of `docs/` paraphrase a private knowledge base of expert interviews, so do not make the repository or the docs public without the author's agreement. `MANIFEST.in` prunes `docs/` from the source distribution; keep it that way.
+- **Public.** The repository, the user docs site and the PyPI package are all public. Parts of the frozen design docs paraphrase expert interviews, which the author has agreed to publish. `MANIFEST.in` prunes `docs/` from the source distribution; keep it that way.
 
 ## Layout
 
@@ -36,7 +36,7 @@ It is an engine only: the package ships no curated rules. Rule files belong to t
 | `queryearth/registry.py` | `Registry`: declarations, `add`, `load` (one rule file, all or nothing), `query`, `query_points`, `PointResult` |
 | `tests/` | One file per module, plus `test_queries.py` (bulk path) and `test_records.py` (rule files, the loader checks and `to_feature` round trips) |
 | `examples/toy/` | A made-up rule file, `rules.geojson`, and `play.py`, a walkthrough to run cell by cell |
-| `docs/source/` | The public user docs (Sphinx with MyST Markdown), built and deployed to GitHub Pages by `.github/workflows/docs.yml`: one folder per release (`vX.Y.Z/`) plus `dev/` for `main`, with a version menu; `.github/docs_versions.py` keeps the version list and the root redirect. Nothing derived from the private interviews goes here |
+| `docs/source/` | The public user docs (Sphinx with MyST Markdown), built and deployed to GitHub Pages by `.github/workflows/docs.yml`: one folder per release (`vX.Y.Z/`) plus `dev/` for `main`, with a version menu; `.github/docs_versions.py` keeps the version list and the root redirect. |
 | `docs/design.md` | Frozen: the design and the spec as they stood at commit e5e9d0e, with "As built" notes where the code then differed |
 | `docs/reference/` | Frozen: `fixtures.md` (correctness fixtures), `decisions.md` (the Q-numbered decisions and detailed contracts), `usage.py` (a usage example), and background, consumer and glossary notes |
 
