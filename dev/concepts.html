@@ -6,14 +6,14 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Concepts &mdash; queryearth 0.1.1.dev1</title>
+  <title>Concepts &mdash; queryearth 0.1.1.dev2</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
 
   
       <script src="_static/jquery.js?v=5d32c60e"></script>
       <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="_static/documentation_options.js?v=ad65bcb3"></script>
+      <script src="_static/documentation_options.js?v=9a9d36d9"></script>
       <script src="_static/doctools.js?v=fd6eb6e6"></script>
       <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="_static/versions.js?v=58ec1786"></script>
@@ -191,7 +191,12 @@
 </section>
 <section id="query-with-what-you-use">
 <h2>Query with what you use<a class="headerlink" href="#query-with-what-you-use" title="Link to this heading"></a></h2>
-<p>Pass the space and time a product actually contributes: the cells and time steps you read, not a buffered shape. A model grid is converted to a polygon by the caller, for example its outline.</p>
+<p>Pass the space and time a product actually contributes: the cells and time steps you read, not a buffered shape. For a model grid, <a class="reference internal" href="api.html#queryearth.converters.grid_outline" title="queryearth.converters.grid_outline"><code class="xref py py-func docutils literal notranslate"><span class="pre">queryearth.converters.grid_outline()</span></code></a> gives its outline from the corners of its cells, such as mom6_forge’s <code class="docutils literal notranslate"><span class="pre">grid.qlon</span></code> and <code class="docutils literal notranslate"><span class="pre">grid.qlat</span></code>:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">domain</span> <span class="o">=</span> <span class="n">qe</span><span class="o">.</span><span class="n">converters</span><span class="o">.</span><span class="n">grid_outline</span><span class="p">(</span><span class="n">grid</span><span class="o">.</span><span class="n">qlon</span><span class="o">.</span><span class="n">values</span><span class="p">,</span> <span class="n">grid</span><span class="o">.</span><span class="n">qlat</span><span class="o">.</span><span class="n">values</span><span class="p">)</span>
+<span class="n">registry</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="n">space</span><span class="o">=</span><span class="n">domain</span><span class="p">,</span> <span class="n">time</span><span class="o">=</span><span class="p">(</span><span class="s2">"2000-01-01"</span><span class="p">,</span> <span class="s2">"2000-12-31"</span><span class="p">))</span>
+</pre></div>
+</div>
+<p>A grid that contains a pole becomes the whole polar cap beyond its outline, since queryearth does not take a ring around a pole: no rule that touches the grid is missed, but area fractions are measured against the cap.</p>
 </section>
 <section id="space">
 <h2>Space<a class="headerlink" href="#space" title="Link to this heading"></a></h2>

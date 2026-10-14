@@ -6,14 +6,14 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>API reference &mdash; queryearth 0.1.1.dev1</title>
+  <title>API reference &mdash; queryearth 0.1.1.dev2</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
 
   
       <script src="_static/jquery.js?v=5d32c60e"></script>
       <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="_static/documentation_options.js?v=ad65bcb3"></script>
+      <script src="_static/documentation_options.js?v=9a9d36d9"></script>
       <script src="_static/doctools.js?v=fd6eb6e6"></script>
       <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="_static/versions.js?v=58ec1786"></script>
@@ -126,6 +126,10 @@
 <li class="toctree-l3"><a class="reference internal" href="#queryearth.space.wrap_lon"><code class="docutils literal notranslate"><span class="pre">wrap_lon()</span></code></a></li>
 </ul>
 </li>
+<li class="toctree-l2"><a class="reference internal" href="#module-queryearth.converters">queryearth.converters</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#queryearth.converters.grid_outline"><code class="docutils literal notranslate"><span class="pre">grid_outline()</span></code></a></li>
+</ul>
+</li>
 </ul>
 </li>
 </ul>
@@ -156,11 +160,12 @@
              
   <section id="api-reference">
 <h1>API reference<a class="headerlink" href="#api-reference" title="Link to this heading"></a></h1>
-<p>Everything below is importable from <code class="docutils literal notranslate"><span class="pre">queryearth</span></code>, except the shape helpers, which live in <code class="docutils literal notranslate"><span class="pre">queryearth.space</span></code>.</p>
+<p>Everything below is importable from <code class="docutils literal notranslate"><span class="pre">queryearth</span></code>, except the shape helpers, which live in <code class="docutils literal notranslate"><span class="pre">queryearth.space</span></code>, and the converters, which live in <code class="docutils literal notranslate"><span class="pre">queryearth.converters</span></code>.</p>
 <p id="module-queryearth">queryearth: match rules scoped by area, time and other dimensions to a request.</p>
-<p>queryearth.time holds time keys, intervals and their measures, and
+<p>queryearth.time holds time keys, intervals and their measures,
 queryearth.space points, polygons and closed-set measures (imported as
-<code class="docutils literal notranslate"><span class="pre">from</span> <span class="pre">queryearth</span> <span class="pre">import</span> <span class="pre">space</span> <span class="pre">as</span> <span class="pre">sp</span></code>). The rule engine is at the top level:
+<code class="docutils literal notranslate"><span class="pre">from</span> <span class="pre">queryearth</span> <span class="pre">import</span> <span class="pre">space</span> <span class="pre">as</span> <span class="pre">sp</span></code>), and queryearth.converters turns other
+descriptions of a place, such as a model grid, into spaces. The rule engine is at the top level:
 a Registry of dimensions and rules answers queries with Finding
 objects, which callers log with the logging module. See docs/design.md for the
 design.</p>
@@ -598,6 +603,26 @@ and subtracted. A ring that goes around a pole raises ValueError.</p>
 <dd><p>x in [-180, 180] with no rounding error, as a float or an array like x.</p>
 <p>180 and -180 stay as given. Adding or subtracting 360 is exact, since the
 remainder and 360 are within a factor of two of each other.</p>
+</dd></dl>
+
+</section>
+<section id="module-queryearth.converters">
+<span id="queryearth-converters"></span><h2>queryearth.converters<a class="headerlink" href="#module-queryearth.converters" title="Link to this heading"></a></h2>
+<p>Converters: turn other descriptions of a place into queryearth spaces.</p>
+<p>Each converter returns an ordinary Space (a point or a polygon), so nothing else
+in queryearth needs to know where it came from.</p>
+<dl class="py function">
+<dt class="sig sig-object py" id="queryearth.converters.grid_outline">
+<span class="sig-prename descclassname"><span class="pre">queryearth.converters.</span></span><span class="sig-name descname"><span class="pre">grid_outline</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">lon</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lat</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#queryearth.space.Space" title="queryearth.space.Space"><span class="pre">Space</span></a></span></span><a class="reference internal" href="_modules/queryearth/converters.html#grid_outline"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#queryearth.converters.grid_outline" title="Link to this definition"></a></dt>
+<dd><p>The outline of a curvilinear grid, from the corners of its cells.</p>
+<p>lon and lat are 2-D arrays of cell corners in degrees, shaped (ny + 1, nx + 1),
+such as a MOM6 supergrid’s corners or mom6_forge’s <code class="docutils literal notranslate"><span class="pre">grid.qlon</span></code> and
+<code class="docutils literal notranslate"><span class="pre">grid.qlat</span></code>. The outline is the ring of the outer corners, so its edges
+follow the grid’s, and a grid across the antimeridian is split there.</p>
+<p>queryearth does not take a ring around a pole, so a grid that contains a pole
+becomes the whole polar cap beyond its outline’s farthest latitude. The cap
+is larger than the grid: no rule that touches the grid is missed, but area
+fractions are measured against the cap.</p>
 </dd></dl>
 
 </section>

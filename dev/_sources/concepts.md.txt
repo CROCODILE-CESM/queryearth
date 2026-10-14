@@ -73,7 +73,14 @@ registry.query(time=("2005-01-01", "2005-12-31"), dimensions={"product": ["toy_c
 
 ## Query with what you use
 
-Pass the space and time a product actually contributes: the cells and time steps you read, not a buffered shape. A model grid is converted to a polygon by the caller, for example its outline.
+Pass the space and time a product actually contributes: the cells and time steps you read, not a buffered shape. For a model grid, {func}`queryearth.converters.grid_outline` gives its outline from the corners of its cells, such as mom6_forge's `grid.qlon` and `grid.qlat`:
+
+```python
+domain = qe.converters.grid_outline(grid.qlon.values, grid.qlat.values)
+registry.query(space=domain, time=("2000-01-01", "2000-12-31"))
+```
+
+A grid that contains a pole becomes the whole polar cap beyond its outline, since queryearth does not take a ring around a pole: no rule that touches the grid is missed, but area fractions are measured against the cap.
 
 ## Space
 
