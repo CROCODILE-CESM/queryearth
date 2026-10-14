@@ -29,7 +29,9 @@ if errors:
 
 ```python
 ocean = {"product": ["toy_ocean"], "variable": ["thetao"]}
-result = registry.query_points(lon, lat, weights=cell_area, time=january, facets=ocean)
+result = registry.query_points(
+    lon, lat, weights=cell_area, time=january, dimensions=ocean
+)
 mask = result.masks["TOY002"]  # shaped like lon
 share = result.fractions["TOY002"]  # weighted share of the points
 flagged = result.any()  # points inside a definite finding at WARNING or above

@@ -5,14 +5,14 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>queryearth.dimensions &mdash; queryearth 0.0.2.dev7</title>
+  <title>queryearth.dimensions &mdash; queryearth 0.1.1.dev1</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
 
   
       <script src="../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../_static/documentation_options.js?v=c4eeb907"></script>
+      <script src="../../_static/documentation_options.js?v=ad65bcb3"></script>
       <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../_static/versions.js?v=58ec1786"></script>
@@ -77,8 +77,9 @@
 <span></span><span class="sd">"""Dimensions: every kind of scope, through one interface (section 4.13).</span>
 
 <span class="sd">A dimension decides only whether one rule value meets one query value; the</span>
-<span class="sd">Registry does everything else (conditional findings, unknown names, sorting). Space and time are built in on every Registry and cannot be replaced.</span>
-<span class="sd">Axis (numeric ranges), Labels (facets matched by glob patterns) and Versions</span>
+<span class="sd">Registry does everything else (conditional findings, unknown names, sorting).</span>
+<span class="sd">Space and time are built in on every Registry and cannot be replaced. Axis</span>
+<span class="sd">(numeric ranges), Labels (names matched by glob patterns) and Versions</span>
 <span class="sd">(OSV-style version ranges) are the built-in plugins, and a user plugin</span>
 <span class="sd">implements the same four members.</span>
 <span class="sd">"""</span>
@@ -95,11 +96,11 @@
 <span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">queryearth</span><span class="w"> </span><span class="kn">import</span> <span class="n">space</span> <span class="k">as</span> <span class="n">sp</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">queryearth.objects</span><span class="w"> </span><span class="kn">import</span> <span class="n">AxisOverlap</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">queryearth.time</span><span class="w"> </span><span class="kn">import</span> <span class="n">TimeSpec</span><span class="p">,</span> <span class="n">overlap</span><span class="p">,</span> <span class="n">time_fraction</span>
 
 <span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span>
     <span class="s2">"Axis"</span><span class="p">,</span>
+    <span class="s2">"AxisOverlap"</span><span class="p">,</span>
     <span class="s2">"DimMatch"</span><span class="p">,</span>
     <span class="s2">"Dimension"</span><span class="p">,</span>
     <span class="s2">"Labels"</span><span class="p">,</span>
@@ -238,6 +239,30 @@
 
 
 <span class="c1"># ---- Axis: a named ordered dimension in one unit ----------------------------------</span>
+<div class="viewcode-block" id="AxisOverlap">
+<a class="viewcode-back" href="../../api.html#queryearth.AxisOverlap">[docs]</a>
+<span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">AxisOverlap</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""An interval on one axis that keeps its open ends, such as [8, 10).</span>
+
+<span class="sd">    An open end at infinity has its closed flag False.</span>
+<span class="sd">    """</span>
+
+    <span class="n">lo</span><span class="p">:</span> <span class="nb">float</span>
+    <span class="n">hi</span><span class="p">:</span> <span class="nb">float</span>
+    <span class="n">lo_closed</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span>
+    <span class="n">hi_closed</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">__post_init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="nb">object</span><span class="o">.</span><span class="fm">__setattr__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">"lo"</span><span class="p">,</span> <span class="nb">float</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">lo</span><span class="p">))</span>
+        <span class="nb">object</span><span class="o">.</span><span class="fm">__setattr__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">"hi"</span><span class="p">,</span> <span class="nb">float</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">hi</span><span class="p">))</span>
+        <span class="k">if</span> <span class="n">math</span><span class="o">.</span><span class="n">isnan</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">lo</span><span class="p">)</span> <span class="ow">or</span> <span class="n">math</span><span class="o">.</span><span class="n">isnan</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">hi</span><span class="p">)</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">lo</span> <span class="o">&gt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">hi</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">"an axis interval needs lo &lt;= hi, got </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">lo</span><span class="si">}</span><span class="s2">, </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">hi</span><span class="si">}</span><span class="s2">"</span>
+            <span class="p">)</span></div>
+
+
+
 <span class="k">def</span><span class="w"> </span><span class="nf">axis_intersection</span><span class="p">(</span><span class="n">rule</span><span class="p">:</span> <span class="n">AxisOverlap</span><span class="p">,</span> <span class="n">lo</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">hi</span><span class="p">:</span> <span class="nb">float</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">AxisOverlap</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""The intersection of a rule interval with the closed range [lo, hi]."""</span>
     <span class="n">start</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">rule</span><span class="o">.</span><span class="n">lo</span><span class="p">,</span> <span class="n">lo</span><span class="p">)</span>
@@ -325,10 +350,10 @@
 
 
 
-<span class="c1"># ---- Labels: a facet matched by case-sensitive fnmatch globs ----------------------</span>
+<span class="c1"># ---- Labels: names matched by case-sensitive fnmatch globs -------------------------</span>
 <span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">Patterns</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">"""A parsed facet rule: values must match some any_of and no none_of."""</span>
+<span class="w">    </span><span class="sd">"""A parsed label rule: values must match some any_of and no none_of."""</span>
 
     <span class="n">any_of</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span>  <span class="c1"># None: any value not excluded</span>
     <span class="n">none_of</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span> <span class="o">=</span> <span class="p">()</span>
@@ -343,32 +368,34 @@
 <a class="viewcode-back" href="../../api.html#queryearth.Labels">[docs]</a>
 <span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">Labels</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">"""A categorical facet: rule patterns against query values (section 4.7)."""</span>
+<span class="w">    </span><span class="sd">"""A label dimension: names, which rules match with glob patterns (section 4.7)."""</span>
 
     <span class="n">name</span><span class="p">:</span> <span class="nb">str</span>
     <span class="n">description</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">""</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">parse_rule</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Patterns</span><span class="p">:</span>
+        <span class="n">what</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"label dimension </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="si">!r}</span><span class="s2">"</span>
         <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">Patterns</span><span class="p">):</span>
             <span class="k">return</span> <span class="n">value</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">Mapping</span><span class="p">):</span>
-            <span class="k">return</span> <span class="n">Patterns</span><span class="p">(</span><span class="n">_string_list</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="sa">f</span><span class="s2">"facet </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="si">!r}</span><span class="s2">"</span><span class="p">))</span>
+            <span class="k">return</span> <span class="n">Patterns</span><span class="p">(</span><span class="n">_string_list</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">what</span><span class="p">))</span>
         <span class="n">unknown</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">value</span><span class="p">)</span> <span class="o">-</span> <span class="p">{</span><span class="s2">"any_of"</span><span class="p">,</span> <span class="s2">"none_of"</span><span class="p">}</span>
         <span class="k">if</span> <span class="n">unknown</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">value</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                <span class="sa">f</span><span class="s2">"facet </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="si">!r}</span><span class="s2"> takes a list of patterns or "</span>
+                <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">what</span><span class="si">}</span><span class="s2"> takes a list of patterns or "</span>
                 <span class="sa">f</span><span class="s2">"</span><span class="se">{{</span><span class="s2">'any_of': [...], 'none_of': [...]</span><span class="se">}}</span><span class="s2">, got </span><span class="si">{</span><span class="nb">dict</span><span class="p">(</span><span class="n">value</span><span class="p">)</span><span class="si">!r}</span><span class="s2">"</span>
             <span class="p">)</span>
         <span class="n">any_of</span> <span class="o">=</span> <span class="kc">None</span>
         <span class="k">if</span> <span class="s2">"any_of"</span> <span class="ow">in</span> <span class="n">value</span><span class="p">:</span>
-            <span class="n">any_of</span> <span class="o">=</span> <span class="n">_string_list</span><span class="p">(</span><span class="n">value</span><span class="p">[</span><span class="s2">"any_of"</span><span class="p">],</span> <span class="sa">f</span><span class="s2">"facet </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="si">!r}</span><span class="s2"> any_of"</span><span class="p">)</span>
+            <span class="n">any_of</span> <span class="o">=</span> <span class="n">_string_list</span><span class="p">(</span><span class="n">value</span><span class="p">[</span><span class="s2">"any_of"</span><span class="p">],</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">what</span><span class="si">}</span><span class="s2"> any_of"</span><span class="p">)</span>
         <span class="n">none_of</span> <span class="o">=</span> <span class="p">()</span>
         <span class="k">if</span> <span class="s2">"none_of"</span> <span class="ow">in</span> <span class="n">value</span><span class="p">:</span>
-            <span class="n">none_of</span> <span class="o">=</span> <span class="n">_string_list</span><span class="p">(</span><span class="n">value</span><span class="p">[</span><span class="s2">"none_of"</span><span class="p">],</span> <span class="sa">f</span><span class="s2">"facet </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="si">!r}</span><span class="s2"> none_of"</span><span class="p">)</span>
+            <span class="n">none_of</span> <span class="o">=</span> <span class="n">_string_list</span><span class="p">(</span><span class="n">value</span><span class="p">[</span><span class="s2">"none_of"</span><span class="p">],</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">what</span><span class="si">}</span><span class="s2"> none_of"</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">Patterns</span><span class="p">(</span><span class="n">any_of</span><span class="p">,</span> <span class="n">none_of</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">parse_query</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="o">...</span><span class="p">]:</span>
-        <span class="k">return</span> <span class="nb">tuple</span><span class="p">(</span><span class="nb">dict</span><span class="o">.</span><span class="n">fromkeys</span><span class="p">(</span><span class="n">_string_list</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="sa">f</span><span class="s2">"facet </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="si">!r}</span><span class="s2">"</span><span class="p">)))</span>
+        <span class="n">what</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"label dimension </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="si">!r}</span><span class="s2">"</span>
+        <span class="k">return</span> <span class="nb">tuple</span><span class="p">(</span><span class="nb">dict</span><span class="o">.</span><span class="n">fromkeys</span><span class="p">(</span><span class="n">_string_list</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">what</span><span class="p">)))</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">match</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">rule</span><span class="p">:</span> <span class="n">Patterns</span><span class="p">,</span> <span class="n">query</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="o">...</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">DimMatch</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
         <span class="n">hits</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">v</span> <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">query</span> <span class="k">if</span> <span class="n">rule</span><span class="o">.</span><span class="n">admits</span><span class="p">(</span><span class="n">v</span><span class="p">))</span>
@@ -456,17 +483,17 @@
 <a class="viewcode-back" href="../../api.html#queryearth.Versions">[docs]</a>
 <span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">Versions</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">"""The version facet: a union of OSV-style ranges (section 4.8)."""</span>
+<span class="w">    </span><span class="sd">"""A version dimension: rules give a union of OSV-style ranges (section 4.8)."""</span>
 
-    <span class="n">name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">"version"</span>
+    <span class="n">name</span><span class="p">:</span> <span class="nb">str</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">parse_rule</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">VersionRange</span><span class="p">,</span> <span class="o">...</span><span class="p">]:</span>
         <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">Mapping</span><span class="p">):</span>
             <span class="n">value</span> <span class="o">=</span> <span class="p">[</span><span class="n">value</span><span class="p">]</span>
         <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">or</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">Iterable</span><span class="p">):</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                <span class="sa">f</span><span class="s2">"facet </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="si">!r}</span><span class="s2"> takes a version range or a list of them, "</span>
-                <span class="sa">f</span><span class="s2">"not </span><span class="si">{</span><span class="n">value</span><span class="si">!r}</span><span class="s2">"</span>
+                <span class="sa">f</span><span class="s2">"dimension </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="si">!r}</span><span class="s2"> takes a version range or a list of "</span>
+                <span class="sa">f</span><span class="s2">"them, not </span><span class="si">{</span><span class="n">value</span><span class="si">!r}</span><span class="s2">"</span>
             <span class="p">)</span>
         <span class="n">ranges</span> <span class="o">=</span> <span class="p">[]</span>
         <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">value</span><span class="p">:</span>
@@ -483,11 +510,11 @@
                 <span class="n">fields</span><span class="p">[</span><span class="s2">"versions"</span><span class="p">]</span> <span class="o">=</span> <span class="n">_string_list</span><span class="p">(</span><span class="n">fields</span><span class="p">[</span><span class="s2">"versions"</span><span class="p">],</span> <span class="s2">"versions"</span><span class="p">)</span>
             <span class="n">ranges</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">VersionRange</span><span class="p">(</span><span class="o">**</span><span class="n">fields</span><span class="p">))</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="n">ranges</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"facet </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="si">!r}</span><span class="s2"> needs at least one range"</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"dimension </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="si">!r}</span><span class="s2"> needs at least one range"</span><span class="p">)</span>
         <span class="k">return</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">ranges</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">parse_query</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="o">...</span><span class="p">]:</span>
-        <span class="k">return</span> <span class="nb">tuple</span><span class="p">(</span><span class="nb">dict</span><span class="o">.</span><span class="n">fromkeys</span><span class="p">(</span><span class="n">_string_list</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="sa">f</span><span class="s2">"facet </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="si">!r}</span><span class="s2">"</span><span class="p">)))</span>
+        <span class="k">return</span> <span class="nb">tuple</span><span class="p">(</span><span class="nb">dict</span><span class="o">.</span><span class="n">fromkeys</span><span class="p">(</span><span class="n">_string_list</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="sa">f</span><span class="s2">"dimension </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="si">!r}</span><span class="s2">"</span><span class="p">)))</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">match</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span> <span class="n">rule</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">VersionRange</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span> <span class="n">query</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span>

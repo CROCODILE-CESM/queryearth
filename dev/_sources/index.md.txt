@@ -1,6 +1,6 @@
 # queryearth
 
-queryearth answers one question: given where (a point or a polygon), when (a time range) and anything else that matters (grid resolution, product, variable, model and so on), which registered rules apply, how much of the query does each one cover, and what does it say to watch out for or to do?
+queryearth answers one question: given where (a point or a polygon), when (a time range) and anything else that matters (grid resolution, product, variable, model and so on), which registered rules apply, how much of the query does each one cover, and what does it say to watch out for or to do? Each of these is a [dimension](concepts.md#dimensions).
 
 Rules are short Python objects or GeoJSON records. A query returns **findings** of two kinds:
 
@@ -23,7 +23,7 @@ queryearth needs Python 3.11 or later, numpy, and shapely 2.1 or later. It is pr
 import queryearth as qe
 from queryearth import space as sp
 
-registry = qe.Registry("demo", axes=[qe.Axis("resolution", "km")])
+registry = qe.Registry("demo", dimensions=[qe.Axis("resolution", "km")])
 registry.add(
     qe.Rule(
         code="DEMO001",
@@ -42,7 +42,7 @@ registry.add(
         kind="suggestion",
         title="Fine grid: turn off the coarse-grid scheme",
         message="Below 10 km the model resolves this process itself.",
-        scope=qe.Scope(axes={"resolution": {"lt": 10}}),
+        scope=qe.Scope(dimensions={"resolution": {"lt": 10}}),
         suggestions=[qe.Suggestion("settings", "coarse_scheme", False)],
     )
 )
@@ -50,7 +50,7 @@ registry.add(
 for f in registry.query(
     space=sp.box(-60, -70, -20, -40),  # west, south, east, north
     time=qe.interval("2000-01-01", "2005-12-31"),
-    axes={"resolution": 8},
+    dimensions={"resolution": 8},
 ):
     print(f.code, f.kind, f"area {f.area_fraction:.0%}", f"time {f.time_fraction:.0%}")
 ```

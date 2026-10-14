@@ -6,14 +6,14 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>The toy example &mdash; queryearth 0.0.2.dev7</title>
+  <title>The toy example &mdash; queryearth 0.1.1.dev1</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
 
   
       <script src="_static/jquery.js?v=5d32c60e"></script>
       <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="_static/documentation_options.js?v=c4eeb907"></script>
+      <script src="_static/documentation_options.js?v=ad65bcb3"></script>
       <script src="_static/doctools.js?v=fd6eb6e6"></script>
       <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="_static/versions.js?v=58ec1786"></script>
@@ -103,8 +103,8 @@
 <span class="sd">file and rerun to see what changes.</span>
 <span class="sd">"""</span>
 
-<span class="c1"># %% Set up: a Registry with the resolution axis the rules use (the facets they</span>
-<span class="c1"># use, product, variable and model, are declared by default), then load the rules.</span>
+<span class="c1"># %% Set up: a Registry that declares the dimensions the rules use, a resolution</span>
+<span class="c1"># axis and the labels product, variable and model, then load the rules.</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
 
@@ -116,7 +116,13 @@
 <span class="n">HERE</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="nb">globals</span><span class="p">()</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"__file__"</span><span class="p">,</span> <span class="s2">"play.py"</span><span class="p">))</span><span class="o">.</span><span class="n">resolve</span><span class="p">()</span><span class="o">.</span><span class="n">parent</span>
 
 <span class="n">registry</span> <span class="o">=</span> <span class="n">qe</span><span class="o">.</span><span class="n">Registry</span><span class="p">(</span>
-    <span class="s2">"toy"</span><span class="p">,</span> <span class="n">axes</span><span class="o">=</span><span class="p">[</span><span class="n">qe</span><span class="o">.</span><span class="n">Axis</span><span class="p">(</span><span class="s2">"resolution"</span><span class="p">,</span> <span class="s2">"km"</span><span class="p">,</span> <span class="s2">"horizontal grid spacing"</span><span class="p">)]</span>
+    <span class="s2">"toy"</span><span class="p">,</span>
+    <span class="n">dimensions</span><span class="o">=</span><span class="p">[</span>
+        <span class="n">qe</span><span class="o">.</span><span class="n">Axis</span><span class="p">(</span><span class="s2">"resolution"</span><span class="p">,</span> <span class="s2">"km"</span><span class="p">,</span> <span class="s2">"horizontal grid spacing"</span><span class="p">),</span>
+        <span class="n">qe</span><span class="o">.</span><span class="n">Labels</span><span class="p">(</span><span class="s2">"product"</span><span class="p">),</span>
+        <span class="n">qe</span><span class="o">.</span><span class="n">Labels</span><span class="p">(</span><span class="s2">"variable"</span><span class="p">),</span>
+        <span class="n">qe</span><span class="o">.</span><span class="n">Labels</span><span class="p">(</span><span class="s2">"model"</span><span class="p">),</span>
+    <span class="p">],</span>
 <span class="p">)</span>
 <span class="nb">print</span><span class="p">(</span><span class="s2">"loaded:"</span><span class="p">,</span> <span class="n">registry</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">HERE</span> <span class="o">/</span> <span class="s2">"rules.geojson"</span><span class="p">))</span>
 
@@ -144,28 +150,26 @@
 <span class="c1"># TOY101 needs the Arctic, and only the top of this domain is north of 66.5N.</span>
 <span class="n">bering</span> <span class="o">=</span> <span class="n">sp</span><span class="o">.</span><span class="n">box</span><span class="p">(</span><span class="mi">165</span><span class="p">,</span> <span class="mi">52</span><span class="p">,</span> <span class="o">-</span><span class="mi">160</span><span class="p">,</span> <span class="mi">70</span><span class="p">)</span>  <span class="c1"># west, south, east, north</span>
 <span class="n">winter</span> <span class="o">=</span> <span class="n">qe</span><span class="o">.</span><span class="n">interval</span><span class="p">(</span><span class="s2">"2000-11-01"</span><span class="p">,</span> <span class="s2">"2001-03-31"</span><span class="p">)</span>
-<span class="n">ocean</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"model"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"mom6"</span><span class="p">],</span> <span class="s2">"product"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"toy_ocean"</span><span class="p">],</span> <span class="s2">"variable"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"thetao"</span><span class="p">,</span> <span class="s2">"so"</span><span class="p">]}</span>
-<span class="n">show</span><span class="p">(</span>
-    <span class="n">registry</span><span class="o">.</span><span class="n">query</span><span class="p">(</span>
-        <span class="n">space</span><span class="o">=</span><span class="n">bering</span><span class="p">,</span>
-        <span class="n">time</span><span class="o">=</span><span class="n">winter</span><span class="p">,</span>
-        <span class="n">axes</span><span class="o">=</span><span class="p">{</span><span class="s2">"resolution"</span><span class="p">:</span> <span class="p">(</span><span class="mi">8</span><span class="p">,</span> <span class="mi">8</span><span class="p">)},</span>
-        <span class="n">facets</span><span class="o">=</span><span class="n">ocean</span><span class="p">,</span>
-    <span class="p">)</span>
-<span class="p">)</span>
+<span class="n">ocean</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">"resolution"</span><span class="p">:</span> <span class="p">(</span><span class="mi">8</span><span class="p">,</span> <span class="mi">8</span><span class="p">),</span>
+    <span class="s2">"model"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"mom6"</span><span class="p">],</span>
+    <span class="s2">"product"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"toy_ocean"</span><span class="p">],</span>
+    <span class="s2">"variable"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"thetao"</span><span class="p">,</span> <span class="s2">"so"</span><span class="p">],</span>
+<span class="p">}</span>
+<span class="n">show</span><span class="p">(</span><span class="n">registry</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="n">space</span><span class="o">=</span><span class="n">bering</span><span class="p">,</span> <span class="n">time</span><span class="o">=</span><span class="n">winter</span><span class="p">,</span> <span class="n">dimensions</span><span class="o">=</span><span class="n">ocean</span><span class="p">))</span>
 
 <span class="c1"># %% 2. Resolution only. TOY102 applies outright; with include_conditional=True</span>
 <span class="c1"># the other rules come back too, each naming what the query left out.</span>
-<span class="n">show</span><span class="p">(</span><span class="n">registry</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="n">axes</span><span class="o">=</span><span class="p">{</span><span class="s2">"resolution"</span><span class="p">:</span> <span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">)},</span> <span class="n">include_conditional</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span>
+<span class="n">show</span><span class="p">(</span><span class="n">registry</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="n">dimensions</span><span class="o">=</span><span class="p">{</span><span class="s2">"resolution"</span><span class="p">:</span> <span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">)},</span> <span class="n">include_conditional</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span>
 
 <span class="c1"># %% 3. Coverage limits are ordinary rules. toy_coastal covers one box from 2010</span>
 <span class="c1"># to 2023 only, so asking for it in the Bering Sea gives TOY006 (outside its box)</span>
 <span class="c1"># and in the Gulf in 2005 gives TOY004 (before 2010).</span>
 <span class="n">coastal</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"product"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"toy_coastal"</span><span class="p">]}</span>
-<span class="n">show</span><span class="p">(</span><span class="n">registry</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="n">space</span><span class="o">=</span><span class="n">bering</span><span class="p">,</span> <span class="n">time</span><span class="o">=</span><span class="n">winter</span><span class="p">,</span> <span class="n">facets</span><span class="o">=</span><span class="n">coastal</span><span class="p">))</span>
+<span class="n">show</span><span class="p">(</span><span class="n">registry</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="n">space</span><span class="o">=</span><span class="n">bering</span><span class="p">,</span> <span class="n">time</span><span class="o">=</span><span class="n">winter</span><span class="p">,</span> <span class="n">dimensions</span><span class="o">=</span><span class="n">coastal</span><span class="p">))</span>
 <span class="n">gulf</span> <span class="o">=</span> <span class="n">sp</span><span class="o">.</span><span class="n">box</span><span class="p">(</span><span class="o">-</span><span class="mi">95</span><span class="p">,</span> <span class="mi">22</span><span class="p">,</span> <span class="o">-</span><span class="mi">85</span><span class="p">,</span> <span class="mi">29</span><span class="p">)</span>
 <span class="n">year_2005</span> <span class="o">=</span> <span class="n">qe</span><span class="o">.</span><span class="n">interval</span><span class="p">(</span><span class="s2">"2005-01-01"</span><span class="p">,</span> <span class="s2">"2005-12-31"</span><span class="p">)</span>
-<span class="n">show</span><span class="p">(</span><span class="n">registry</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="n">space</span><span class="o">=</span><span class="n">gulf</span><span class="p">,</span> <span class="n">time</span><span class="o">=</span><span class="n">year_2005</span><span class="p">,</span> <span class="n">facets</span><span class="o">=</span><span class="n">coastal</span><span class="p">))</span>
+<span class="n">show</span><span class="p">(</span><span class="n">registry</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="n">space</span><span class="o">=</span><span class="n">gulf</span><span class="p">,</span> <span class="n">time</span><span class="o">=</span><span class="n">year_2005</span><span class="p">,</span> <span class="n">dimensions</span><span class="o">=</span><span class="n">coastal</span><span class="p">))</span>
 
 <span class="c1"># %% 4. Rules written in Python. A static rule, and a computed rule whose</span>
 <span class="c1"># suggestion depends on the query (a made-up time step from the finest cells).</span>
@@ -176,7 +180,7 @@
         <span class="n">title</span><span class="o">=</span><span class="s2">"toy_atmos 2 m temperature is too cold over sea ice"</span><span class="p">,</span>
         <span class="n">message</span><span class="o">=</span><span class="s2">"Over sea ice, toy_atmos t2m runs a few kelvin too cold."</span><span class="p">,</span>
         <span class="n">scope</span><span class="o">=</span><span class="n">qe</span><span class="o">.</span><span class="n">Scope</span><span class="p">(</span>
-            <span class="n">space</span><span class="o">=</span><span class="n">sp</span><span class="o">.</span><span class="n">box</span><span class="p">(</span><span class="o">-</span><span class="mi">180</span><span class="p">,</span> <span class="mi">60</span><span class="p">,</span> <span class="mi">180</span><span class="p">,</span> <span class="mi">90</span><span class="p">),</span> <span class="n">facets</span><span class="o">=</span><span class="p">{</span><span class="s2">"product"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"toy_atmos"</span><span class="p">]}</span>
+            <span class="n">space</span><span class="o">=</span><span class="n">sp</span><span class="o">.</span><span class="n">box</span><span class="p">(</span><span class="o">-</span><span class="mi">180</span><span class="p">,</span> <span class="mi">60</span><span class="p">,</span> <span class="mi">180</span><span class="p">,</span> <span class="mi">90</span><span class="p">),</span> <span class="n">dimensions</span><span class="o">=</span><span class="p">{</span><span class="s2">"product"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"toy_atmos"</span><span class="p">]}</span>
         <span class="p">),</span>
     <span class="p">)</span>
 <span class="p">)</span>
@@ -185,32 +189,21 @@
 <span class="nd">@registry</span><span class="o">.</span><span class="n">rule</span><span class="p">(</span>
     <span class="s2">"TOY202"</span><span class="p">,</span>
     <span class="n">kind</span><span class="o">=</span><span class="s2">"suggestion"</span><span class="p">,</span>
-    <span class="n">axes</span><span class="o">=</span><span class="p">{</span><span class="s2">"resolution"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"gt"</span><span class="p">:</span> <span class="mi">0</span><span class="p">}},</span>  <span class="c1"># needs a resolution, so conditional without one</span>
+    <span class="n">dimensions</span><span class="o">=</span><span class="p">{</span><span class="s2">"resolution"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"gt"</span><span class="p">:</span> <span class="mi">0</span><span class="p">}},</span>  <span class="c1"># conditional without a resolution</span>
 <span class="p">)</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">time_step</span><span class="p">(</span><span class="n">query</span><span class="p">,</span> <span class="n">match</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""Set the toy time step from the finest cells"""</span>
-    <span class="n">finest_km</span> <span class="o">=</span> <span class="n">match</span><span class="o">.</span><span class="n">axes</span><span class="p">[</span><span class="s2">"resolution"</span><span class="p">]</span><span class="o">.</span><span class="n">lo</span>
+    <span class="n">finest_km</span> <span class="o">=</span> <span class="n">match</span><span class="o">.</span><span class="n">dimensions</span><span class="p">[</span><span class="s2">"resolution"</span><span class="p">]</span><span class="o">.</span><span class="n">overlap</span><span class="o">.</span><span class="n">lo</span>
     <span class="n">seconds</span> <span class="o">=</span> <span class="mf">30.0</span> <span class="o">*</span> <span class="n">finest_km</span>  <span class="c1"># made up: 30 s per km</span>
     <span class="k">return</span> <span class="p">{</span><span class="s2">"suggestions"</span><span class="p">:</span> <span class="p">[</span><span class="n">qe</span><span class="o">.</span><span class="n">Suggestion</span><span class="p">(</span><span class="s2">"MOM_input"</span><span class="p">,</span> <span class="s2">"TOY_DT"</span><span class="p">,</span> <span class="n">seconds</span><span class="p">,</span> <span class="s2">"made up"</span><span class="p">)]}</span>
 
 
-<span class="n">show</span><span class="p">(</span>
-    <span class="n">registry</span><span class="o">.</span><span class="n">query</span><span class="p">(</span>
-        <span class="n">space</span><span class="o">=</span><span class="n">bering</span><span class="p">,</span>
-        <span class="n">time</span><span class="o">=</span><span class="n">winter</span><span class="p">,</span>
-        <span class="n">axes</span><span class="o">=</span><span class="p">{</span><span class="s2">"resolution"</span><span class="p">:</span> <span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="mi">12</span><span class="p">)},</span>
-        <span class="n">facets</span><span class="o">=</span><span class="p">{</span><span class="s2">"product"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"toy_atmos"</span><span class="p">]},</span>
-    <span class="p">)</span>
-<span class="p">)</span>
+<span class="n">atmos</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"resolution"</span><span class="p">:</span> <span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="mi">12</span><span class="p">),</span> <span class="s2">"product"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"toy_atmos"</span><span class="p">]}</span>
+<span class="n">show</span><span class="p">(</span><span class="n">registry</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="n">space</span><span class="o">=</span><span class="n">bering</span><span class="p">,</span> <span class="n">time</span><span class="o">=</span><span class="n">winter</span><span class="p">,</span> <span class="n">dimensions</span><span class="o">=</span><span class="n">atmos</span><span class="p">))</span>
 
 <span class="c1"># %% 5. Findings are data. Log each at its own level, and raise for anything at</span>
 <span class="c1"># ERROR or above (nothing here; try the product toy_coastal).</span>
-<span class="n">findings</span> <span class="o">=</span> <span class="n">registry</span><span class="o">.</span><span class="n">query</span><span class="p">(</span>
-    <span class="n">space</span><span class="o">=</span><span class="n">bering</span><span class="p">,</span>
-    <span class="n">time</span><span class="o">=</span><span class="n">winter</span><span class="p">,</span>
-    <span class="n">axes</span><span class="o">=</span><span class="p">{</span><span class="s2">"resolution"</span><span class="p">:</span> <span class="p">(</span><span class="mi">8</span><span class="p">,</span> <span class="mi">8</span><span class="p">)},</span>
-    <span class="n">facets</span><span class="o">=</span><span class="n">ocean</span><span class="p">,</span>
-<span class="p">)</span>
+<span class="n">findings</span> <span class="o">=</span> <span class="n">registry</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="n">space</span><span class="o">=</span><span class="n">bering</span><span class="p">,</span> <span class="n">time</span><span class="o">=</span><span class="n">winter</span><span class="p">,</span> <span class="n">dimensions</span><span class="o">=</span><span class="n">ocean</span><span class="p">)</span>
 <span class="n">logging</span><span class="o">.</span><span class="n">basicConfig</span><span class="p">(</span><span class="n">level</span><span class="o">=</span><span class="n">logging</span><span class="o">.</span><span class="n">INFO</span><span class="p">,</span> <span class="nb">format</span><span class="o">=</span><span class="s2">"</span><span class="si">%(levelname)s</span><span class="s2"> </span><span class="si">%(message)s</span><span class="s2">"</span><span class="p">,</span> <span class="n">force</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">findings</span><span class="p">:</span>
     <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="s2">"toy"</span><span class="p">)</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">f</span><span class="o">.</span><span class="n">level</span><span class="p">,</span> <span class="n">f</span><span class="p">)</span>  <span class="c1"># str(f) is "[CODE] title (...)"</span>
@@ -225,7 +218,7 @@
 <span class="n">year_2000</span> <span class="o">=</span> <span class="n">qe</span><span class="o">.</span><span class="n">interval</span><span class="p">(</span><span class="s2">"2000-01-01"</span><span class="p">,</span> <span class="s2">"2000-12-31"</span><span class="p">)</span>
 <span class="k">for</span> <span class="n">product</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">"toy_ocean"</span><span class="p">,</span> <span class="s2">"toy_coastal"</span><span class="p">]:</span>
     <span class="n">salinity</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"product"</span><span class="p">:</span> <span class="p">[</span><span class="n">product</span><span class="p">],</span> <span class="s2">"variable"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"so"</span><span class="p">]}</span>
-    <span class="n">found</span> <span class="o">=</span> <span class="n">registry</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="n">space</span><span class="o">=</span><span class="n">gulf</span><span class="p">,</span> <span class="n">time</span><span class="o">=</span><span class="n">year_2000</span><span class="p">,</span> <span class="n">facets</span><span class="o">=</span><span class="n">salinity</span><span class="p">)</span>
+    <span class="n">found</span> <span class="o">=</span> <span class="n">registry</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="n">space</span><span class="o">=</span><span class="n">gulf</span><span class="p">,</span> <span class="n">time</span><span class="o">=</span><span class="n">year_2000</span><span class="p">,</span> <span class="n">dimensions</span><span class="o">=</span><span class="n">salinity</span><span class="p">)</span>
     <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"  </span><span class="si">{</span><span class="n">product</span><span class="si">:</span><span class="s2">11</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="p">[</span><span class="n">f</span><span class="o">.</span><span class="n">code</span><span class="w"> </span><span class="k">for</span><span class="w"> </span><span class="n">f</span><span class="w"> </span><span class="ow">in</span><span class="w"> </span><span class="n">found</span><span class="p">]</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 
 <span class="c1"># %% 7. Many points at once: every 1-degree cell centre, January 2001, toy_ocean.</span>
@@ -234,7 +227,7 @@
     <span class="n">lon</span><span class="p">,</span>
     <span class="n">lat</span><span class="p">,</span>
     <span class="n">time</span><span class="o">=</span><span class="n">qe</span><span class="o">.</span><span class="n">interval</span><span class="p">(</span><span class="s2">"2001-01-01"</span><span class="p">,</span> <span class="s2">"2001-01-31"</span><span class="p">),</span>
-    <span class="n">facets</span><span class="o">=</span><span class="p">{</span><span class="s2">"product"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"toy_ocean"</span><span class="p">],</span> <span class="s2">"variable"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"thetao"</span><span class="p">]},</span>
+    <span class="n">dimensions</span><span class="o">=</span><span class="p">{</span><span class="s2">"product"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"toy_ocean"</span><span class="p">],</span> <span class="s2">"variable"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"thetao"</span><span class="p">]},</span>
 <span class="p">)</span>
 <span class="k">for</span> <span class="n">code</span><span class="p">,</span> <span class="n">mask</span> <span class="ow">in</span> <span class="n">result</span><span class="o">.</span><span class="n">masks</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
     <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"  </span><span class="si">{</span><span class="n">code</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">mask</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span><span class="si">}</span><span class="s2"> of </span><span class="si">{</span><span class="n">mask</span><span class="o">.</span><span class="n">size</span><span class="si">}</span><span class="s2"> points"</span><span class="p">)</span>
@@ -275,7 +268,7 @@
 <span class="w">        </span><span class="nt">"message"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Few salinity profiles went into toy_ocean before 2004, so its salinity drifts in that period."</span><span class="p">,</span>
 <span class="w">        </span><span class="nt">"instruction"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Start after 2004 if you can."</span><span class="p">,</span>
 <span class="w">        </span><span class="nt">"action"</span><span class="p">:</span><span class="w"> </span><span class="s2">"use_with_caution"</span><span class="p">,</span>
-<span class="w">        </span><span class="nt">"facets"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="nt">"dimensions"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
 <span class="w">          </span><span class="nt">"product"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
 <span class="w">            </span><span class="s2">"toy_ocean"</span>
 <span class="w">          </span><span class="p">],</span>
@@ -322,7 +315,7 @@
 <span class="w">        </span><span class="nt">"kind"</span><span class="p">:</span><span class="w"> </span><span class="s2">"warning"</span><span class="p">,</span>
 <span class="w">        </span><span class="nt">"title"</span><span class="p">:</span><span class="w"> </span><span class="s2">"toy_ocean is too warm in the Bering Sea in winter"</span><span class="p">,</span>
 <span class="w">        </span><span class="nt">"message"</span><span class="p">:</span><span class="w"> </span><span class="s2">"From December to March, toy_ocean sea temperature in the Bering Sea runs about 1 K too warm."</span><span class="p">,</span>
-<span class="w">        </span><span class="nt">"facets"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="nt">"dimensions"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
 <span class="w">          </span><span class="nt">"product"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
 <span class="w">            </span><span class="s2">"toy_ocean"</span>
 <span class="w">          </span><span class="p">],</span>
@@ -358,7 +351,7 @@
 <span class="w">        </span><span class="nt">"message"</span><span class="p">:</span><span class="w"> </span><span class="s2">"toy_atmos precipitation from June to August 2015 was produced with a faulty input file."</span><span class="p">,</span>
 <span class="w">        </span><span class="nt">"level"</span><span class="p">:</span><span class="w"> </span><span class="s2">"error"</span><span class="p">,</span>
 <span class="w">        </span><span class="nt">"action"</span><span class="p">:</span><span class="w"> </span><span class="s2">"do_not_use"</span><span class="p">,</span>
-<span class="w">        </span><span class="nt">"facets"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="nt">"dimensions"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
 <span class="w">          </span><span class="nt">"product"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
 <span class="w">            </span><span class="s2">"toy_atmos"</span>
 <span class="w">          </span><span class="p">],</span>
@@ -386,7 +379,7 @@
 <span class="w">        </span><span class="nt">"message"</span><span class="p">:</span><span class="w"> </span><span class="s2">"toy_coastal has no data before 2010."</span><span class="p">,</span>
 <span class="w">        </span><span class="nt">"level"</span><span class="p">:</span><span class="w"> </span><span class="s2">"error"</span><span class="p">,</span>
 <span class="w">        </span><span class="nt">"action"</span><span class="p">:</span><span class="w"> </span><span class="s2">"do_not_use"</span><span class="p">,</span>
-<span class="w">        </span><span class="nt">"facets"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="nt">"dimensions"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
 <span class="w">          </span><span class="nt">"product"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
 <span class="w">            </span><span class="s2">"toy_coastal"</span>
 <span class="w">          </span><span class="p">]</span>
@@ -411,7 +404,7 @@
 <span class="w">        </span><span class="nt">"message"</span><span class="p">:</span><span class="w"> </span><span class="s2">"toy_coastal has no data after 2023."</span><span class="p">,</span>
 <span class="w">        </span><span class="nt">"level"</span><span class="p">:</span><span class="w"> </span><span class="s2">"error"</span><span class="p">,</span>
 <span class="w">        </span><span class="nt">"action"</span><span class="p">:</span><span class="w"> </span><span class="s2">"do_not_use"</span><span class="p">,</span>
-<span class="w">        </span><span class="nt">"facets"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="nt">"dimensions"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
 <span class="w">          </span><span class="nt">"product"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
 <span class="w">            </span><span class="s2">"toy_coastal"</span>
 <span class="w">          </span><span class="p">]</span>
@@ -479,7 +472,7 @@
 <span class="w">        </span><span class="nt">"message"</span><span class="p">:</span><span class="w"> </span><span class="s2">"toy_coastal has data only in one box, roughly the Gulf of Mexico."</span><span class="p">,</span>
 <span class="w">        </span><span class="nt">"level"</span><span class="p">:</span><span class="w"> </span><span class="s2">"error"</span><span class="p">,</span>
 <span class="w">        </span><span class="nt">"action"</span><span class="p">:</span><span class="w"> </span><span class="s2">"do_not_use"</span><span class="p">,</span>
-<span class="w">        </span><span class="nt">"facets"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="nt">"dimensions"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
 <span class="w">          </span><span class="nt">"product"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
 <span class="w">            </span><span class="s2">"toy_coastal"</span>
 <span class="w">          </span><span class="p">]</span>
@@ -503,7 +496,7 @@
 <span class="w">          </span><span class="nt">"south"</span><span class="p">:</span><span class="w"> </span><span class="mf">66.5</span><span class="p">,</span>
 <span class="w">          </span><span class="nt">"north"</span><span class="p">:</span><span class="w"> </span><span class="mi">90</span>
 <span class="w">        </span><span class="p">},</span>
-<span class="w">        </span><span class="nt">"facets"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="nt">"dimensions"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
 <span class="w">          </span><span class="nt">"model"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
 <span class="w">            </span><span class="s2">"mom6"</span>
 <span class="w">          </span><span class="p">]</span>
@@ -529,7 +522,7 @@
 <span class="w">        </span><span class="nt">"kind"</span><span class="p">:</span><span class="w"> </span><span class="s2">"suggestion"</span><span class="p">,</span>
 <span class="w">        </span><span class="nt">"title"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Fine grid: turn off the coarse-grid eddy scheme"</span><span class="p">,</span>
 <span class="w">        </span><span class="nt">"message"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Below 10 km the model starts to resolve eddies itself."</span><span class="p">,</span>
-<span class="w">        </span><span class="nt">"axes"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="nt">"dimensions"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
 <span class="w">          </span><span class="nt">"resolution"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
 <span class="w">            </span><span class="nt">"lt"</span><span class="p">:</span><span class="w"> </span><span class="mi">10</span><span class="p">,</span>
 <span class="w">            </span><span class="nt">"unit"</span><span class="p">:</span><span class="w"> </span><span class="s2">"km"</span>
@@ -556,7 +549,7 @@
 <span class="w">        </span><span class="nt">"kind"</span><span class="p">:</span><span class="w"> </span><span class="s2">"suggestion"</span><span class="p">,</span>
 <span class="w">        </span><span class="nt">"title"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Coarse grid: raise the toy viscosity"</span><span class="p">,</span>
 <span class="w">        </span><span class="nt">"message"</span><span class="p">:</span><span class="w"> </span><span class="s2">"At 50 km or coarser, the toy model needs more viscosity to stay stable."</span><span class="p">,</span>
-<span class="w">        </span><span class="nt">"axes"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="nt">"dimensions"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
 <span class="w">          </span><span class="nt">"resolution"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
 <span class="w">            </span><span class="nt">"ge"</span><span class="p">:</span><span class="w"> </span><span class="mi">50</span><span class="p">,</span>
 <span class="w">            </span><span class="nt">"unit"</span><span class="p">:</span><span class="w"> </span><span class="s2">"km"</span>

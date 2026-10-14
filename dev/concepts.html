@@ -6,14 +6,14 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Concepts &mdash; queryearth 0.0.2.dev7</title>
+  <title>Concepts &mdash; queryearth 0.1.1.dev1</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
 
   
       <script src="_static/jquery.js?v=5d32c60e"></script>
       <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="_static/documentation_options.js?v=c4eeb907"></script>
+      <script src="_static/documentation_options.js?v=ad65bcb3"></script>
       <script src="_static/doctools.js?v=fd6eb6e6"></script>
       <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="_static/versions.js?v=58ec1786"></script>
@@ -46,6 +46,7 @@
               <ul class="current">
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Concepts</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="#rules-and-their-scope">Rules and their scope</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#dimensions">Dimensions</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#queries-and-findings">Queries and findings</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#conditional-findings">Conditional findings</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#products">Products</a></li>
@@ -89,50 +90,86 @@
 <h1>Concepts<a class="headerlink" href="#concepts" title="Link to this heading"></a></h1>
 <section id="rules-and-their-scope">
 <h2>Rules and their scope<a class="headerlink" href="#rules-and-their-scope" title="Link to this heading"></a></h2>
-<p>A <strong>rule</strong> has a code, an outcome (what it says) and a scope (where, when and for what it applies). Rules are written in Python or as records in GeoJSON rule files, and both kinds are added to a <a class="reference internal" href="api.html#queryearth.Registry" title="queryearth.Registry"><code class="xref py py-class docutils literal notranslate"><span class="pre">Registry</span></code></a>, the object you query (see <a class="reference internal" href="rules.html"><span class="std std-doc">Writing rules</span></a>). A scope is a conjunction over dimensions, and a dimension the rule leaves out matches anything:</p>
+<p>A <strong>rule</strong> has a code, an outcome (what it says) and a scope (where, when and for what it applies). Rules are written in Python or as records in GeoJSON rule files, and both kinds are added to a <a class="reference internal" href="api.html#queryearth.Registry" title="queryearth.Registry"><code class="xref py py-class docutils literal notranslate"><span class="pre">Registry</span></code></a>, the object you query (see <a class="reference internal" href="rules.html"><span class="std std-doc">Writing rules</span></a>). A scope is given on <a class="reference internal" href="#dimensions">dimensions</a>, such as space, time and grid resolution.</p>
+<p>A <strong>code</strong> is a prefix plus three or four digits, such as <code class="docutils literal notranslate"><span class="pre">CRU001</span></code>, or <code class="docutils literal notranslate"><span class="pre">ERA5-014</span></code> (a prefix that ends in a digit needs the hyphen).</p>
+</section>
+<section id="dimensions">
+<h2>Dimensions<a class="headerlink" href="#dimensions" title="Link to this heading"></a></h2>
+<p>Everything a rule can be scoped by is a dimension. Each dimension has a set of values: a rule’s scope picks some of them, a query picks some of them, and the two meet where they overlap. There are six kinds:</p>
 <table class="docutils align-default">
 <thead>
-<tr class="row-odd"><th class="head"><p>Dimension</p></th>
-<th class="head"><p>Rule side</p></th>
-<th class="head"><p>Query side</p></th>
+<tr class="row-odd"><th class="head"><p>Kind</p></th>
+<th class="head"><p>Values</p></th>
+<th class="head"><p>A rule gives</p></th>
+<th class="head"><p>A query gives</p></th>
+<th class="head"><p>Declare it with</p></th>
 </tr>
 </thead>
 <tbody>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">space</span></code></p></td>
-<td><p>a polygon</p></td>
-<td><p>a point or a polygon</p></td>
+<tr class="row-even"><td><p>Space (built in)</p></td>
+<td><p>points on the sphere</p></td>
+<td><p>a polygon or box</p></td>
+<td><p>a point or polygon</p></td>
+<td><p>—</p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">time</span></code></p></td>
-<td><p>intervals, optionally limited to some months of the year</p></td>
+<tr class="row-odd"><td><p>Time (built in)</p></td>
+<td><p>the time line</p></td>
+<td><p>intervals, optionally some months each year</p></td>
 <td><p>an interval</p></td>
+<td><p>—</p></td>
 </tr>
-<tr class="row-even"><td><p>axes, such as <code class="docutils literal notranslate"><span class="pre">resolution</span></code></p></td>
-<td><p>a range: <code class="docutils literal notranslate"><span class="pre">{&quot;gt&quot;,</span> <span class="pre">&quot;ge&quot;,</span> <span class="pre">&quot;lt&quot;,</span> <span class="pre">&quot;le&quot;}</span></code> in the axis’s unit</p></td>
-<td><p>a number or a range <code class="docutils literal notranslate"><span class="pre">(lo,</span> <span class="pre">hi)</span></code></p></td>
+<tr class="row-even"><td><p>Axis</p></td>
+<td><p>numbers, with a unit</p></td>
+<td><p>a range: <code class="docutils literal notranslate"><span class="pre">{&quot;lt&quot;:</span> <span class="pre">10}</span></code>, with any of <code class="docutils literal notranslate"><span class="pre">gt</span></code>, <code class="docutils literal notranslate"><span class="pre">ge</span></code>, <code class="docutils literal notranslate"><span class="pre">lt</span></code>, <code class="docutils literal notranslate"><span class="pre">le</span></code> (and optionally the declared <code class="docutils literal notranslate"><span class="pre">&quot;unit&quot;</span></code>)</p></td>
+<td><p>a number or a range, such as <code class="docutils literal notranslate"><span class="pre">8</span></code> or <code class="docutils literal notranslate"><span class="pre">(5,</span> <span class="pre">10)</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">qe.Axis(&quot;resolution&quot;,</span> <span class="pre">&quot;km&quot;)</span></code></p></td>
 </tr>
-<tr class="row-odd"><td><p>facets: <code class="docutils literal notranslate"><span class="pre">product</span></code>, <code class="docutils literal notranslate"><span class="pre">variable</span></code>, <code class="docutils literal notranslate"><span class="pre">version</span></code>, <code class="docutils literal notranslate"><span class="pre">model</span></code>, <code class="docutils literal notranslate"><span class="pre">component</span></code></p></td>
-<td><p>values or glob patterns; versions as ranges</p></td>
-<td><p>values</p></td>
+<tr class="row-odd"><td><p>Labels</p></td>
+<td><p>names</p></td>
+<td><p>names, with <code class="docutils literal notranslate"><span class="pre">*</span></code> and <code class="docutils literal notranslate"><span class="pre">?</span></code> wildcards: <code class="docutils literal notranslate"><span class="pre">[&quot;glorys&quot;,</span> <span class="pre">&quot;era5*&quot;]</span></code>; or <code class="docutils literal notranslate"><span class="pre">{&quot;any_of&quot;:</span> <span class="pre">[...],</span> <span class="pre">&quot;none_of&quot;:</span> <span class="pre">[...]}</span></code></p></td>
+<td><p>one or more names, such as <code class="docutils literal notranslate"><span class="pre">&quot;era5&quot;</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">qe.Labels(&quot;product&quot;)</span></code></p></td>
 </tr>
-<tr class="row-even"><td><p>plugin dimensions</p></td>
-<td><p>whatever the plugin parses</p></td>
-<td><p>whatever the plugin parses</p></td>
+<tr class="row-even"><td><p>Versions</p></td>
+<td><p>versions, such as <code class="docutils literal notranslate"><span class="pre">4.07</span></code> or <code class="docutils literal notranslate"><span class="pre">ERA5T</span></code></p></td>
+<td><p>ranges or exact versions: <code class="docutils literal notranslate"><span class="pre">{&quot;introduced&quot;:</span> <span class="pre">&quot;4.00&quot;,</span> <span class="pre">&quot;fixed&quot;:</span> <span class="pre">&quot;4.09&quot;}</span></code>, <code class="docutils literal notranslate"><span class="pre">{&quot;versions&quot;:</span> <span class="pre">[&quot;ERA5T&quot;]}</span></code>, or a list of them</p></td>
+<td><p>one or more versions, such as <code class="docutils literal notranslate"><span class="pre">&quot;4.07&quot;</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">qe.Versions(&quot;version&quot;)</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p>Your own</p></td>
+<td><p>anything</p></td>
+<td><p>anything</p></td>
+<td><p>anything</p></td>
+<td><p>a class with <code class="docutils literal notranslate"><span class="pre">name</span></code>, <code class="docutils literal notranslate"><span class="pre">parse_rule</span></code>, <code class="docutils literal notranslate"><span class="pre">parse_query</span></code> and <code class="docutils literal notranslate"><span class="pre">match</span></code></p></td>
 </tr>
 </tbody>
 </table>
-<p>Axes are declared on the <a class="reference internal" href="api.html#queryearth.Registry" title="queryearth.Registry"><code class="xref py py-class docutils literal notranslate"><span class="pre">Registry</span></code></a> with one unit each, for example <code class="docutils literal notranslate"><span class="pre">qe.Axis(&quot;resolution&quot;,</span> <span class="pre">&quot;km&quot;)</span></code>. The default facets can be replaced or extended with <code class="docutils literal notranslate"><span class="pre">Registry(facets=...)</span></code>.</p>
-<p>A <strong>code</strong> is a prefix plus three or four digits, such as <code class="docutils literal notranslate"><span class="pre">CRU001</span></code>, or <code class="docutils literal notranslate"><span class="pre">ERA5-014</span></code> (a prefix that ends in a digit needs the hyphen).</p>
+<p>A rule’s values are written the same way in Python (<code class="docutils literal notranslate"><span class="pre">Scope(dimensions=...)</span></code>) and in a rule file (the record’s <code class="docutils literal notranslate"><span class="pre">&quot;dimensions&quot;</span></code> member).</p>
+<p>A scope picks values on some dimensions and leaves the rest open: a dimension the rule leaves out matches anything. A rule applies when its scope and the query overlap on every dimension. A query that leaves out a dimension the rule constrains gets a <a class="reference internal" href="#conditional-findings">conditional finding</a>.</p>
+<p>Space and time are built into every Registry. Every other dimension is declared, in one list, when you make the Registry, and its name is the key that rules and queries use:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">registry</span> <span class="o">=</span> <span class="n">qe</span><span class="o">.</span><span class="n">Registry</span><span class="p">(</span>
+    <span class="s2">"mine"</span><span class="p">,</span>
+    <span class="n">dimensions</span><span class="o">=</span><span class="p">[</span>
+        <span class="n">qe</span><span class="o">.</span><span class="n">Axis</span><span class="p">(</span><span class="s2">"resolution"</span><span class="p">,</span> <span class="s2">"km"</span><span class="p">),</span>
+        <span class="n">qe</span><span class="o">.</span><span class="n">Labels</span><span class="p">(</span><span class="s2">"product"</span><span class="p">),</span>
+        <span class="n">qe</span><span class="o">.</span><span class="n">Labels</span><span class="p">(</span><span class="s2">"variable"</span><span class="p">),</span>
+        <span class="n">qe</span><span class="o">.</span><span class="n">Versions</span><span class="p">(</span><span class="s2">"version"</span><span class="p">),</span>
+    <span class="p">],</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<p>Scopes and queries give space and time as <code class="docutils literal notranslate"><span class="pre">space=</span></code> and <code class="docutils literal notranslate"><span class="pre">time=</span></code>, and the other dimensions in one mapping, such as <code class="docutils literal notranslate"><span class="pre">dimensions={&quot;resolution&quot;:</span> <span class="pre">8,</span> <span class="pre">&quot;product&quot;:</span> <span class="pre">&quot;era5&quot;}</span></code>. A name the Registry has not declared raises <code class="docutils literal notranslate"><span class="pre">UnknownNameError</span></code>, so a misspelt name never looks like “no rule applies”. <a class="reference internal" href="extending.html#dimension-plugins"><span class="std std-ref">Extending queryearth</span></a> shows how to write your own kind.</p>
 </section>
 <section id="queries-and-findings">
 <h2>Queries and findings<a class="headerlink" href="#queries-and-findings" title="Link to this heading"></a></h2>
-<p>A <a class="reference internal" href="api.html#queryearth.Query" title="queryearth.Query"><code class="xref py py-class docutils literal notranslate"><span class="pre">Query</span></code></a> gives any subset of the same dimensions. “Resolution 8 km” on its own is a complete query. <a class="reference internal" href="api.html#queryearth.Registry.query" title="queryearth.Registry.query"><code class="xref py py-meth docutils literal notranslate"><span class="pre">Registry.query()</span></code></a> takes a <code class="docutils literal notranslate"><span class="pre">Query</span></code> or its fields as keywords, and returns a sorted list of <a class="reference internal" href="api.html#queryearth.Finding" title="queryearth.Finding"><code class="xref py py-class docutils literal notranslate"><span class="pre">Finding</span></code></a> objects: highest level first, then by kind and code.</p>
+<p>A <a class="reference internal" href="api.html#queryearth.Query" title="queryearth.Query"><code class="xref py py-class docutils literal notranslate"><span class="pre">Query</span></code></a> gives values on any subset of the dimensions. “Resolution 8 km” on its own is a complete query. <a class="reference internal" href="api.html#queryearth.Registry.query" title="queryearth.Registry.query"><code class="xref py py-meth docutils literal notranslate"><span class="pre">Registry.query()</span></code></a> takes a <code class="docutils literal notranslate"><span class="pre">Query</span></code> or its fields as keywords, and returns a sorted list of <a class="reference internal" href="api.html#queryearth.Finding" title="queryearth.Finding"><code class="xref py py-class docutils literal notranslate"><span class="pre">Finding</span></code></a> objects: highest level first, then by kind and code.</p>
 <p>A finding is the rule’s outcome plus how it matched:</p>
 <ul class="simple">
 <li><p><code class="docutils literal notranslate"><span class="pre">kind</span></code> is <code class="docutils literal notranslate"><span class="pre">warning</span></code> or <code class="docutils literal notranslate"><span class="pre">suggestion</span></code>;</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">level</span></code> is a <code class="docutils literal notranslate"><span class="pre">logging</span></code> level: by default <code class="docutils literal notranslate"><span class="pre">logging.WARNING</span></code> (30) for a warning and <code class="docutils literal notranslate"><span class="pre">logging.INFO</span></code> (20) for a suggestion;</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">area_fraction</span></code> and <code class="docutils literal notranslate"><span class="pre">overlap_km2</span></code> give how much of the query’s area the rule covers;</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">time_overlap</span></code> and <code class="docutils literal notranslate"><span class="pre">time_fraction</span></code> give the overlapping periods and their share of the query’s time;</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">axes</span></code>, <code class="docutils literal notranslate"><span class="pre">matched_facets</span></code> and <code class="docutils literal notranslate"><span class="pre">dims</span></code> hold the overlap on each other dimension;</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">dimensions</span></code> holds, for each other dimension, a <a class="reference internal" href="api.html#queryearth.DimMatch" title="queryearth.DimMatch"><code class="xref py py-class docutils literal notranslate"><span class="pre">DimMatch</span></code></a> with its <code class="docutils literal notranslate"><span class="pre">overlap</span></code> and, where it can be measured, its <code class="docutils literal notranslate"><span class="pre">fraction</span></code> of the query’s values;</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">suggestions</span></code> holds structured actions (<code class="docutils literal notranslate"><span class="pre">target</span></code>, <code class="docutils literal notranslate"><span class="pre">key</span></code>, <code class="docutils literal notranslate"><span class="pre">value</span></code>, <code class="docutils literal notranslate"><span class="pre">rationale</span></code>) for a suggestion. queryearth never interprets them; your code applies them.</p></li>
 </ul>
 <p><code class="docutils literal notranslate"><span class="pre">Finding.to_dict()</span></code> gives a JSON-ready dictionary.</p>
@@ -140,14 +177,14 @@
 <section id="conditional-findings">
 <h2>Conditional findings<a class="headerlink" href="#conditional-findings" title="Link to this heading"></a></h2>
 <p>When a query leaves out a dimension that a rule constrains, the rule can neither match nor fail. Its finding is <strong>conditional</strong>: <code class="docutils literal notranslate"><span class="pre">conditional_on</span></code> names what is missing, for example <code class="docutils literal notranslate"><span class="pre">(&quot;space&quot;,</span> <span class="pre">&quot;model&quot;)</span></code>. Conditional findings are hidden unless you pass <code class="docutils literal notranslate"><span class="pre">include_conditional=True</span></code>, which is a quick way to see every rule that might apply:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">registry</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="n">axes</span><span class="o">=</span><span class="p">{</span><span class="s2">"resolution"</span><span class="p">:</span> <span class="mi">8</span><span class="p">},</span> <span class="n">include_conditional</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">registry</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="n">dimensions</span><span class="o">=</span><span class="p">{</span><span class="s2">"resolution"</span><span class="p">:</span> <span class="mi">8</span><span class="p">},</span> <span class="n">include_conditional</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 </pre></div>
 </div>
 </section>
 <section id="products">
 <h2>Products<a class="headerlink" href="#products" title="Link to this heading"></a></h2>
-<p><code class="docutils literal notranslate"><span class="pre">product</span></code> is an ordinary facet, matched like <code class="docutils literal notranslate"><span class="pre">variable</span></code>: exact, case-sensitive values or glob patterns. Coverage limits and other per-product facts are ordinary rules scoped by it, and you query once per product you use. In the <a class="reference internal" href="example.html"><span class="std std-doc">toy example</span></a>, TOY004 is an ERROR for <code class="docutils literal notranslate"><span class="pre">toy_coastal</span></code> before 2010:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">registry</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="n">time</span><span class="o">=</span><span class="p">(</span><span class="s2">"2005-01-01"</span><span class="p">,</span> <span class="s2">"2005-12-31"</span><span class="p">),</span> <span class="n">facets</span><span class="o">=</span><span class="p">{</span><span class="s2">"product"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"toy_coastal"</span><span class="p">]})</span>
+<p><code class="docutils literal notranslate"><span class="pre">product</span></code> is an ordinary label dimension, matched like <code class="docutils literal notranslate"><span class="pre">variable</span></code>: exact, case-sensitive names or glob patterns. Coverage limits and other per-product facts are ordinary rules scoped by it, and you query once per product you use. In the <a class="reference internal" href="example.html"><span class="std std-doc">toy example</span></a>, TOY004 is an ERROR for <code class="docutils literal notranslate"><span class="pre">toy_coastal</span></code> before 2010:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">registry</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="n">time</span><span class="o">=</span><span class="p">(</span><span class="s2">"2005-01-01"</span><span class="p">,</span> <span class="s2">"2005-12-31"</span><span class="p">),</span> <span class="n">dimensions</span><span class="o">=</span><span class="p">{</span><span class="s2">"product"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"toy_coastal"</span><span class="p">]})</span>
 <span class="c1"># [TOY004] toy_coastal starts in 2010 (2005-01-01..2005-12-31; draft)</span>
 </pre></div>
 </div>

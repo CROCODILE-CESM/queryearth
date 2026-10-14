@@ -6,14 +6,14 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Extending queryearth &mdash; queryearth 0.0.2.dev7</title>
+  <title>Extending queryearth &mdash; queryearth 0.1.1.dev1</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
 
   
       <script src="_static/jquery.js?v=5d32c60e"></script>
       <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="_static/documentation_options.js?v=c4eeb907"></script>
+      <script src="_static/documentation_options.js?v=ad65bcb3"></script>
       <script src="_static/doctools.js?v=fd6eb6e6"></script>
       <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="_static/versions.js?v=58ec1786"></script>
@@ -90,7 +90,7 @@
 </thead>
 <tbody>
 <tr class="row-even"><td><p>A new kind of scope: a hierarchy, a taxonomy, a network</p></td>
-<td><p>A <code class="docutils literal notranslate"><span class="pre">Dimension</span></code> plugin, passed to <code class="docutils literal notranslate"><span class="pre">Registry(dimensions=...)</span></code></p></td>
+<td><p>A <code class="docutils literal notranslate"><span class="pre">Dimension</span></code> plugin, declared with the others in <code class="docutils literal notranslate"><span class="pre">Registry(dimensions=[...])</span></code></p></td>
 </tr>
 <tr class="row-odd"><td><p>A rule computed from the query or from data you hold</p></td>
 <td><p>A <code class="docutils literal notranslate"><span class="pre">ComputedRule</span></code> subclass or an <code class="docutils literal notranslate"><span class="pre">&#64;registry.rule</span></code> function</p></td>
@@ -109,7 +109,7 @@
 <p>Geometry and time semantics are not pluggable. Space and time are dimensions inside the engine, but <code class="docutils literal notranslate"><span class="pre">SpaceDimension</span></code> and <code class="docutils literal notranslate"><span class="pre">TimeDimension</span></code> are built into every Registry and cannot be replaced, so “overlaps” means the same thing for every rule.</p>
 <section id="dimension-plugins">
 <h2>Dimension plugins<a class="headerlink" href="#dimension-plugins" title="Link to this heading"></a></h2>
-<p>A dimension has a <code class="docutils literal notranslate"><span class="pre">name</span></code> and three methods:</p>
+<p><a class="reference internal" href="concepts.html#dimensions"><span class="std std-ref">Dimensions</span></a> lists the kinds that come with queryearth; <code class="docutils literal notranslate"><span class="pre">Axis</span></code>, <code class="docutils literal notranslate"><span class="pre">Labels</span></code> and <code class="docutils literal notranslate"><span class="pre">Versions</span></code> are written the same way as your own. A dimension has a <code class="docutils literal notranslate"><span class="pre">name</span></code> and three methods:</p>
 <ul class="simple">
 <li><p><code class="docutils literal notranslate"><span class="pre">parse_rule(value)</span></code> checks and parses a rule’s value when the rule is added, from Python or from a record, and raises <code class="docutils literal notranslate"><span class="pre">ValueError</span></code> for a bad one;</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">parse_query(value)</span></code> does the same for a query’s value;</p></li>
@@ -145,10 +145,10 @@
         <span class="n">kind</span><span class="o">=</span><span class="s2">"warning"</span><span class="p">,</span>
         <span class="n">title</span><span class="o">=</span><span class="s2">"Gauges sparse in basins 14 and 62"</span><span class="p">,</span>
         <span class="n">message</span><span class="o">=</span><span class="s2">"Few gauges report in these basins."</span><span class="p">,</span>
-        <span class="n">scope</span><span class="o">=</span><span class="n">qe</span><span class="o">.</span><span class="n">Scope</span><span class="p">(</span><span class="n">dims</span><span class="o">=</span><span class="p">{</span><span class="s2">"basin"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"14"</span><span class="p">,</span> <span class="s2">"62"</span><span class="p">]}),</span>
+        <span class="n">scope</span><span class="o">=</span><span class="n">qe</span><span class="o">.</span><span class="n">Scope</span><span class="p">(</span><span class="n">dimensions</span><span class="o">=</span><span class="p">{</span><span class="s2">"basin"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"14"</span><span class="p">,</span> <span class="s2">"62"</span><span class="p">]}),</span>
     <span class="p">)</span>
 <span class="p">)</span>
-<span class="n">registry</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="n">dims</span><span class="o">=</span><span class="p">{</span><span class="s2">"basin"</span><span class="p">:</span> <span class="s2">"1423"</span><span class="p">})</span>  <span class="c1"># BAS001, overlap ("14",), fraction 1.0</span>
+<span class="n">registry</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="n">dimensions</span><span class="o">=</span><span class="p">{</span><span class="s2">"basin"</span><span class="p">:</span> <span class="s2">"1423"</span><span class="p">})</span>  <span class="c1"># BAS001, overlap ("14",), fraction 1.0</span>
 </pre></div>
 </div>
 <p>A dimension may also define these optional members:</p>

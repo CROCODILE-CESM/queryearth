@@ -5,14 +5,14 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>queryearth.registry &mdash; queryearth 0.0.2.dev7</title>
+  <title>queryearth.registry &mdash; queryearth 0.1.1.dev1</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
 
   
       <script src="../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../_static/documentation_options.js?v=c4eeb907"></script>
+      <script src="../../_static/documentation_options.js?v=ad65bcb3"></script>
       <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../_static/versions.js?v=58ec1786"></script>
@@ -98,7 +98,7 @@
 <span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">queryearth</span><span class="w"> </span><span class="kn">import</span> <span class="n">space</span> <span class="k">as</span> <span class="n">sp</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">queryearth.dimensions</span><span class="w"> </span><span class="kn">import</span> <span class="n">Axis</span><span class="p">,</span> <span class="n">Labels</span><span class="p">,</span> <span class="n">SpaceDimension</span><span class="p">,</span> <span class="n">TimeDimension</span><span class="p">,</span> <span class="n">Versions</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">queryearth.dimensions</span><span class="w"> </span><span class="kn">import</span> <span class="n">SpaceDimension</span><span class="p">,</span> <span class="n">TimeDimension</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">queryearth.objects</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
     <span class="n">KINDS</span><span class="p">,</span>
     <span class="n">DuplicateCodeError</span><span class="p">,</span>
@@ -127,7 +127,6 @@
 <span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span><span class="s2">"Registry"</span><span class="p">,</span> <span class="s2">"PointResult"</span><span class="p">]</span>
 
 <span class="n">_SLUG</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="sa">r</span><span class="s2">"[a-z][a-z0-9_]*"</span><span class="p">)</span>
-<span class="n">_GROUPS</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"space"</span><span class="p">:</span> <span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="s2">"time"</span><span class="p">:</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="s2">"axes"</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span> <span class="s2">"facets"</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span> <span class="s2">"dims"</span><span class="p">:</span> <span class="mi">2</span><span class="p">}</span>
 
 <span class="n">_default</span><span class="p">:</span> <span class="n">Registry</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
 <span class="n">_default_lock</span> <span class="o">=</span> <span class="n">threading</span><span class="o">.</span><span class="n">Lock</span><span class="p">()</span>
@@ -152,37 +151,23 @@
 <span class="k">class</span><span class="w"> </span><span class="nc">Registry</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""Declared dimensions and rules; answers queries.</span>
 
-<span class="sd">    There is no hidden global registry: a library keeps its own Registry, and</span>
-<span class="sd">    Registry.default() is the application default for scripts and notebooks.</span>
+<span class="sd">    Space and time are built in; dimensions lists every other dimension, such</span>
+<span class="sd">    as Axis, Labels and Versions objects and plugins, in the order that</span>
+<span class="sd">    conditional_on names them. There is no hidden global registry: a library</span>
+<span class="sd">    keeps its own Registry, and Registry.default() is the application default</span>
+<span class="sd">    for scripts and notebooks.</span>
 <span class="sd">    """</span>
 
-    <span class="n">FACETS</span> <span class="o">=</span> <span class="p">(</span><span class="s2">"product"</span><span class="p">,</span> <span class="s2">"variable"</span><span class="p">,</span> <span class="s2">"version"</span><span class="p">,</span> <span class="s2">"model"</span><span class="p">,</span> <span class="s2">"component"</span><span class="p">)</span>
-
-    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
-        <span class="bp">self</span><span class="p">,</span>
-        <span class="n">name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">""</span><span class="p">,</span>
-        <span class="o">*</span><span class="p">,</span>
-        <span class="n">axes</span><span class="p">:</span> <span class="n">Iterable</span><span class="p">[</span><span class="n">Axis</span><span class="p">]</span> <span class="o">=</span> <span class="p">(),</span>
-        <span class="n">facets</span><span class="p">:</span> <span class="n">Iterable</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="n">FACETS</span><span class="p">,</span>  <span class="c1"># "version" becomes Versions(), others Labels</span>
-        <span class="n">dimensions</span><span class="p">:</span> <span class="n">Iterable</span><span class="p">[</span><span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="p">(),</span>  <span class="c1"># any other plugin dimensions</span>
-    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">""</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">dimensions</span><span class="p">:</span> <span class="n">Iterable</span><span class="p">[</span><span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="p">())</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="n">name</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_groups</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">,</span> <span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="p">[</span>  <span class="c1"># then axes, facets, others</span>
-            <span class="p">(</span><span class="s2">"space"</span><span class="p">,</span> <span class="n">SpaceDimension</span><span class="p">(),</span> <span class="s2">"space"</span><span class="p">),</span>
-            <span class="p">(</span><span class="s2">"time"</span><span class="p">,</span> <span class="n">TimeDimension</span><span class="p">(),</span> <span class="s2">"time"</span><span class="p">),</span>
-        <span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_dimensions</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s2">"space"</span><span class="p">:</span> <span class="n">SpaceDimension</span><span class="p">(),</span>
+            <span class="s2">"time"</span><span class="p">:</span> <span class="n">TimeDimension</span><span class="p">(),</span>
+        <span class="p">}</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_entries</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">_Entry</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_codes</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_prefilters_cache</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_last</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>  <span class="c1"># the last query parsed</span>
-        <span class="k">for</span> <span class="n">axis</span> <span class="ow">in</span> <span class="n">axes</span><span class="p">:</span>
-            <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">axis</span><span class="p">,</span> <span class="n">Axis</span><span class="p">):</span>
-                <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"axes holds Axis objects, not </span><span class="si">{</span><span class="n">axis</span><span class="si">!r}</span><span class="s2">"</span><span class="p">)</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">add_dimension</span><span class="p">(</span><span class="n">axis</span><span class="p">)</span>
-        <span class="k">for</span> <span class="n">facet</span> <span class="ow">in</span> <span class="n">facets</span><span class="p">:</span>
-            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">facet</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
-                <span class="n">facet</span> <span class="o">=</span> <span class="n">Versions</span><span class="p">()</span> <span class="k">if</span> <span class="n">facet</span> <span class="o">==</span> <span class="s2">"version"</span> <span class="k">else</span> <span class="n">Labels</span><span class="p">(</span><span class="n">facet</span><span class="p">)</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">add_dimension</span><span class="p">(</span><span class="n">facet</span><span class="p">)</span>
         <span class="k">for</span> <span class="n">dimension</span> <span class="ow">in</span> <span class="n">dimensions</span><span class="p">:</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">add_dimension</span><span class="p">(</span><span class="n">dimension</span><span class="p">)</span>
 
@@ -205,22 +190,23 @@
 <div class="viewcode-block" id="Registry.add_dimension">
 <a class="viewcode-back" href="../../api.html#queryearth.Registry.add_dimension">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">add_dimension</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dimension</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">"""Declare a plugin dimension (section 4.13), before any rule is added."""</span>
+<span class="w">        </span><span class="sd">"""Declare a dimension (section 4.13), before any rule is added."""</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_entries</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"declare dimensions before adding rules"</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">dimension</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">"declare a dimension with an object such as qe.Labels(</span><span class="si">{</span><span class="n">dimension</span><span class="si">!r}</span><span class="s2">),"</span>
+                <span class="sa">f</span><span class="s2">" not the bare name </span><span class="si">{</span><span class="n">dimension</span><span class="si">!r}</span><span class="s2">"</span>
+            <span class="p">)</span>
         <span class="n">name</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">dimension</span><span class="p">,</span> <span class="s2">"name"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">_SLUG</span><span class="o">.</span><span class="n">fullmatch</span><span class="p">(</span><span class="n">name</span><span class="p">):</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"a dimension name is a lowercase slug, not </span><span class="si">{</span><span class="n">name</span><span class="si">!r}</span><span class="s2">"</span><span class="p">)</span>
-        <span class="k">if</span> <span class="nb">any</span><span class="p">(</span><span class="n">n</span> <span class="o">==</span> <span class="n">name</span> <span class="k">for</span> <span class="n">n</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">_</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_groups</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">name</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_dimensions</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"dimension name </span><span class="si">{</span><span class="n">name</span><span class="si">!r}</span><span class="s2"> is reserved or already declared"</span><span class="p">)</span>
         <span class="k">for</span> <span class="n">member</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"parse_rule"</span><span class="p">,</span> <span class="s2">"parse_query"</span><span class="p">,</span> <span class="s2">"match"</span><span class="p">):</span>
             <span class="k">if</span> <span class="ow">not</span> <span class="nb">callable</span><span class="p">(</span><span class="nb">getattr</span><span class="p">(</span><span class="n">dimension</span><span class="p">,</span> <span class="n">member</span><span class="p">,</span> <span class="kc">None</span><span class="p">)):</span>
                 <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"dimension </span><span class="si">{</span><span class="n">name</span><span class="si">!r}</span><span class="s2"> has no </span><span class="si">{</span><span class="n">member</span><span class="si">}</span><span class="s2">() method"</span><span class="p">)</span>
-        <span class="n">group</span> <span class="o">=</span> <span class="s2">"axes"</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">dimension</span><span class="p">,</span> <span class="n">Axis</span><span class="p">)</span> <span class="k">else</span> <span class="s2">"dims"</span>
-        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">dimension</span><span class="p">,</span> <span class="p">(</span><span class="n">Labels</span><span class="p">,</span> <span class="n">Versions</span><span class="p">)):</span>
-            <span class="n">group</span> <span class="o">=</span> <span class="s2">"facets"</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_groups</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">name</span><span class="p">,</span> <span class="n">dimension</span><span class="p">,</span> <span class="n">group</span><span class="p">))</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_groups</span><span class="o">.</span><span class="n">sort</span><span class="p">(</span><span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">g</span><span class="p">:</span> <span class="n">_GROUPS</span><span class="p">[</span><span class="n">g</span><span class="p">[</span><span class="mi">2</span><span class="p">]])</span>  <span class="c1"># stable sort</span></div>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_dimensions</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="n">dimension</span></div>
 
 
 <div class="viewcode-block" id="Registry.add">
@@ -297,13 +283,7 @@
 <span class="w">        </span><span class="sd">"""Registry.add; source names a record's file ("python" from Python)."""</span>
         <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">rule</span><span class="p">,</span> <span class="n">ComputedRule</span><span class="p">):</span>
             <span class="n">form</span><span class="p">,</span> <span class="n">get</span> <span class="o">=</span> <span class="s2">"computed"</span><span class="p">,</span> <span class="n">rule</span><span class="o">.</span><span class="n">meta</span><span class="o">.</span><span class="n">get</span>
-            <span class="n">scope</span> <span class="o">=</span> <span class="n">Scope</span><span class="p">(</span>
-                <span class="n">get</span><span class="p">(</span><span class="s2">"space"</span><span class="p">),</span>
-                <span class="n">time_of</span><span class="p">(</span><span class="n">get</span><span class="p">(</span><span class="s2">"time"</span><span class="p">)),</span>
-                <span class="n">get</span><span class="p">(</span><span class="s2">"axes"</span><span class="p">,</span> <span class="p">{}),</span>
-                <span class="n">get</span><span class="p">(</span><span class="s2">"facets"</span><span class="p">,</span> <span class="p">{}),</span>
-                <span class="n">get</span><span class="p">(</span><span class="s2">"dims"</span><span class="p">,</span> <span class="p">{}),</span>
-            <span class="p">)</span>
+            <span class="n">scope</span> <span class="o">=</span> <span class="n">Scope</span><span class="p">(</span><span class="n">get</span><span class="p">(</span><span class="s2">"space"</span><span class="p">),</span> <span class="n">time_of</span><span class="p">(</span><span class="n">get</span><span class="p">(</span><span class="s2">"time"</span><span class="p">)),</span> <span class="n">get</span><span class="p">(</span><span class="s2">"dimensions"</span><span class="p">,</span> <span class="p">{}))</span>
         <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="nb">getattr</span><span class="p">(</span><span class="n">rule</span><span class="p">,</span> <span class="s2">"scope"</span><span class="p">,</span> <span class="kc">None</span><span class="p">),</span> <span class="n">Scope</span><span class="p">)</span> <span class="ow">and</span> <span class="nb">hasattr</span><span class="p">(</span>
             <span class="n">rule</span><span class="p">,</span> <span class="s2">"evaluate"</span>
         <span class="p">):</span>
@@ -360,16 +340,14 @@
 
 
     <span class="c1"># ---- names --------------------------------------------------------------------</span>
-    <span class="k">def</span><span class="w"> </span><span class="nf">_dimension</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">group</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="nb">str</span><span class="p">]:</span>
-        <span class="k">for</span> <span class="n">declared</span><span class="p">,</span> <span class="n">dimension</span><span class="p">,</span> <span class="n">kind</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_groups</span><span class="p">:</span>
-            <span class="k">if</span> <span class="n">declared</span> <span class="o">==</span> <span class="n">name</span><span class="p">:</span>
-                <span class="k">if</span> <span class="n">group</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">kind</span> <span class="o">!=</span> <span class="n">group</span><span class="p">:</span>
-                    <span class="k">raise</span> <span class="n">UnknownNameError</span><span class="p">(</span>
-                        <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">name</span><span class="si">!r}</span><span class="s2"> is declared in </span><span class="si">{</span><span class="n">kind</span><span class="si">}</span><span class="s2">, not </span><span class="si">{</span><span class="n">group</span><span class="si">}</span><span class="s2">"</span>
-                    <span class="p">)</span>
-                <span class="k">return</span> <span class="n">dimension</span><span class="p">,</span> <span class="n">kind</span>
-        <span class="n">declared</span> <span class="o">=</span> <span class="p">[</span><span class="n">n</span> <span class="k">for</span> <span class="n">n</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">_</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_groups</span><span class="p">]</span>
-        <span class="k">raise</span> <span class="n">UnknownNameError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"undeclared dimension </span><span class="si">{</span><span class="n">name</span><span class="si">!r}</span><span class="s2">; declared: </span><span class="si">{</span><span class="n">declared</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_dimension</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""A declared dimension; space and time have their own fields instead."""</span>
+        <span class="k">if</span> <span class="n">name</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"space"</span><span class="p">,</span> <span class="s2">"time"</span><span class="p">)</span> <span class="ow">or</span> <span class="n">name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_dimensions</span><span class="p">:</span>
+            <span class="n">declared</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_dimensions</span><span class="p">)[</span><span class="mi">2</span><span class="p">:]</span>
+            <span class="k">raise</span> <span class="n">UnknownNameError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">"undeclared dimension </span><span class="si">{</span><span class="n">name</span><span class="si">!r}</span><span class="s2">; declared: </span><span class="si">{</span><span class="n">declared</span><span class="si">}</span><span class="s2">"</span>
+            <span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_dimensions</span><span class="p">[</span><span class="n">name</span><span class="p">]</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">_compile</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span> <span class="n">scope</span><span class="p">:</span> <span class="n">Scope</span><span class="p">,</span> <span class="n">requires</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span> <span class="n">code</span><span class="p">:</span> <span class="nb">str</span>
@@ -380,17 +358,15 @@
         <span class="n">values</span> <span class="o">=</span> <span class="p">{</span>
             <span class="n">k</span><span class="p">:</span> <span class="n">v</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="p">((</span><span class="s2">"space"</span><span class="p">,</span> <span class="n">space</span><span class="p">),</span> <span class="p">(</span><span class="s2">"time"</span><span class="p">,</span> <span class="n">scope</span><span class="o">.</span><span class="n">time</span><span class="p">))</span> <span class="k">if</span> <span class="n">v</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
         <span class="p">}</span>
-        <span class="k">for</span> <span class="n">group</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"axes"</span><span class="p">,</span> <span class="s2">"facets"</span><span class="p">,</span> <span class="s2">"dims"</span><span class="p">):</span>
-            <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">scope</span><span class="p">,</span> <span class="n">group</span><span class="p">)</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
-                <span class="n">dimension</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_dimension</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">group</span><span class="p">)</span>
-                <span class="k">try</span><span class="p">:</span>
-                    <span class="n">values</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="n">dimension</span><span class="o">.</span><span class="n">parse_rule</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
-                <span class="k">except</span> <span class="ne">ValueError</span> <span class="k">as</span> <span class="n">err</span><span class="p">:</span>
-                    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">code</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">err</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="nn">err</span>
+        <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">scope</span><span class="o">.</span><span class="n">dimensions</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">values</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_dimension</span><span class="p">(</span><span class="n">name</span><span class="p">)</span><span class="o">.</span><span class="n">parse_rule</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+            <span class="k">except</span> <span class="ne">ValueError</span> <span class="k">as</span> <span class="n">err</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">code</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">err</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="nn">err</span>
         <span class="k">return</span> <span class="n">CompiledScope</span><span class="p">(</span><span class="n">values</span><span class="p">,</span> <span class="n">requires</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">_parse_query</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">query</span><span class="p">:</span> <span class="n">Query</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
-<span class="w">        </span><span class="sd">"""The query's values, parsed by their plugins."""</span>
+<span class="w">        </span><span class="sd">"""The query's values, parsed by their dimensions."""</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_last</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="ow">is</span> <span class="n">query</span><span class="p">:</span>
             <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_last</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
         <span class="n">parsed</span> <span class="o">=</span> <span class="p">{</span>
@@ -398,10 +374,8 @@
             <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="p">((</span><span class="s2">"space"</span><span class="p">,</span> <span class="n">query</span><span class="o">.</span><span class="n">space</span><span class="p">),</span> <span class="p">(</span><span class="s2">"time"</span><span class="p">,</span> <span class="n">query</span><span class="o">.</span><span class="n">time</span><span class="p">))</span>
             <span class="k">if</span> <span class="n">v</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
         <span class="p">}</span>
-        <span class="k">for</span> <span class="n">group</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"axes"</span><span class="p">,</span> <span class="s2">"facets"</span><span class="p">,</span> <span class="s2">"dims"</span><span class="p">):</span>
-            <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">query</span><span class="p">,</span> <span class="n">group</span><span class="p">)</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
-                <span class="n">dimension</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_dimension</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">group</span><span class="p">)</span>
-                <span class="n">parsed</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="n">dimension</span><span class="o">.</span><span class="n">parse_query</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">query</span><span class="o">.</span><span class="n">dimensions</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="n">parsed</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_dimension</span><span class="p">(</span><span class="n">name</span><span class="p">)</span><span class="o">.</span><span class="n">parse_query</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_last</span> <span class="o">=</span> <span class="p">(</span><span class="n">query</span><span class="p">,</span> <span class="n">parsed</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">parsed</span>
 
@@ -459,9 +433,8 @@
                         <span class="k">if</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">e</span><span class="o">.</span><span class="n">scope</span><span class="o">.</span><span class="n">values</span>
                     <span class="p">]</span>
                 <span class="p">)</span>
-                <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">dimension</span><span class="p">,</span> <span class="n">_</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_groups</span>
-                <span class="k">if</span> <span class="nb">type</span><span class="p">(</span><span class="n">dimension</span><span class="p">)</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="n">Axis</span><span class="p">,</span> <span class="n">Labels</span><span class="p">)</span>
-                <span class="ow">and</span> <span class="nb">callable</span><span class="p">(</span><span class="nb">getattr</span><span class="p">(</span><span class="n">dimension</span><span class="p">,</span> <span class="s2">"build"</span><span class="p">,</span> <span class="kc">None</span><span class="p">))</span>
+                <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">dimension</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_dimensions</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
+                <span class="k">if</span> <span class="nb">callable</span><span class="p">(</span><span class="nb">getattr</span><span class="p">(</span><span class="n">dimension</span><span class="p">,</span> <span class="s2">"build"</span><span class="p">,</span> <span class="kc">None</span><span class="p">))</span>
                 <span class="ow">and</span> <span class="ow">not</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">dimension</span><span class="p">,</span> <span class="s2">"comparable"</span><span class="p">)</span>
             <span class="p">}</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_prefilters_cache</span>
