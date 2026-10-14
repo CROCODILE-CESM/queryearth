@@ -189,6 +189,46 @@ def test_finding_str_is_the_text_to_log():
         "[ERA5-023] ERA5-023 title (2007-10-01..2013-12-31; draft)"
     )
     assert str(finding("CRU004", status="reviewed")) == "[CRU004] CRU004 title"
+    assert str(finding("TOY004", time_overlap=[("..", "2009-12-31")])) == (
+        "[TOY004] TOY004 title (..2009-12-31; draft)"
+    )
+
+
+def test_report_is_the_text_for_people():
+    findings = [
+        qe.Finding(
+            code="CROC010",
+            title="Consider CICE",
+            message="Sea ice forms here.",
+            status="reviewed",
+            level="warning",
+        ),
+        qe.Finding(
+            code="CROC001",
+            title="Turn off GM",
+            message="Eddies are partly resolved.",
+            instruction="Check the run's eddy kinetic energy.",
+            status="reviewed",
+            changes=[
+                qe.Change("MOM_input", "THICKNESSDIFFUSE", False),
+                qe.Change("MOM_input", "KHTH", 0.0, "no GM at all"),
+            ],
+            conditional_on=("space",),
+        ),
+    ]
+    assert qe.report(findings) == "\n".join(
+        [
+            "WARNING [CROC010] Consider CICE",
+            "    Sea ice forms here.",
+            "INFO [CROC001] Turn off GM",
+            "    Eddies are partly resolved.",
+            "    Check the run's eddy kinetic energy.",
+            "    Conditional on: space",
+            "    Change: MOM_input THICKNESSDIFFUSE = False",
+            "    Change: MOM_input KHTH = 0.0 (no GM at all)",
+        ]
+    )
+    assert qe.report([]) == ""
 
 
 def test_query_accepts_shorthands():

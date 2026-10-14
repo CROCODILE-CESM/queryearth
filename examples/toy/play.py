@@ -37,25 +37,12 @@ print("loaded:", registry.load(HERE / "rules.geojson"))
 
 
 def show(findings):
-    """One line per finding, then any changes under it."""
-    if not findings:
-        print("  (no findings)")
-    for f in findings:
-        area, time = (
-            "-" if x is None else f"{x:.0%}" for x in (f.area_fraction, f.time_fraction)
-        )
-        level = logging.getLevelName(f.level)
-        print(f"  {f.code:7} {level}")
-        print(f"          {f.title}")
-        print(f"          area {area}, time {time}, periods {f.time_overlap}")
-        if f.conditional_on:
-            print(f"          conditional on {f.conditional_on}")
-        for c in f.changes:
-            print(f"          -> set {c.target}:{c.key} = {c.value!r}")
+    """Each finding's level, code and title, then its message and changes."""
+    print(qe.report(findings) or "(no findings)", end="\n\n")
 
 
 # %% 1. A Bering Sea domain that crosses the antimeridian, winter 2000-01, 8 km.
-# TOY002 covers only December to March, so its time fraction is below 1.
+# TOY002 covers only December to March, so it reports just those months.
 # TOY101 needs the Arctic, and only the top of this domain is north of 66.5N.
 bering = sp.box(165, 52, -160, 70)  # west, south, east, north
 winter = qe.interval("2000-11-01", "2001-03-31")

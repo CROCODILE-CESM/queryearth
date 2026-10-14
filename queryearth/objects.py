@@ -36,6 +36,7 @@ __all__ = [
     "Scope",
     "Status",
     "UnknownNameError",
+    "report",
 ]
 
 Confidence = Literal["observed", "likely", "possible", "unknown"]  # CAP certainty
@@ -268,13 +269,36 @@ class Finding(Outcome, Match):
         notes = [self.query_label] if self.query_label else []
         if self.area_fraction is not None:
             notes.append(f"area {self.area_fraction:.0%}")
-        if self.time_overlap:
-            notes.append(", ".join(f"{a}..{b}" for a, b in self.time_overlap))
+        if self.time_overlap:  # an open end is "..", shown as nothing: "..2009-12-31"
+            ends = [
+                ["" if e == ".." else e for e in pair] for pair in self.time_overlap
+            ]
+            notes.append(", ".join(f"{a}..{b}" for a, b in ends))
         if self.status == "draft":
             notes.append("draft")
         return f"[{self.code}] {self.title}" + (
             f" ({'; '.join(notes)})" if notes else ""
         )
+
+
+def report(findings: Iterable[Finding]) -> str:
+    """The text of findings for people to read, or "" for none.
+
+    Each finding is its level and str(finding), then indented lines for its
+    message, instruction, what a conditional finding is waiting on, and each
+    change.
+    """
+    lines = []
+    for f in findings:
+        lines += [f"{logging.getLevelName(f.level)} {f}", f"    {f.message}"]
+        if f.instruction:
+            lines.append(f"    {f.instruction}")
+        if f.conditional_on:
+            lines.append(f"    Conditional on: {', '.join(f.conditional_on)}")
+        for c in f.changes:
+            why = f" ({c.rationale})" if c.rationale else ""
+            lines.append(f"    Change: {c.target} {c.key} = {c.value!r}{why}")
+    return "\n".join(lines)
 
 
 # ---- scopes and queries -----------------------------------------------------------

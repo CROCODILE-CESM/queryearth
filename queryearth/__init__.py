@@ -3,10 +3,10 @@
 queryearth.time holds time keys, intervals and their measures,
 queryearth.space points, polygons and closed-set measures (imported as
 ``from queryearth import space as sp``), and queryearth.converters turns other
-descriptions of a place, such as a model grid, into spaces. The rule engine is at the top level:
-a Registry of dimensions and rules answers queries with Finding
-objects, which callers log with the logging module. See docs/design.md for the
-design.
+descriptions of a place, such as a model grid, into spaces. The rule engine is
+at the top level: a Registry of dimensions and rules answers queries with
+Finding objects, which callers log with the logging module or print with
+report(). See docs/design.md for the design.
 """
 
 try:
@@ -38,6 +38,7 @@ from queryearth.objects import (
     Scope,
     Status,
     UnknownNameError,
+    report,
 )
 from queryearth.rules import CheckResult, ComputedRule, Rule, RuleFunc, RuleKind
 from queryearth.space import Space
@@ -76,5 +77,6 @@ __all__ = [
     "__version__",
     "interval",
     "parse_time",
+    "report",
     "space",
 ]

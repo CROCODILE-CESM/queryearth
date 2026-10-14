@@ -2,7 +2,21 @@
 
 ## Reporting findings
 
-Findings are data: queryearth never warns, logs or raises for them. A finding's `level` is a `logging` level, and `str(finding)` is a one-line message that starts with its code, such as `[TOY002] toy_ocean is too warm in the Bering Sea in winter (area 83%; 2000-12-01..2001-03-31; draft)`. So log them with the `logging` module:
+Findings are data: queryearth never prints, warns, logs or raises for them. To show them to people, print {func}`~queryearth.report`, which gives each finding's level and one-line text, then its message and changes, or `""` when there are none:
+
+```python
+print(qe.report(findings))
+```
+
+```text
+WARNING [TOY002] toy_ocean is too warm in the Bering Sea in winter (area 83%; 2000-12-01..2001-03-31; draft)
+    From December to March, toy_ocean sea temperature in the Bering Sea runs about 1 K too warm.
+INFO [TOY102] Fine grid: turn off the coarse-grid eddy scheme (area 100%; 2000-11-01..2001-03-31; draft)
+    Below 10 km the model starts to resolve eddies itself.
+    Change: MOM_input TOY_EDDY_SCHEME = False (Made-up parameter name.)
+```
+
+The first line of each is `str(finding)`: the code, the title, the share of the query's area, the periods it applies to, and "draft" for a rule not yet reviewed. A finding's `level` is a `logging` level, so to log findings instead, log that line at its level:
 
 ```python
 import logging
