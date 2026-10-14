@@ -4,6 +4,8 @@ import os
 import re
 from pathlib import Path
 
+import queryearth as qe
+
 LLMS = Path(__file__).resolve().parents[1] / "docs" / "source" / "llms.txt"
 
 
@@ -30,4 +32,6 @@ def test_the_rule_file_and_the_python_run_as_written(tmp_path):
         "MINE002",
         "MINE003",
     ]
-    assert (tmp_path / "mine.geojson").exists()
+    written = qe.Registry.from_file(tmp_path / "mine.geojson")
+    assert [r["code"] for r in written.describe()["rules"]] == ["MINE001"]
+    assert written.groups == {"MINE": "My rules"}

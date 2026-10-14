@@ -24,6 +24,7 @@ import numpy as np
 from queryearth import space as sp
 from queryearth.dimensions import (
     Dimension,
+    Edge,
     SpaceDimension,
     TimeDimension,
     describe_dimension,
@@ -49,15 +50,22 @@ from queryearth.rules import (
     Rule,
     RuleFunc,
     binding_of,
-    check_code,
+    check_prefix,
     computed_findings,
+    make_code,
     make_findings,
     match_scope,
+    split_code,
 )
 
-__all__ = ["Registry", "PointResult"]
+__all__ = ["FORMAT", "Registry", "PointResult"]
+
+# The release that last changed the rule file format. to_file() writes it in the
+# "queryearth" member, and a file that needs a later release is refused.
+FORMAT = "0.4"
 
 _SLUG = re.compile(r"[a-z][a-z0-9_]*")
+_RELEASE = re.compile(r"([0-9]+)\.([0-9]+)(?:\.[0-9]+)?")
 
 _default: Registry | None = None
 _default_lock = threading.Lock()
@@ -85,6 +93,28 @@ def _read(path: Path) -> Any:
         raise LoadError([f"{path.name}: {err}"]) from err
 
 
+def _format_problems(collection: Any, where: str) -> list[str]:
+    """Why this queryearth cannot read a collection, from its "queryearth" member."""
+    given = collection.get("queryearth") if isinstance(collection, Mapping) else None
+    if given is None:
+        return []
+    found = _RELEASE.fullmatch(given) if isinstance(given, str) else None
+    if found is None:
+        return [
+            f'{where}: "queryearth" is the release whose file format the file '
+            f'uses, such as "{FORMAT}", not {given!r}'
+        ]
+    newest = tuple(int(n) for n in _RELEASE.fullmatch(FORMAT).groups()[:2])
+    if tuple(int(n) for n in found.groups()[:2]) > newest:
+        from queryearth import __version__
+
+        return [
+            f"{where}: this file needs queryearth {given} or later; this is "
+            f"queryearth {__version__}, which reads files up to {FORMAT}"
+        ]
+    return []
+
+
 class Registry:
     """Declared dimensions and rules; answers queries.
 
@@ -95,18 +125,27 @@ class Registry:
     for scripts and notebooks.
     """
 
-    def __init__(self, name: str = "", *, dimensions: Iterable[Any] = ()) -> None:
+    def __init__(
+        self,
+        name: str = "",
+        *,
+        dimensions: Iterable[Any] = (),
+        groups: Mapping[str, str] | None = None,
+    ) -> None:
         self.name = name
         self._dimensions: dict[str, Any] = {
             "space": SpaceDimension(),
             "time": TimeDimension(),
         }
+        self._groups: dict[str, str] = {}
         self._entries: list[_Entry] = []
         self._codes: dict[str, int] = {}
         self._prefilters_cache: dict[str, Any] | None = None
         self._last: tuple[Any, Any] = (None, None)  # the last query parsed
         for dimension in dimensions:
             self.add_dimension(dimension)
+        for prefix, title in (groups or {}).items():
+            self.add_group(prefix, title)
 
     def __repr__(self) -> str:
         return f"Registry({self.name!r}, rules={len(self._entries)})"
@@ -142,6 +181,36 @@ class Registry:
             raise ValueError(f"dimension name {name!r} is reserved or already declared")
         self._dimensions[name] = dimension
 
+    def add_group(self, prefix: str, title: str) -> None:
+        """Declare a group of rules, before any rule is added: the rules whose
+        codes have this prefix, such as ITF for ITF001. Once a Registry declares
+        groups, every rule's prefix must be one of them."""
+        if self._entries:
+            raise ValueError("declare groups before adding rules")
+        check_prefix(prefix)
+        if not isinstance(title, str) or not title.strip():
+            raise ValueError(f"group {prefix!r} needs a title")
+        if prefix in self._groups:
+            raise ValueError(f"group {prefix!r} is already declared")
+        self._groups[prefix] = title
+
+    @property
+    def groups(self) -> dict[str, str]:
+        """The declared groups, prefix to title, in the order declared."""
+        return dict(self._groups)
+
+    def next_code(self, prefix: str) -> str:
+        """The code for a new rule in a group: one more than the highest number
+        any rule here has with that prefix, withdrawn ones too, so no number is
+        given twice. ITF001 when the group has no rules yet."""
+        check_prefix(prefix)
+        if self._groups and prefix not in self._groups:
+            raise UnknownNameError(
+                f"undeclared group {prefix!r}; declared: {list(self._groups)}"
+            )
+        numbers = [n for p, n in map(split_code, self._codes) if p == prefix]
+        return make_code(prefix, max(numbers, default=0) + 1)
+
     def add(self, rule: Any) -> None:
         """Add a Rule, a ComputedRule instance, any RuleKind or a record mapping.
 
@@ -163,18 +232,30 @@ class Registry:
         The file declares the dimensions its rules use in its "dimensions"
         member, in the form describe() gives: [{"name": "resolution", "kind":
         "axis", "unit": "km"}, {"name": "product", "kind": "labels"}]. Space and
-        time need no declaring. Raises LoadError as load() does.
+        time need no declaring. Its optional "groups" member maps code prefixes
+        to titles, and "queryearth" names the release whose format it uses.
+        Raises LoadError as load() does.
         """
         path = Path(path)
         data = _read(path)
+        problems = _format_problems(data, path.name)
+        if problems:
+            raise LoadError(problems)
         declared = data.get("dimensions", []) if isinstance(data, Mapping) else []
         try:
             if not isinstance(declared, list):
                 raise ValueError("it is a list of dimensions")
-            dimensions = [dimension_from(d) for d in declared]
-            registry = cls(path.stem, dimensions=dimensions)
+            registry = cls(path.stem, dimensions=map(dimension_from, declared))
         except (ValueError, TypeError) as err:
             raise LoadError([f"{path.name}: dimensions: {err}"]) from err
+        groups = data.get("groups") if isinstance(data, Mapping) else None
+        try:
+            if groups is not None and not isinstance(groups, Mapping):
+                raise ValueError("it maps each prefix to a title")
+            for prefix, title in (groups or {}).items():
+                registry.add_group(prefix, title)
+        except (ValueError, TypeError) as err:
+            raise LoadError([f"{path.name}: groups: {err}"]) from err
         try:
             registry.load(path)
         except LoadError as err:
@@ -190,8 +271,8 @@ class Registry:
         Returns the codes loaded; their findings have the file name as source.
         Loading never runs code. Raises LoadError listing every problem with the
         file, the feature's position and its code, and then leaves the Registry
-        as it was. A file that declares its dimensions must declare them as this
-        Registry does.
+        as it was. A file that declares its dimensions or groups must declare
+        them as this Registry does.
         """
         path = Path(path)
         data = _read(path)
@@ -209,7 +290,9 @@ class Registry:
             or collection.get("type") != "FeatureCollection"
         ):
             raise LoadError([f"{where}: not a GeoJSON FeatureCollection or Feature"])
-        problems = self._declared_problems(collection.get("dimensions"), where)
+        problems = _format_problems(collection, where)
+        problems += self._declared_problems(collection.get("dimensions"), where)
+        problems += self._group_problems(collection.get("groups"), where)
         if problems:
             raise LoadError(problems)
         saved = {k: copy.copy(v) for k, v in vars(self).items()}
@@ -264,11 +347,31 @@ class Registry:
                 )
         return problems
 
+    def _group_problems(self, declared: Any, where: str) -> list[str]:
+        """How a collection's "groups" member disagrees with this Registry; the
+        titles are for people, so they may differ."""
+        if declared is None:
+            return []
+        if not isinstance(declared, Mapping):
+            return [f"{where}: groups: it maps each prefix to a title"]
+        problems = []
+        for prefix in declared:
+            if prefix not in self._groups:
+                problems.append(
+                    f"{where}: group {prefix!r} is not declared on registry {self.name!r}"
+                )
+        return problems
+
     def _add(self, rule: Any, source: str) -> None:
         """Registry.add; source names a record's file ("python" from Python)."""
         if isinstance(rule, ComputedRule):
             form, get = "computed", rule.meta.get
-            scope = Scope(get("space"), time_of(get("time")), get("dimensions", {}))
+            scope = Scope(
+                get("space"),
+                time_of(get("time")),
+                get("dimensions", {}),
+                get("edge", False),
+            )
         elif isinstance(getattr(rule, "scope", None), Scope) and hasattr(
             rule, "evaluate"
         ):
@@ -278,7 +381,11 @@ class Registry:
         else:
             raise TypeError(f"cannot add {rule!r}: not a Rule or a RuleKind")
         code = rule.code
-        check_code(code)
+        group = split_code(code)[0]
+        if self._groups and group not in self._groups:
+            raise UnknownNameError(
+                f"{code}: undeclared group {group!r}; declared: {list(self._groups)}"
+            )
         compiled = self._compile(scope, _strings(get("requires", ())), code)
         qualname = rule._qualname() if form == "computed" else None
         at = self._codes.get(code)
@@ -338,9 +445,9 @@ class Registry:
         return found
 
     def describe(self) -> dict[str, Any]:
-        """What this Registry can answer, as a JSON-ready dict: its declared
-        dimensions in the form of a rule file's "dimensions" member, the values its
-        rules give on each (values()), and each rule's code, title and level.
+        """What this Registry can answer, as a JSON-ready dict: its groups and
+        its declared dimensions as a rule file gives them, the values its rules
+        give on each dimension (values()), and each rule's code, title and level.
         Space and time are always there and are not listed."""
         declared = list(self._dimensions.items())[2:]
         rules = []
@@ -357,10 +464,32 @@ class Registry:
             )
         return {
             "name": self.name,
+            "groups": dict(self._groups),
             "dimensions": [describe_dimension(d) for _, d in declared],
             "values": {name: _jsonable(self.values(name)) for name, _ in declared},
             "rules": rules,
         }
+
+    # ---- writing ------------------------------------------------------------------
+    def to_collection(self) -> dict[str, Any]:
+        """This Registry as a rule file, a JSON-ready FeatureCollection: the
+        file format it needs, its groups, its declared dimensions and a record
+        for each static rule. Computed rules are code, so they are left out;
+        describe() lists them."""
+        collection: dict[str, Any] = {"type": "FeatureCollection", "queryearth": FORMAT}
+        if self._groups:
+            collection["groups"] = dict(self._groups)
+        declared = list(self._dimensions.values())[2:]
+        collection["dimensions"] = [describe_dimension(d) for d in declared]
+        collection["features"] = [
+            e.rule.to_feature() for e in self._entries if e.form == "record"
+        ]
+        return collection
+
+    def to_file(self, path: str | os.PathLike[str]) -> None:
+        """Write to_collection() to a rule file that from_file() reads back."""
+        text = json.dumps(self.to_collection(), indent=2, ensure_ascii=False)
+        Path(path).write_text(text + "\n", encoding="utf-8")
 
     # ---- names --------------------------------------------------------------------
     def _dimension(self, name: str) -> Any:
@@ -381,6 +510,8 @@ class Registry:
         values = {
             k: v for k, v in (("space", space), ("time", scope.time)) if v is not None
         }
+        if scope.edge:
+            values["space"] = Edge(space)
         for name, value in scope.dimensions.items():
             try:
                 values[name] = self._dimension(name).parse_rule(value)
@@ -519,6 +650,8 @@ class Registry:
             if match.conditional_on and not conditional:
                 continue
             space = entry.scope.values.get("space")
+            if isinstance(space, Edge):
+                continue  # a point has no edge
             mask = valid.copy() if space is None else sp.points_mask(space, x, y)
             if not mask.any():
                 continue

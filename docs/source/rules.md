@@ -30,7 +30,7 @@ rule = qe.Rule(
 registry.add(rule)
 ```
 
-A {class}`~queryearth.Scope` takes `space`, `time` and, in `dimensions`, a value for each other [dimension](concepts.md#dimensions) the rule constrains, by its declared name. `changes` lists {class}`~queryearth.Change` objects, or mappings with the same fields. `level` takes a `logging` level or its name, such as `"error"`, in place of [the default](concepts.md#rules-and-their-scope). Adding a code that is already on the Registry raises `DuplicateCodeError`.
+A {class}`~queryearth.Scope` takes `space`, `time` and, in `dimensions`, a value for each other [dimension](concepts.md#dimensions) the rule constrains, by its declared name; `edge=True` makes it an [edge rule](concepts.md#space). `changes` lists {class}`~queryearth.Change` objects, or mappings with the same fields. `level` takes a `logging` level or its name, such as `"error"`, in place of [the default](concepts.md#rules-and-their-scope). Adding a code that is already on the Registry raises `DuplicateCodeError`.
 
 ## Computed rules
 
@@ -48,13 +48,19 @@ The function runs only when the scope matches definitely. It returns `True` (one
 
 ## Rule files
 
-A rule file is a GeoJSON file holding a FeatureCollection of records, or a single record. A FeatureCollection can declare the [dimensions](concepts.md#dimensions) its rules use in a top-level `dimensions` member, such as `[{"name": "resolution", "kind": "axis", "unit": "km"}, {"name": "product", "kind": "labels"}]`: each has a `name`, a `kind` (`axis`, `labels` or `versions`), a `unit` for an axis, and optionally a `description`. {meth}`Registry.from_file() <queryearth.Registry.from_file>` then makes a Registry with those dimensions and loads the rules:
+A rule file is a GeoJSON file holding a FeatureCollection of records, or a single record. Besides `features`, a FeatureCollection can have three top-level members:
+
+- `queryearth`: the release whose file format the file uses, such as `"0.4"`. A file that needs a later release than the one installed is refused, with a message that says so; a file without it is read as it is.
+- `groups`: the [groups](concepts.md#rules-and-their-scope) of its rules, each code prefix with its title, such as `{"GRID": "Grid and numerics", "ITF": "Indonesian Throughflow"}`.
+- `dimensions`: the [dimensions](concepts.md#dimensions) its rules use, such as `[{"name": "resolution", "kind": "axis", "unit": "km"}, {"name": "product", "kind": "labels"}]`. Each has a `name`, a `kind` (`axis`, `labels` or `versions`), a `unit` for an axis, and optionally a `description`.
+
+{meth}`Registry.from_file() <queryearth.Registry.from_file>` makes a Registry with those groups and dimensions and loads the rules:
 
 ```python
 registry = qe.Registry.from_file("examples/toy/rules.geojson")
 ```
 
-{meth}`Registry.load() <queryearth.Registry.load>` adds a file's rules to a Registry you already have, and returns their codes. That Registry must declare every dimension the records use, and a file that declares its dimensions must declare them as the Registry does:
+{meth}`Registry.load() <queryearth.Registry.load>` adds a file's rules to a Registry you already have, and returns their codes. That Registry must declare every dimension the records use; a file that declares its dimensions must declare them as the Registry does, and its groups must be declared on the Registry:
 
 ```python
 codes = registry.load("mine.geojson")
@@ -70,7 +76,7 @@ Each rule is one GeoJSON Feature. Its `geometry` is a Polygon, a MultiPolygon or
 |---|---|
 | Identity and outcome | `code`, `title` and `message`, all required; `level` (`info`, `warning` or `error`; optional, with [a default](concepts.md#rules-and-their-scope)) |
 | Advice | `instruction`, `confidence`, `action`, and `changes` (a list of `{target, key, value, rationale}` objects) |
-| Scope | `dimensions` (the value on each other dimension, by name), `box` (`{west, width, south, north}`, a shorthand for a polygon; geometry must then be null), `periods` (intervals inside `time`), `recurrence` (`{"months": [12, 1, 2]}`), and the fallback `time_start` and `time_end` |
+| Scope | `dimensions` (the value on each other dimension, by name), `box` (`{west, width, south, north}`, a shorthand for a polygon; geometry must then be null), `edge` (`true` for an [edge rule](concepts.md#space)), `periods` (intervals inside `time`), `recurrence` (`{"months": [12, 1, 2]}`), and the fallback `time_start` and `time_end` |
 | Overlap | `min_overlap`, an area fraction from 0 to 1 below which the finding is too small to count, which you can filter on |
 | Provenance | `evidence`, `references`, `aliases` |
 | Lifecycle | `status` (`draft`, `reviewed` or `deprecated`; a reviewed record cites a reference), `created`, `updated`, `withdrawn` (kept for history, never matched), `supersedes` |
@@ -104,16 +110,11 @@ The values in `dimensions` take the forms in the [table of dimensions](concepts.
 
 ### Writing records
 
-{meth}`Rule.to_feature() <queryearth.Rule.to_feature>` turns a rule back into a record, leaving out the fields at their defaults and writing the scope's `dimensions` as given, so that `Rule.from_feature(rule.to_feature())` gives the same rule. A `box` is written as its polygon, split at ±180, and time as the `time` member plus `periods` and `recurrence` where needed. A rule whose space is a point, or whose level is not info, warning or error, has no record form and raises `ValueError`. A computed rule is code, so it has no record form either. To write rules to a file:
+{meth}`Rule.to_feature() <queryearth.Rule.to_feature>` turns a rule back into a record, leaving out the fields at their defaults and writing the scope's `dimensions` as given, so that `Rule.from_feature(rule.to_feature())` gives the same rule. A `box` is written as its polygon, split at ±180, and time as the `time` member plus `periods` and `recurrence` where needed. A rule whose space is a point, or whose level is not info, warning or error, has no record form and raises `ValueError`. A computed rule is code, so it has no record form either.
+
+{meth}`Registry.to_file() <queryearth.Registry.to_file>` writes a Registry's rule file: the `queryearth` release of its format, its groups and dimensions, and a record for each rule, in the order they were added. Computed rules are left out. {meth}`Registry.to_collection() <queryearth.Registry.to_collection>` gives the same FeatureCollection as a dict.
 
 ```python
-import json
-
-collection = {
-    "type": "FeatureCollection",
-    "dimensions": registry.describe()["dimensions"],  # so from_file() can read it
-    "features": [rule.to_feature()],
-}
-with open("mine.geojson", "w") as f:
-    json.dump(collection, f, indent=2)
+registry.to_file("mine.geojson")
+again = qe.Registry.from_file("mine.geojson")
 ```

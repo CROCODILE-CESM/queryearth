@@ -24,7 +24,7 @@ from queryearth.dimensions import (
     Prefilter,
     Versions,
 )
-from queryearth.registry import Registry, PointResult
+from queryearth.registry import FORMAT, Registry, PointResult
 from queryearth.objects import (
     Action,
     Change,
@@ -45,6 +45,7 @@ from queryearth.space import Space
 from queryearth.time import Interval, TimeSpec, interval, parse_time
 
 __all__ = [
+    "FORMAT",
     "Action",
     "Axis",
     "AxisOverlap",

@@ -24,6 +24,8 @@ __all__ = [
     "Space",
     "area_km2",
     "box",
+    "edge",
+    "edge_meets",
     "measure",
     "meets",
     "point",
@@ -34,6 +36,10 @@ __all__ = [
 
 R_KM = 6371.0088  # mean Earth radius; area fractions do not depend on it
 LAT_TOLERANCE = 1e-9  # degrees beyond +-90 that are clamped rather than refused
+_EAST = shapely.LineString([(180.0, -90.0), (180.0, 90.0)])
+_POLES = shapely.MultiLineString(
+    [[(-180.0, 90.0), (180.0, 90.0)], [(-180.0, -90.0), (180.0, -90.0)]]
+)
 
 
 @dataclass(frozen=True, eq=False)
@@ -80,6 +86,12 @@ def _polygonal(shape: shapely.Geometry) -> shapely.Geometry:
     # make_valid can nest a MultiPolygon inside a GeometryCollection
     parts = shapely.get_parts(shapely.get_parts(shape))
     return shapely.union_all(parts[shapely.get_type_id(parts) == 3])  # Polygon
+
+
+def _lines(shape: shapely.Geometry) -> shapely.Geometry:
+    """The line parts of a geometry, merged."""
+    parts = shapely.get_parts(shapely.get_parts(shape))
+    return shapely.union_all(parts[shapely.get_type_id(parts) == 1])  # LineString
 
 
 def _split_at_seam(shape: shapely.Geometry) -> shapely.Geometry:
@@ -187,6 +199,23 @@ def polygon(shape: Any) -> Space:
     return _finish(geometry)
 
 
+def edge(space: Space) -> shapely.Geometry:
+    """A polygon's edges on the globe, as lines.
+
+    That is its boundary without the cuts at +-180, which join two parts of one
+    shape, and without lines along latitude 90 or -90, which are a single point
+    on the globe: the edge of a polar cap is its one circle of latitude.
+    """
+    if space.kind != "polygon":
+        raise ValueError(f"only a polygon has an edge, not a {space.kind}")
+    lines = _lines(shapely.boundary(space.geometry))
+    east = _lines(shapely.intersection(lines, _EAST))
+    west = _lines(shapely.intersection(lines, _shift(_EAST, -360.0)))
+    cut = _lines(shapely.intersection(east, _shift(west, 360.0)))  # on both sides
+    seams = shapely.union_all([cut, _shift(cut, -360.0), _POLES])
+    return _lines(shapely.difference(lines, seams))
+
+
 # ---- areas (design.md section 6.3) ---------------------------------------------
 def _ring_area(coords: Any) -> float:
     """Signed area of a closed ring with straight lon/lat edges; CCW is positive.
@@ -272,6 +301,22 @@ def meets(rule: Rule, query: Space) -> bool:
     x0, _, x1, _ = other.bounds
     return (x0 == -180.0 and shapely.intersects(shape, _shift(other, 360.0))) or (
         x1 == 180.0 and shapely.intersects(shape, _shift(other, -360.0))
+    )
+
+
+def edge_meets(rule: Space | shapely.Geometry, query: Space) -> bool:
+    """Whether the edge of a query polygon (edge()) meets a rule shape, as
+    closed sets. A point has no edge, so it meets no rule this way."""
+    if query.kind != "polygon":
+        return False
+    shape, line = _shape(rule), edge(query)
+    if line.is_empty:
+        return False
+    if shapely.intersects(shape, line):
+        return True
+    x0, _, x1, _ = line.bounds
+    return (x0 == -180.0 and shapely.intersects(shape, _shift(line, 360.0))) or (
+        x1 == 180.0 and shapely.intersects(shape, _shift(line, -360.0))
     )
 
 

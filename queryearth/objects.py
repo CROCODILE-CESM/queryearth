@@ -316,18 +316,27 @@ class Scope:
 
     dimensions maps the name of each other dimension the rule constrains to
     its value in record form; the Registry checks every name and parses each
-    value with its dimension.
+    value with its dimension. With edge=True the rule applies where the
+    query's edge meets its space, rather than wherever they overlap, for
+    advice about where a domain's boundary falls.
     """
 
     space: Space | None = None
     time: TimeSpec | None = None
     dimensions: Mapping[str, Any] = field(default_factory=dict)
+    edge: bool = False
 
     def __post_init__(self) -> None:
         _space_of(self.space, "a scope's space")
         if self.time is not None and not isinstance(self.time, TimeSpec):
             raise TypeError("a scope's time is a TimeSpec or None")
         _set(self, "dimensions", _mapping(self.dimensions, "scope dimensions"))
+        if not isinstance(self.edge, bool):
+            raise TypeError(f"a scope's edge is True or False, not {self.edge!r}")
+        if self.edge and self.space is None:
+            raise ValueError(
+                "an edge rule needs a space: it applies where the query's edge meets it"
+            )
 
 
 @dataclass(frozen=True)

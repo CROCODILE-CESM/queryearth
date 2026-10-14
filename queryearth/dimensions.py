@@ -124,11 +124,23 @@ class SpaceDimension(Dimension):
 
     parse_query = parse_rule
 
-    def match(self, rule: sp.Space | None, query: sp.Space) -> DimMatch | None:
-        if rule is not None and not sp.meets(rule, query):
+    def match(self, rule: sp.Space | Edge | None, query: sp.Space) -> DimMatch | None:
+        if isinstance(rule, Edge):
+            if not sp.edge_meets(rule.space, query):
+                return None
+            rule = rule.space
+        elif rule is not None and not sp.meets(rule, query):
             return None
         fraction, km2 = sp.measure(rule, query)
         return DimMatch(km2, fraction)
+
+
+@dataclass(frozen=True, eq=False)
+class Edge:
+    """The space of an edge rule (Scope edge=True), as the Registry compiles it:
+    the rule meets a query whose edge meets this space."""
+
+    space: sp.Space
 
 
 class TimeDimension(Dimension):

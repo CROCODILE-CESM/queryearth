@@ -35,8 +35,10 @@ CheckResult = bool | Mapping[str, Any] | Iterable[Mapping[str, Any]] | None
 RuleFunc = Callable[[Query, Match], CheckResult]
 
 # A prefix plus three or four digits, with a hyphen after a prefix that ends in
-# a digit, so every code parses one way (Q8).
-CODE = re.compile(r"(?:[A-Z][A-Z0-9]{0,10}[A-Z]-?|[A-Z][A-Z0-9]{0,10}[0-9]-)[0-9]{3,4}")
+# a digit, so every code parses one way (Q8). The prefix is the rule's group.
+CODE = re.compile(
+    r"(?:([A-Z][A-Z0-9]{0,10}[A-Z])-?|([A-Z][A-Z0-9]{0,10}[0-9])-)([0-9]{3,4})"
+)
 
 
 def check_code(code: Any) -> None:
@@ -46,6 +48,37 @@ def check_code(code: Any) -> None:
             f"{code!r} is not a rule code: capitals and digits plus three or four "
             "digits, such as CRU001, with a hyphen after a prefix that ends in a "
             "digit (ERA5-014)"
+        )
+
+
+def split_code(code: str) -> tuple[str, int]:
+    """A valid code's prefix, which is its group, and its number: ("ERA5", 14)
+    for ERA5-014."""
+    check_code(code)
+    found = CODE.fullmatch(code)
+    return found[1] or found[2], int(found[3])
+
+
+def make_code(prefix: str, number: int) -> str:
+    """The code with this prefix and number, such as CRU001 or ERA5-014."""
+    check_prefix(prefix)
+    if (
+        isinstance(number, bool)
+        or not isinstance(number, int)
+        or not 0 <= number <= 9999
+    ):
+        raise ValueError(f"a code's number is 0 to 9999, not {number!r}")
+    return f"{prefix}{'-' if prefix[-1].isdigit() else ''}{number:03d}"
+
+
+def check_prefix(prefix: Any) -> None:
+    """Raise ValueError unless prefix is a code's prefix, and so a group."""
+    code = f"{prefix}-001" if isinstance(prefix, str) else None
+    found = CODE.fullmatch(code) if code else None
+    if found is None or (found[1] or found[2]) != prefix:
+        raise ValueError(
+            f"{prefix!r} is not a code prefix: two to twelve capitals and digits, "
+            "starting with a capital, such as CRU or ERA5"
         )
 
 
@@ -228,7 +261,7 @@ _RULE_KEYS = tuple(f.name for f in dataclasses.fields(Outcome)) + tuple(
     "created updated withdrawn supersedes aliases".split()
 )
 _RECORD_KEYS = set(_RULE_KEYS) | set(
-    "dimensions box periods recurrence time_start time_end".split()
+    "dimensions box edge periods recurrence time_start time_end".split()
 )
 _EXTENSION = re.compile(r"x_[a-z0-9_]+")
 
@@ -321,7 +354,10 @@ class Rule(Outcome):
         if box is not None:
             space = box_of(box)
         time = parse_time(feature.get("time"), **props)
-        scope = Scope(space, time, props.get("dimensions", {}))
+        edge = props.get("edge", False)
+        if not isinstance(edge, bool):
+            raise ValueError(f"edge is true or false, not {edge!r}")
+        scope = Scope(space, time, props.get("dimensions", {}), edge)
         fields = {k: props[k] for k in _RULE_KEYS if k in props}
         extensions = {k: v for k, v in props.items() if k.startswith("x_")}
         return cls(**fields, scope=scope, extensions=extensions)
@@ -341,6 +377,8 @@ class Rule(Outcome):
         default = logging.INFO if self.changes else logging.WARNING
         props["level"] = level if self.level != default else None
         props["dimensions"] = self.scope.dimensions
+        if self.scope.edge:
+            props["edge"] = True
         defaults = {f.name: f.default for f in dataclasses.fields(Rule)}
         props = {k: v for k, v in props.items() if v != defaults.get(k, {})}
         time, geometry, spec = None, None, self.scope.time
@@ -377,7 +415,7 @@ class Rule(Outcome):
 OUTCOME_KEYS = tuple(f.name for f in dataclasses.fields(Outcome) if f.name != "code")
 META_KEYS = frozenset(
     OUTCOME_KEYS
-    + ("dimensions", "space", "time", "requires")
+    + ("dimensions", "space", "time", "edge", "requires")
     + ("supersedes", "withdrawn")
 )
 
@@ -393,8 +431,8 @@ class ComputedRule:
 
     Class keywords give its identity and scope: code, registry (default
     Registry.default()), abstract, the Outcome fields (title and message
-    default to the docstring), space (a Space), time, dimensions and requires
-    (keys of Query.context).
+    default to the docstring), space (a Space), edge (as Scope's), time,
+    dimensions and requires (keys of Query.context).
     Defining a subclass registers one instance; a subclass inherits its bases'
     keywords, merged, with its own winning (Q9).
 
