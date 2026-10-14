@@ -12,8 +12,9 @@ there describes real data or real model guidance. Edit rules.geojson or this
 file and rerun to see what changes.
 """
 
-# %% Set up: a Registry that declares the dimensions the rules use, a resolution
-# axis and the labels product, variable and model, then load the rules.
+# %% Set up: the rule file declares the dimensions its rules use (a resolution
+# axis and the labels product, variable and model), so from_file() makes a
+# Registry with them and loads the rules.
 import logging
 from pathlib import Path
 
@@ -24,16 +25,8 @@ from queryearth import space as sp
 
 HERE = Path(globals().get("__file__", "play.py")).resolve().parent
 
-registry = qe.Registry(
-    "toy",
-    dimensions=[
-        qe.Axis("resolution", "km", "horizontal grid spacing"),
-        qe.Labels("product"),
-        qe.Labels("variable"),
-        qe.Labels("model"),
-    ],
-)
-print("loaded:", registry.load(HERE / "rules.geojson"))
+registry = qe.Registry.from_file(HERE / "rules.geojson")
+print("loaded:", [rule["code"] for rule in registry.describe()["rules"]])
 
 
 def show(findings):

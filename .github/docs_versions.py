@@ -2,9 +2,9 @@
 
 The gh-pages branch holds one folder per version: "dev" (main) and one per
 release tag (v0.1.0, ...). This writes versions.json (read by the version
-menu, newest release first, then dev) and a root index.html that redirects
-to the newest release, and removes anything else at the root, such as the
-files of the single-version site that came before.
+menu, newest release first, then dev), a root index.html that redirects
+to the newest release and a root llms.txt copied from it, and removes anything
+else at the root, such as the files of the single-version site that came before.
 
 Usage: python .github/docs_versions.py SITE_DIR
 """
@@ -16,7 +16,7 @@ import sys
 from pathlib import Path
 
 RELEASE = re.compile(r"v(\d+)\.(\d+)\.(\d+)(.*)")
-KEEP = {".git", ".nojekyll", "index.html", "versions.json", "dev"}
+KEEP = {".git", ".nojekyll", "index.html", "llms.txt", "versions.json", "dev"}
 
 
 def order(name: str) -> tuple:
@@ -55,6 +55,9 @@ def main(site: Path) -> None:
 </body>
 </html>
 """)
+    newest = site / target / "llms.txt"  # language models look for /llms.txt
+    if newest.exists():
+        shutil.copyfile(newest, site / "llms.txt")
     print("versions:", ", ".join(versions), "->", target)
 
 

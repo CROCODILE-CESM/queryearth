@@ -43,6 +43,8 @@ registry = qe.Registry(
 
 Scopes and queries give space and time as `space=` and `time=`, and the other dimensions in one mapping, such as `dimensions={"resolution": 8, "product": "era5"}`. A name the Registry has not declared raises `UnknownNameError`, so a misspelt name never looks like "no rule applies". [Extending queryearth](extending.md#dimension-plugins) shows how to write your own kind.
 
+A rule file can declare its dimensions itself, so that {meth}`Registry.from_file() <queryearth.Registry.from_file>` reads it with no Python declarations (see [Rule files](rules.md#rule-files)). {meth}`Registry.describe() <queryearth.Registry.describe>` tells a person or a program what a Registry can answer: its dimensions, the values its rules give on each ({meth}`Registry.values() <queryearth.Registry.values>`) and its rules, as JSON.
+
 ## Queries and findings
 
 A {class}`~queryearth.Query` gives values on any subset of the dimensions. "Resolution 8 km" on its own is a complete query. {meth}`Registry.query() <queryearth.Registry.query>` takes a `Query` or its fields as keywords, and returns a sorted list of {class}`~queryearth.Finding` objects: highest level first, then those without changes before those with changes, then by code.

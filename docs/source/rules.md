@@ -48,13 +48,19 @@ The function runs only when the scope matches definitely. It returns `True` (one
 
 ## Rule files
 
-A rule file is a GeoJSON file holding a FeatureCollection of records, or a single record. {meth}`Registry.load() <queryearth.Registry.load>` adds its rules and returns their codes:
+A rule file is a GeoJSON file holding a FeatureCollection of records, or a single record. A FeatureCollection can declare the [dimensions](concepts.md#dimensions) its rules use in a top-level `dimensions` member, such as `[{"name": "resolution", "kind": "axis", "unit": "km"}, {"name": "product", "kind": "labels"}]`: each has a `name`, a `kind` (`axis`, `labels` or `versions`), a `unit` for an axis, and optionally a `description`. {meth}`Registry.from_file() <queryearth.Registry.from_file>` then makes a Registry with those dimensions and loads the rules:
 
 ```python
-codes = registry.load("examples/toy/rules.geojson")
+registry = qe.Registry.from_file("examples/toy/rules.geojson")
 ```
 
-Loading never runs code. Every problem is reported at once in a `LoadError` that names the file, the feature's position and its code, and the Registry is left unchanged. The [dimensions](concepts.md#dimensions) the records use must be declared on the Registry first. Products need no declaration of their own: records name them as values of a `product` label dimension. A finding from a loaded rule has the file name as its `source`. A Feature or FeatureCollection mapping can also be added directly with `Registry.add(mapping)`.
+{meth}`Registry.load() <queryearth.Registry.load>` adds a file's rules to a Registry you already have, and returns their codes. That Registry must declare every dimension the records use, and a file that declares its dimensions must declare them as the Registry does:
+
+```python
+codes = registry.load("mine.geojson")
+```
+
+Loading never runs code. Every problem is reported at once in a `LoadError` that names the file, the feature's position and its code, and the Registry is left unchanged. Products need no declaration of their own: records name them as values of a `product` label dimension. A finding from a loaded rule has the file name as its `source`. A Feature or FeatureCollection mapping can also be added directly with `Registry.add(mapping)`.
 
 ### Records
 
@@ -103,7 +109,11 @@ The values in `dimensions` take the forms in the [table of dimensions](concepts.
 ```python
 import json
 
-collection = {"type": "FeatureCollection", "features": [rule.to_feature()]}
+collection = {
+    "type": "FeatureCollection",
+    "dimensions": registry.describe()["dimensions"],  # so from_file() can read it
+    "features": [rule.to_feature()],
+}
 with open("mine.geojson", "w") as f:
     json.dump(collection, f, indent=2)
 ```

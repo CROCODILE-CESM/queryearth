@@ -35,6 +35,8 @@ __all__ = [
     "TimeDimension",
     "VersionRange",
     "Versions",
+    "describe_dimension",
+    "dimension_from",
 ]
 
 
@@ -431,6 +433,7 @@ class Versions(Dimension):
     """A version dimension: rules give a union of OSV-style ranges (section 4.8)."""
 
     name: str
+    description: str = ""
 
     def parse_rule(self, value: Any) -> tuple[VersionRange, ...]:
         if isinstance(value, Mapping):
@@ -468,3 +471,48 @@ class Versions(Dimension):
         if not hits:
             return None
         return DimMatch(hits, len(hits) / len(query))
+
+
+# ---- plain descriptions: a rule file's "dimensions" member -------------------------
+_KINDS = {"axis": Axis, "labels": Labels, "versions": Versions}
+
+
+def describe_dimension(dimension: Dimension) -> dict[str, str]:
+    """A dimension in the plain form a rule file's "dimensions" member uses, such
+    as {"name": "resolution", "kind": "axis", "unit": "km"}. A plugin's kind is
+    its class name; only axis, labels and versions can be made back from it."""
+    kind = next((k for k, cls in _KINDS.items() if type(dimension) is cls), None)
+    if kind is None:
+        return {"name": dimension.name, "kind": type(dimension).__name__}
+    described = {"name": dimension.name, "kind": kind}
+    if kind == "axis":
+        described["unit"] = dimension.unit
+    if dimension.description:
+        described["description"] = dimension.description
+    return described
+
+
+def dimension_from(described: Any) -> Dimension:
+    """The dimension a plain description declares: the inverse of describe_dimension."""
+    if not isinstance(described, Mapping):
+        raise ValueError(
+            f"a dimension is a mapping of name, kind and unit, not {described!r}"
+        )
+    unknown = set(described) - {"name", "kind", "unit", "description"}
+    if unknown:
+        raise ValueError(f"unknown dimension keys {sorted(unknown)}")
+    kind = described.get("kind")
+    if kind not in _KINDS:
+        raise ValueError(
+            f"a dimension's kind is axis, labels or versions, not {kind!r}; "
+            "declare a plugin dimension in Python"
+        )
+    fields = {
+        "name": described.get("name"),
+        "description": described.get("description", ""),
+    }
+    if kind == "axis":
+        fields["unit"] = described.get("unit")
+    elif "unit" in described:
+        raise ValueError(f"only an axis has a unit, not {kind} {fields['name']!r}")
+    return _KINDS[kind](**fields)

@@ -22,14 +22,22 @@ from typing import Any
 import numpy as np
 
 from queryearth import space as sp
-from queryearth.dimensions import Dimension, SpaceDimension, TimeDimension
+from queryearth.dimensions import (
+    Dimension,
+    SpaceDimension,
+    TimeDimension,
+    describe_dimension,
+    dimension_from,
+)
 from queryearth.objects import (
     DuplicateCodeError,
     Finding,
     LoadError,
+    Outcome,
     Query,
     Scope,
     UnknownNameError,
+    _jsonable,
     level_of,
     time_of,
 )
@@ -67,6 +75,14 @@ class _Entry:
 
 def _strings(value: Any) -> tuple[str, ...]:
     return (value,) if isinstance(value, str) else tuple(value or ())
+
+
+def _read(path: Path) -> Any:
+    """A rule file's JSON, or LoadError naming the file."""
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as err:
+        raise LoadError([f"{path.name}: {err}"]) from err
 
 
 class Registry:
@@ -140,19 +156,45 @@ class Registry:
         else:
             self._add(rule, "python")
 
+    @classmethod
+    def from_file(cls, path: str | os.PathLike[str]) -> Registry:
+        """A Registry made for one rule file, with its rules loaded.
+
+        The file declares the dimensions its rules use in its "dimensions"
+        member, in the form describe() gives: [{"name": "resolution", "kind":
+        "axis", "unit": "km"}, {"name": "product", "kind": "labels"}]. Space and
+        time need no declaring. Raises LoadError as load() does.
+        """
+        path = Path(path)
+        data = _read(path)
+        declared = data.get("dimensions", []) if isinstance(data, Mapping) else []
+        try:
+            if not isinstance(declared, list):
+                raise ValueError("it is a list of dimensions")
+            dimensions = [dimension_from(d) for d in declared]
+            registry = cls(path.stem, dimensions=dimensions)
+        except (ValueError, TypeError) as err:
+            raise LoadError([f"{path.name}: dimensions: {err}"]) from err
+        try:
+            registry.load(path)
+        except LoadError as err:
+            if declared or not any("undeclared dimension" in p for p in err.problems):
+                raise
+            hint = f'{path.name}: declare the dimensions the rules use in the file\'s "dimensions" member'
+            raise LoadError([*err.problems, hint]) from None
+        return registry
+
     def load(self, path: str | os.PathLike[str]) -> list[str]:
         """Add the rules of one GeoJSON file, a FeatureCollection or a single Feature.
 
         Returns the codes loaded; their findings have the file name as source.
         Loading never runs code. Raises LoadError listing every problem with the
         file, the feature's position and its code, and then leaves the Registry
-        as it was.
+        as it was. A file that declares its dimensions must declare them as this
+        Registry does.
         """
         path = Path(path)
-        try:
-            data = json.loads(path.read_text(encoding="utf-8"))
-        except (OSError, ValueError) as err:
-            raise LoadError([f"{path.name}: {err}"]) from err
+        data = _read(path)
         if isinstance(data, Mapping) and data.get("type") == "Feature":
             data = {"type": "FeatureCollection", "features": [data]}
         return self._add_all(data, path.name, path.name)
@@ -167,8 +209,11 @@ class Registry:
             or collection.get("type") != "FeatureCollection"
         ):
             raise LoadError([f"{where}: not a GeoJSON FeatureCollection or Feature"])
+        problems = self._declared_problems(collection.get("dimensions"), where)
+        if problems:
+            raise LoadError(problems)
         saved = {k: copy.copy(v) for k, v in vars(self).items()}
-        codes, problems = [], []
+        codes = []
         try:
             for i, feature in enumerate(features):
                 props = (
@@ -189,6 +234,35 @@ class Registry:
             vars(self).update(saved)
             raise
         return codes
+
+    def _declared_problems(self, declared: Any, where: str) -> list[str]:
+        """How a collection's "dimensions" member disagrees with this Registry."""
+        if declared is None:
+            return []
+        if not isinstance(declared, list):
+            return [f"{where}: dimensions: it is a list of dimensions"]
+        mine = {
+            name: describe_dimension(d)
+            for name, d in list(self._dimensions.items())[2:]
+        }
+        problems = []
+        for item in declared:
+            try:
+                theirs = describe_dimension(dimension_from(item))
+            except (ValueError, TypeError) as err:
+                problems.append(f"{where}: dimensions: {err}")
+                continue
+            ours = mine.get(theirs["name"])
+            plain = {k: v for k, v in theirs.items() if k != "description"}
+            if ours is None:
+                problems.append(
+                    f"{where}: dimension {theirs['name']!r} is not declared on registry {self.name!r}"
+                )
+            elif plain != {k: v for k, v in ours.items() if k != "description"}:
+                problems.append(
+                    f"{where}: the file declares {plain}, registry {self.name!r} has {ours}"
+                )
+        return problems
 
     def _add(self, rule: Any, source: str) -> None:
         """Registry.add; source names a record's file ("python" from Python)."""
@@ -246,6 +320,47 @@ class Registry:
             return func
 
         return register
+
+    # ---- describing --------------------------------------------------------------
+    def values(self, name: str) -> list[Any]:
+        """Every distinct value the rules give on one declared dimension, as they
+        give it and in the order the rules were added. A list means any of its
+        items, so a list is split into its items: ["glorys", "era5*"] gives
+        "glorys" and "era5*"."""
+        self._dimension(name)  # an undeclared name raises UnknownNameError
+        found: list[Any] = []
+        for entry in self._active():
+            given = entry.rule.scope.dimensions.get(name)
+            if given is None:
+                continue
+            items = given if isinstance(given, (list, tuple)) else [given]
+            found += [item for item in items if item not in found]
+        return found
+
+    def describe(self) -> dict[str, Any]:
+        """What this Registry can answer, as a JSON-ready dict: its declared
+        dimensions in the form of a rule file's "dimensions" member, the values its
+        rules give on each (values()), and each rule's code, title and level.
+        Space and time are always there and are not listed."""
+        declared = list(self._dimensions.items())[2:]
+        rules = []
+        for entry in self._active():
+            rule = entry.rule
+            outcome = rule if isinstance(rule, Outcome) else rule.outcome
+            rules.append(
+                {
+                    "code": rule.code,
+                    "title": outcome.title,
+                    "level": logging.getLevelName(outcome.level).lower(),
+                    "computed": entry.form != "record",
+                }
+            )
+        return {
+            "name": self.name,
+            "dimensions": [describe_dimension(d) for _, d in declared],
+            "values": {name: _jsonable(self.values(name)) for name, _ in declared},
+            "rules": rules,
+        }
 
     # ---- names --------------------------------------------------------------------
     def _dimension(self, name: str) -> Any:

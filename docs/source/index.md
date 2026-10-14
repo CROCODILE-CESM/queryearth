@@ -55,6 +55,8 @@ for f in registry.query(
 
 This prints DEMO001 first, at WARNING, because findings come highest [level](concepts.md#rules-and-their-scope) first. DEMO001 covers 58% of the box's area and 67% of its period. Then it prints DEMO101, at INFO, which applies to the whole query at 8 km.
 
+Language models and other programs: <a href="llms.txt">llms.txt</a> describes rule files and the API on one page.
+
 ```{toctree}
 :maxdepth: 2
 

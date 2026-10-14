@@ -26,5 +26,6 @@ autodoc_typehints = "signature"
 
 html_theme = "sphinx_rtd_theme"
 html_static_path = ["_static"]
+html_extra_path = ["llms.txt"]  # served as is, next to index.html, for language models
 html_js_files = ["versions.js"]  # the version menu; see .github/docs_versions.py
 html_title = f"queryearth {version}"
