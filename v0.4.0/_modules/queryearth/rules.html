@@ -1,0 +1,662 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>queryearth.rules &mdash; queryearth 0.4.0</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=6c02275b"></script>
+      <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script src="../../_static/versions.js?v=58ec1786"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            queryearth
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../concepts.html">Concepts</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../rules.html">Writing rules</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../results.html">Using findings</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../extending.html">Extending queryearth</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../example.html">The toy example</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api.html">API reference</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">queryearth</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">queryearth.rules</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for queryearth.rules</h1><div class="highlight"><pre>
+<span></span><span class="sd">"""Rules: static records, computed rules, and the reference scope matching.</span>
+
+<span class="sd">Every rule kind implements RuleKind: a code, a scope and evaluate(query).</span>
+<span class="sd">Rule.evaluate and ComputedRule.evaluate are the reference semantics of</span>
+<span class="sd">design.md section 4.3. Registry.query calls evaluate() on every active rule,</span>
+<span class="sd">after any plugin prefilters.</span>
+<span class="sd">"""</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">dataclasses</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">inspect</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">re</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">collections.abc</span><span class="w"> </span><span class="kn">import</span> <span class="n">Callable</span><span class="p">,</span> <span class="n">Iterable</span><span class="p">,</span> <span class="n">Mapping</span><span class="p">,</span> <span class="n">Sequence</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">dataclasses</span><span class="w"> </span><span class="kn">import</span> <span class="n">dataclass</span><span class="p">,</span> <span class="n">field</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">functools</span><span class="w"> </span><span class="kn">import</span> <span class="n">cached_property</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">TYPE_CHECKING</span><span class="p">,</span> <span class="n">Any</span><span class="p">,</span> <span class="n">ClassVar</span><span class="p">,</span> <span class="n">Protocol</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">shapely</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">queryearth</span><span class="w"> </span><span class="kn">import</span> <span class="n">space</span> <span class="k">as</span> <span class="n">sp</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">queryearth.dimensions</span><span class="w"> </span><span class="kn">import</span> <span class="n">DimMatch</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">queryearth.objects</span><span class="w"> </span><span class="kn">import</span> <span class="n">Finding</span><span class="p">,</span> <span class="n">Match</span><span class="p">,</span> <span class="n">Outcome</span><span class="p">,</span> <span class="n">Query</span><span class="p">,</span> <span class="n">Scope</span><span class="p">,</span> <span class="n">_jsonable</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">queryearth.space</span><span class="w"> </span><span class="kn">import</span> <span class="n">Space</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">queryearth.time</span><span class="w"> </span><span class="kn">import</span> <span class="n">Interval</span><span class="p">,</span> <span class="n">TimeSpec</span><span class="p">,</span> <span class="n">overlap</span><span class="p">,</span> <span class="n">parse_time</span><span class="p">,</span> <span class="n">time_fraction</span>
+
+<span class="k">if</span> <span class="n">TYPE_CHECKING</span><span class="p">:</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">queryearth.registry</span><span class="w"> </span><span class="kn">import</span> <span class="n">Registry</span>
+
+<span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span><span class="s2">"CheckResult"</span><span class="p">,</span> <span class="s2">"ComputedRule"</span><span class="p">,</span> <span class="s2">"Rule"</span><span class="p">,</span> <span class="s2">"RuleFunc"</span><span class="p">,</span> <span class="s2">"RuleKind"</span><span class="p">]</span>
+
+<span class="n">CheckResult</span> <span class="o">=</span> <span class="nb">bool</span> <span class="o">|</span> <span class="n">Mapping</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="n">Iterable</span><span class="p">[</span><span class="n">Mapping</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">|</span> <span class="kc">None</span>
+<span class="n">RuleFunc</span> <span class="o">=</span> <span class="n">Callable</span><span class="p">[[</span><span class="n">Query</span><span class="p">,</span> <span class="n">Match</span><span class="p">],</span> <span class="n">CheckResult</span><span class="p">]</span>
+
+<span class="c1"># A prefix plus three or four digits, with a hyphen after a prefix that ends in</span>
+<span class="c1"># a digit, so every code parses one way (Q8). The prefix is the rule's group.</span>
+<span class="n">CODE</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span>
+    <span class="sa">r</span><span class="s2">"(?:([A-Z][A-Z0-9]{0,10}[A-Z])-?|([A-Z][A-Z0-9]{0,10}[0-9])-)([0-9]{3,4})"</span>
+<span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">check_code</span><span class="p">(</span><span class="n">code</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Raise ValueError unless code is a valid rule code."""</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">code</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">CODE</span><span class="o">.</span><span class="n">fullmatch</span><span class="p">(</span><span class="n">code</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">code</span><span class="si">!r}</span><span class="s2"> is not a rule code: capitals and digits plus three or four "</span>
+            <span class="s2">"digits, such as CRU001, with a hyphen after a prefix that ends in a "</span>
+            <span class="s2">"digit (ERA5-014)"</span>
+        <span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">split_code</span><span class="p">(</span><span class="n">code</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">"""A valid code's prefix, which is its group, and its number: ("ERA5", 14)</span>
+<span class="sd">    for ERA5-014."""</span>
+    <span class="n">check_code</span><span class="p">(</span><span class="n">code</span><span class="p">)</span>
+    <span class="n">found</span> <span class="o">=</span> <span class="n">CODE</span><span class="o">.</span><span class="n">fullmatch</span><span class="p">(</span><span class="n">code</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">found</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="ow">or</span> <span class="n">found</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span> <span class="nb">int</span><span class="p">(</span><span class="n">found</span><span class="p">[</span><span class="mi">3</span><span class="p">])</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">make_code</span><span class="p">(</span><span class="n">prefix</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">number</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""The code with this prefix and number, such as CRU001 or ERA5-014."""</span>
+    <span class="n">check_prefix</span><span class="p">(</span><span class="n">prefix</span><span class="p">)</span>
+    <span class="k">if</span> <span class="p">(</span>
+        <span class="nb">isinstance</span><span class="p">(</span><span class="n">number</span><span class="p">,</span> <span class="nb">bool</span><span class="p">)</span>
+        <span class="ow">or</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">number</span><span class="p">,</span> <span class="nb">int</span><span class="p">)</span>
+        <span class="ow">or</span> <span class="ow">not</span> <span class="mi">0</span> <span class="o">&lt;=</span> <span class="n">number</span> <span class="o">&lt;=</span> <span class="mi">9999</span>
+    <span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"a code's number is 0 to 9999, not </span><span class="si">{</span><span class="n">number</span><span class="si">!r}</span><span class="s2">"</span><span class="p">)</span>
+    <span class="k">return</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">prefix</span><span class="si">}{</span><span class="s1">'-'</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="n">prefix</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">isdigit</span><span class="p">()</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="s1">''</span><span class="si">}{</span><span class="n">number</span><span class="si">:</span><span class="s2">03d</span><span class="si">}</span><span class="s2">"</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">check_prefix</span><span class="p">(</span><span class="n">prefix</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Raise ValueError unless prefix is a code's prefix, and so a group."""</span>
+    <span class="n">code</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">prefix</span><span class="si">}</span><span class="s2">-001"</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">prefix</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="k">else</span> <span class="kc">None</span>
+    <span class="n">found</span> <span class="o">=</span> <span class="n">CODE</span><span class="o">.</span><span class="n">fullmatch</span><span class="p">(</span><span class="n">code</span><span class="p">)</span> <span class="k">if</span> <span class="n">code</span> <span class="k">else</span> <span class="kc">None</span>
+    <span class="k">if</span> <span class="n">found</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="p">(</span><span class="n">found</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="ow">or</span> <span class="n">found</span><span class="p">[</span><span class="mi">2</span><span class="p">])</span> <span class="o">!=</span> <span class="n">prefix</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">prefix</span><span class="si">!r}</span><span class="s2"> is not a code prefix: two to twelve capitals and digits, "</span>
+            <span class="s2">"starting with a capital, such as CRU or ERA5"</span>
+        <span class="p">)</span>
+
+
+<div class="viewcode-block" id="RuleKind">
+<a class="viewcode-back" href="../../api.html#queryearth.RuleKind">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">RuleKind</span><span class="p">(</span><span class="n">Protocol</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Any rule: a code, a scope, and evaluate() on one query.</span>
+
+<span class="sd">    A third-party kind may also define outcomes(query, match) -&gt; CheckResult</span>
+<span class="sd">    and an outcome attribute (an Outcome) (Q5): the Registry then matches its scope</span>
+<span class="sd">    itself and calls outcomes() only for definite matches.</span>
+<span class="sd">    """</span>
+
+    <span class="n">code</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">scope</span><span class="p">:</span> <span class="n">Scope</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">evaluate</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">query</span><span class="p">:</span> <span class="n">Query</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Sequence</span><span class="p">[</span><span class="n">Finding</span><span class="p">]:</span> <span class="o">...</span></div>
+
+
+
+<span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">eq</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">CompiledScope</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""A scope with its names checked and its values parsed by their dimensions."""</span>
+
+    <span class="n">values</span><span class="p">:</span> <span class="n">Mapping</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span>  <span class="c1"># dimension name -&gt; parsed rule value, space and time too</span>
+    <span class="n">requires</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span> <span class="o">=</span> <span class="p">()</span>
+
+
+<span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">eq</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">Binding</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""What a rule needs from the Registry it was added to."""</span>
+
+    <span class="n">registry</span><span class="p">:</span> <span class="n">Registry</span>
+    <span class="n">scope</span><span class="p">:</span> <span class="n">CompiledScope</span>
+    <span class="n">source</span><span class="p">:</span> <span class="nb">str</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">binding_of</span><span class="p">(</span><span class="n">rule</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Binding</span><span class="p">:</span>
+    <span class="n">found</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">rule</span><span class="p">,</span> <span class="s2">"_qe_binding"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">found</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"rule </span><span class="si">{</span><span class="nb">getattr</span><span class="p">(</span><span class="n">rule</span><span class="p">,</span><span class="w"> </span><span class="s1">'code'</span><span class="p">,</span><span class="w"> </span><span class="n">rule</span><span class="p">)</span><span class="si">!r}</span><span class="s2"> is not on a Registry"</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">found</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">match_scope</span><span class="p">(</span>
+    <span class="n">registry</span><span class="p">:</span> <span class="n">Registry</span><span class="p">,</span>
+    <span class="n">scope</span><span class="p">:</span> <span class="n">CompiledScope</span><span class="p">,</span>
+    <span class="n">query</span><span class="p">:</span> <span class="n">Query</span><span class="p">,</span>
+    <span class="n">parsed</span><span class="p">:</span> <span class="n">Mapping</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Match</span><span class="p">,</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Match one scope against one query, dimension by dimension (section 4.3).</span>
+
+<span class="sd">    Returns None when some dimension fails; otherwise the Match, whose</span>
+<span class="sd">    conditional_on names the undecided dimensions in the Registry's order (space,</span>
+<span class="sd">    time, the declared dimensions, then context keys), and details that hold</span>
+<span class="sd">    recurrence_months when time is undecided. Dimensions marked late run after</span>
+<span class="sd">    the others, so the costly spatial test runs last.</span>
+<span class="sd">    """</span>
+    <span class="k">if</span> <span class="n">parsed</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">parsed</span> <span class="o">=</span> <span class="n">registry</span><span class="o">.</span><span class="n">_parse_query</span><span class="p">(</span><span class="n">query</span><span class="p">)</span>
+    <span class="n">undecided</span><span class="p">:</span> <span class="nb">set</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+    <span class="n">found</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">DimMatch</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">for</span> <span class="n">late</span> <span class="ow">in</span> <span class="p">(</span><span class="kc">False</span><span class="p">,</span> <span class="kc">True</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">dimension</span> <span class="ow">in</span> <span class="n">registry</span><span class="o">.</span><span class="n">_dimensions</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="k">if</span> <span class="n">dimension</span><span class="o">.</span><span class="n">late</span> <span class="o">!=</span> <span class="n">late</span><span class="p">:</span>
+                <span class="k">continue</span>
+            <span class="n">rule</span><span class="p">,</span> <span class="n">value</span> <span class="o">=</span> <span class="n">scope</span><span class="o">.</span><span class="n">values</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">name</span><span class="p">),</span> <span class="n">parsed</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">name</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">rule</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">and</span> <span class="p">(</span><span class="n">value</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">dimension</span><span class="o">.</span><span class="n">always</span><span class="p">):</span>
+                <span class="k">continue</span>  <span class="c1"># unconstrained, and nothing to measure</span>
+            <span class="k">if</span> <span class="n">value</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">dimension</span><span class="o">.</span><span class="n">comparable</span><span class="p">(</span><span class="n">rule</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+                <span class="n">undecided</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">name</span><span class="p">)</span>
+                <span class="k">continue</span>
+            <span class="n">found</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="n">dimension</span><span class="o">.</span><span class="n">match</span><span class="p">(</span><span class="n">rule</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">found</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="k">return</span> <span class="kc">None</span>
+    <span class="n">hits</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">DimMatch</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">dimension</span> <span class="ow">in</span> <span class="n">registry</span><span class="o">.</span><span class="n">_dimensions</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="k">if</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">found</span><span class="p">:</span>
+            <span class="n">hits</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="n">dataclasses</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="n">found</span><span class="p">[</span><span class="n">name</span><span class="p">],</span> <span class="n">to_json</span><span class="o">=</span><span class="n">dimension</span><span class="o">.</span><span class="n">to_json</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">undecided</span><span class="p">:</span>  <span class="c1"># the rule's own extent, if the dimension has one</span>
+            <span class="n">extent</span> <span class="o">=</span> <span class="n">dimension</span><span class="o">.</span><span class="n">extent</span><span class="p">(</span><span class="n">scope</span><span class="o">.</span><span class="n">values</span><span class="p">[</span><span class="n">name</span><span class="p">])</span>
+            <span class="k">if</span> <span class="n">extent</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">hits</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="n">DimMatch</span><span class="p">(</span><span class="n">extent</span><span class="p">)</span>
+    <span class="n">details</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">if</span> <span class="s2">"time"</span> <span class="ow">in</span> <span class="n">undecided</span> <span class="ow">and</span> <span class="n">scope</span><span class="o">.</span><span class="n">values</span><span class="p">[</span><span class="s2">"time"</span><span class="p">]</span><span class="o">.</span><span class="n">months</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">details</span><span class="p">[</span><span class="s2">"recurrence_months"</span><span class="p">]</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">scope</span><span class="o">.</span><span class="n">values</span><span class="p">[</span><span class="s2">"time"</span><span class="p">]</span><span class="o">.</span><span class="n">months</span><span class="p">)</span>
+    <span class="n">space</span><span class="p">,</span> <span class="n">time</span> <span class="o">=</span> <span class="n">hits</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">"space"</span><span class="p">,</span> <span class="kc">None</span><span class="p">),</span> <span class="n">hits</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">"time"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+    <span class="n">conditional</span> <span class="o">=</span> <span class="p">[</span><span class="n">name</span> <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">registry</span><span class="o">.</span><span class="n">_dimensions</span> <span class="k">if</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">undecided</span><span class="p">]</span>
+    <span class="n">conditional</span> <span class="o">+=</span> <span class="p">[</span><span class="sa">f</span><span class="s2">"context:</span><span class="si">{</span><span class="n">k</span><span class="si">}</span><span class="s2">"</span> <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">scope</span><span class="o">.</span><span class="n">requires</span> <span class="k">if</span> <span class="n">k</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">query</span><span class="o">.</span><span class="n">context</span><span class="p">]</span>
+    <span class="n">match</span> <span class="o">=</span> <span class="n">Match</span><span class="p">(</span>
+        <span class="n">area_fraction</span><span class="o">=</span><span class="kc">None</span> <span class="k">if</span> <span class="n">space</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">space</span><span class="o">.</span><span class="n">fraction</span><span class="p">,</span>
+        <span class="n">overlap_km2</span><span class="o">=</span><span class="kc">None</span> <span class="k">if</span> <span class="n">space</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">space</span><span class="o">.</span><span class="n">overlap</span><span class="p">,</span>
+        <span class="n">time_overlap</span><span class="o">=</span><span class="p">()</span> <span class="k">if</span> <span class="n">time</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">time</span><span class="o">.</span><span class="n">overlap</span><span class="p">,</span>
+        <span class="n">time_fraction</span><span class="o">=</span><span class="kc">None</span> <span class="k">if</span> <span class="n">time</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">time</span><span class="o">.</span><span class="n">fraction</span><span class="p">,</span>
+        <span class="n">dimensions</span><span class="o">=</span><span class="n">hits</span><span class="p">,</span>
+        <span class="n">conditional_on</span><span class="o">=</span><span class="nb">tuple</span><span class="p">(</span><span class="n">conditional</span><span class="p">),</span>
+    <span class="p">)</span>
+    <span class="k">return</span> <span class="n">match</span><span class="p">,</span> <span class="n">details</span>
+
+
+<span class="c1"># ---- findings ---------------------------------------------------------------------</span>
+<span class="n">_LOCKED</span> <span class="o">=</span> <span class="nb">frozenset</span><span class="p">({</span><span class="s2">"code"</span><span class="p">,</span> <span class="s2">"query_label"</span><span class="p">,</span> <span class="s2">"source"</span><span class="p">,</span> <span class="s2">"conditional_on"</span><span class="p">})</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_time_override</span><span class="p">(</span><span class="n">value</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">query</span><span class="p">:</span> <span class="n">TimeSpec</span> <span class="o">|</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""A time_overlap set by check(), and time_fraction recomputed from it."""</span>
+    <span class="n">parts</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">Interval</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">pair</span> <span class="ow">in</span> <span class="n">value</span><span class="p">:</span>
+        <span class="n">read</span> <span class="o">=</span> <span class="n">parse_time</span><span class="p">({</span><span class="s2">"interval"</span><span class="p">:</span> <span class="nb">list</span><span class="p">(</span><span class="n">pair</span><span class="p">)})</span>
+        <span class="n">parts</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">read</span><span class="o">.</span><span class="n">intervals</span> <span class="k">if</span> <span class="n">read</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="p">(</span><span class="n">Interval</span><span class="p">(</span><span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">),))</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">parts</span><span class="p">:</span>
+        <span class="k">return</span> <span class="p">(),</span> <span class="n">time_fraction</span><span class="p">(</span><span class="kc">None</span><span class="p">,</span> <span class="n">query</span><span class="p">)</span>
+    <span class="n">spec</span> <span class="o">=</span> <span class="n">TimeSpec</span><span class="p">(</span><span class="nb">tuple</span><span class="p">(</span><span class="n">parts</span><span class="p">))</span>
+    <span class="n">inside</span> <span class="o">=</span> <span class="kc">None</span> <span class="k">if</span> <span class="n">query</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">overlap</span><span class="p">(</span><span class="n">spec</span><span class="p">,</span> <span class="n">query</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">spec</span><span class="o">.</span><span class="n">to_wire</span><span class="p">(),</span> <span class="p">(</span><span class="kc">None</span> <span class="k">if</span> <span class="n">query</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">time_fraction</span><span class="p">(</span><span class="n">inside</span><span class="p">,</span> <span class="n">query</span><span class="p">))</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">make_findings</span><span class="p">(</span>
+    <span class="n">outcome</span><span class="p">:</span> <span class="n">Outcome</span><span class="p">,</span>
+    <span class="n">match</span><span class="p">:</span> <span class="n">Match</span><span class="p">,</span>
+    <span class="n">query</span><span class="p">:</span> <span class="n">Query</span><span class="p">,</span>
+    <span class="o">*</span><span class="p">,</span>
+    <span class="n">source</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">details</span><span class="p">:</span> <span class="n">Mapping</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">result</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+    <span class="n">level_given</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">Finding</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">"""Findings from an outcome and a match, applying check()-style results.</span>
+
+<span class="sd">    When the rule declared no level, each finding takes the default for its own</span>
+<span class="sd">    changes, so changes returned by check() make it INFO.</span>
+<span class="sd">    """</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">result</span><span class="p">,</span> <span class="p">(</span><span class="nb">bool</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">bool_</span><span class="p">))</span> <span class="ow">or</span> <span class="n">result</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">overrides</span> <span class="o">=</span> <span class="p">[{}]</span> <span class="k">if</span> <span class="n">result</span> <span class="k">else</span> <span class="p">[]</span>
+    <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">result</span><span class="p">,</span> <span class="n">Mapping</span><span class="p">):</span>
+        <span class="n">overrides</span> <span class="o">=</span> <span class="p">[</span><span class="n">result</span><span class="p">]</span>
+    <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">result</span><span class="p">,</span> <span class="n">Iterable</span><span class="p">)</span> <span class="ow">and</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">result</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+        <span class="n">overrides</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">result</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">outcome</span><span class="o">.</span><span class="n">code</span><span class="si">}</span><span class="s2">: check() returned </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">result</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+    <span class="n">base</span> <span class="o">=</span> <span class="p">{</span><span class="n">f</span><span class="o">.</span><span class="n">name</span><span class="p">:</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">outcome</span><span class="p">,</span> <span class="n">f</span><span class="o">.</span><span class="n">name</span><span class="p">)</span> <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">dataclasses</span><span class="o">.</span><span class="n">fields</span><span class="p">(</span><span class="n">Outcome</span><span class="p">)}</span>
+    <span class="n">base</span><span class="o">.</span><span class="n">update</span><span class="p">((</span><span class="n">f</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">match</span><span class="p">,</span> <span class="n">f</span><span class="o">.</span><span class="n">name</span><span class="p">))</span> <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">dataclasses</span><span class="o">.</span><span class="n">fields</span><span class="p">(</span><span class="n">Match</span><span class="p">))</span>
+    <span class="n">base</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">details</span><span class="o">=</span><span class="n">details</span> <span class="ow">or</span> <span class="p">{},</span> <span class="n">source</span><span class="o">=</span><span class="n">source</span><span class="p">,</span> <span class="n">query_label</span><span class="o">=</span><span class="n">query</span><span class="o">.</span><span class="n">label</span><span class="p">)</span>
+    <span class="n">found</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">override</span> <span class="ow">in</span> <span class="n">overrides</span><span class="p">:</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">override</span><span class="p">,</span> <span class="n">Mapping</span><span class="p">)</span> <span class="ow">or</span> <span class="nb">set</span><span class="p">(</span><span class="n">override</span><span class="p">)</span> <span class="o">&amp;</span> <span class="n">_LOCKED</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">outcome</span><span class="o">.</span><span class="n">code</span><span class="si">}</span><span class="s2">: check() returns mappings of Finding fields, "</span>
+                <span class="sa">f</span><span class="s2">"other than </span><span class="si">{</span><span class="nb">sorted</span><span class="p">(</span><span class="n">_LOCKED</span><span class="p">)</span><span class="si">}</span><span class="s2">"</span>
+            <span class="p">)</span>
+        <span class="n">fields</span> <span class="o">=</span> <span class="p">{</span><span class="o">**</span><span class="n">base</span><span class="p">,</span> <span class="o">**</span><span class="n">override</span><span class="p">}</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">level_given</span> <span class="ow">and</span> <span class="s2">"level"</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">override</span><span class="p">:</span>
+            <span class="n">fields</span><span class="p">[</span><span class="s2">"level"</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>  <span class="c1"># the default for this finding's changes</span>
+        <span class="k">if</span> <span class="s2">"time_overlap"</span> <span class="ow">in</span> <span class="n">override</span><span class="p">:</span>
+            <span class="n">fields</span><span class="p">[</span><span class="s2">"time_overlap"</span><span class="p">],</span> <span class="n">fields</span><span class="p">[</span><span class="s2">"time_fraction"</span><span class="p">]</span> <span class="o">=</span> <span class="n">_time_override</span><span class="p">(</span>
+                <span class="n">override</span><span class="p">[</span><span class="s2">"time_overlap"</span><span class="p">],</span> <span class="n">query</span><span class="o">.</span><span class="n">time</span>
+            <span class="p">)</span>
+        <span class="n">found</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">Finding</span><span class="p">(</span><span class="o">**</span><span class="n">fields</span><span class="p">))</span>
+    <span class="k">return</span> <span class="n">found</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">computed_findings</span><span class="p">(</span>
+    <span class="n">outcome</span><span class="p">:</span> <span class="n">Outcome</span><span class="p">,</span>
+    <span class="n">match</span><span class="p">:</span> <span class="n">Match</span><span class="p">,</span>
+    <span class="n">query</span><span class="p">:</span> <span class="n">Query</span><span class="p">,</span>
+    <span class="n">details</span><span class="p">:</span> <span class="n">Mapping</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span>
+    <span class="n">check</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="n">Query</span><span class="p">,</span> <span class="n">Match</span><span class="p">],</span> <span class="n">Any</span><span class="p">],</span>
+    <span class="n">level_given</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">Finding</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">"""A computed rule's findings: check() runs only for a definite match."""</span>
+    <span class="n">kwargs</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"source"</span><span class="p">:</span> <span class="s2">"computed"</span><span class="p">,</span> <span class="s2">"level_given"</span><span class="p">:</span> <span class="n">level_given</span><span class="p">}</span>
+    <span class="k">if</span> <span class="n">match</span><span class="o">.</span><span class="n">conditional_on</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">make_findings</span><span class="p">(</span><span class="n">outcome</span><span class="p">,</span> <span class="n">match</span><span class="p">,</span> <span class="n">query</span><span class="p">,</span> <span class="n">details</span><span class="o">=</span><span class="n">details</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">make_findings</span><span class="p">(</span><span class="n">outcome</span><span class="p">,</span> <span class="n">match</span><span class="p">,</span> <span class="n">query</span><span class="p">,</span> <span class="n">result</span><span class="o">=</span><span class="n">check</span><span class="p">(</span><span class="n">query</span><span class="p">,</span> <span class="n">match</span><span class="p">),</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+
+
+<span class="c1"># ---- static records ---------------------------------------------------------------</span>
+<span class="n">_CRS84</span> <span class="o">=</span> <span class="s2">"http://www.opengis.net/def/crs/OGC/0/CRS84"</span>
+<span class="n">_FEATURE_KEYS</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span>
+    <span class="s2">"type id geometry time place bbox properties featureType coordRefSys conformsTo"</span><span class="o">.</span><span class="n">split</span><span class="p">()</span>
+<span class="p">)</span>
+<span class="n">_RULE_KEYS</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">f</span><span class="o">.</span><span class="n">name</span> <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">dataclasses</span><span class="o">.</span><span class="n">fields</span><span class="p">(</span><span class="n">Outcome</span><span class="p">))</span> <span class="o">+</span> <span class="nb">tuple</span><span class="p">(</span>
+    <span class="s2">"created updated withdrawn supersedes aliases"</span><span class="o">.</span><span class="n">split</span><span class="p">()</span>
+<span class="p">)</span>
+<span class="n">_RECORD_KEYS</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">_RULE_KEYS</span><span class="p">)</span> <span class="o">|</span> <span class="nb">set</span><span class="p">(</span>
+    <span class="s2">"dimensions box edge periods recurrence time_start time_end"</span><span class="o">.</span><span class="n">split</span><span class="p">()</span>
+<span class="p">)</span>
+<span class="n">_EXTENSION</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="sa">r</span><span class="s2">"x_[a-z0-9_]+"</span><span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">box_of</span><span class="p">(</span><span class="n">box</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Space</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""The box() of a record's {west, width, south, north}."""</span>
+    <span class="k">if</span> <span class="p">(</span>
+        <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">box</span><span class="p">,</span> <span class="n">Mapping</span><span class="p">)</span>
+        <span class="ow">or</span> <span class="nb">set</span><span class="p">(</span><span class="n">box</span><span class="p">)</span> <span class="o">!=</span> <span class="p">{</span><span class="s2">"west"</span><span class="p">,</span> <span class="s2">"width"</span><span class="p">,</span> <span class="s2">"south"</span><span class="p">,</span> <span class="s2">"north"</span><span class="p">}</span>
+        <span class="ow">or</span> <span class="ow">not</span> <span class="nb">all</span><span class="p">(</span><span class="nb">type</span><span class="p">(</span><span class="n">v</span><span class="p">)</span> <span class="ow">in</span> <span class="p">(</span><span class="nb">int</span><span class="p">,</span> <span class="nb">float</span><span class="p">)</span> <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">box</span><span class="o">.</span><span class="n">values</span><span class="p">())</span>
+        <span class="ow">or</span> <span class="ow">not</span> <span class="o">-</span><span class="mf">180.0</span> <span class="o">&lt;=</span> <span class="n">box</span><span class="p">[</span><span class="s2">"west"</span><span class="p">]</span> <span class="o">&lt;</span> <span class="mf">180.0</span>
+        <span class="ow">or</span> <span class="ow">not</span> <span class="mf">0.0</span> <span class="o">&lt;</span> <span class="n">box</span><span class="p">[</span><span class="s2">"width"</span><span class="p">]</span> <span class="o">&lt;=</span> <span class="mf">360.0</span>
+    <span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"a box is </span><span class="se">{{</span><span class="s2">west, width, south, north</span><span class="se">}}</span><span class="s2">, not </span><span class="si">{</span><span class="n">box</span><span class="si">!r}</span><span class="s2">"</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">sp</span><span class="o">.</span><span class="n">box</span><span class="p">(</span><span class="n">box</span><span class="p">[</span><span class="s2">"west"</span><span class="p">],</span> <span class="n">box</span><span class="p">[</span><span class="s2">"south"</span><span class="p">],</span> <span class="n">box</span><span class="p">[</span><span class="s2">"west"</span><span class="p">]</span> <span class="o">+</span> <span class="n">box</span><span class="p">[</span><span class="s2">"width"</span><span class="p">],</span> <span class="n">box</span><span class="p">[</span><span class="s2">"north"</span><span class="p">])</span>
+
+
+<div class="viewcode-block" id="Rule">
+<a class="viewcode-back" href="../../api.html#queryearth.Rule">[docs]</a>
+<span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">kw_only</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">Rule</span><span class="p">(</span><span class="n">Outcome</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""A static record: one GeoJSON Feature (Rule.from_feature) or built in Python.</span>
+
+<span class="sd">    Registry.add checks its names; evaluate() then runs against that Registry</span>
+<span class="sd">    (a rule added to a second Registry is added as a copy). to_feature() writes</span>
+<span class="sd">    it back as a record.</span>
+<span class="sd">    """</span>
+
+    <span class="n">scope</span><span class="p">:</span> <span class="n">Scope</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="n">Scope</span><span class="p">)</span>
+    <span class="n">created</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>  <span class="c1"># record lifecycle time, not data time</span>
+    <span class="n">updated</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">withdrawn</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>  <span class="c1"># kept for history, never matched</span>
+    <span class="n">supersedes</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span> <span class="o">=</span> <span class="p">()</span>
+    <span class="n">aliases</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span> <span class="o">=</span> <span class="p">()</span>
+    <span class="n">extensions</span><span class="p">:</span> <span class="n">Mapping</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">dict</span><span class="p">)</span>  <span class="c1"># x_* properties</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">__post_init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">Outcome</span><span class="o">.</span><span class="n">__post_init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">scope</span><span class="p">,</span> <span class="n">Scope</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">code</span><span class="si">}</span><span class="s2">: scope is a Scope"</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"supersedes"</span><span class="p">,</span> <span class="s2">"aliases"</span><span class="p">):</span>
+            <span class="n">value</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">)</span>
+            <span class="nb">object</span><span class="o">.</span><span class="fm">__setattr__</span><span class="p">(</span>
+                <span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="p">(</span><span class="n">value</span><span class="p">,)</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="k">else</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+            <span class="p">)</span>
+        <span class="nb">object</span><span class="o">.</span><span class="fm">__setattr__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">"extensions"</span><span class="p">,</span> <span class="nb">dict</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">extensions</span><span class="p">))</span>
+
+<div class="viewcode-block" id="Rule.from_feature">
+<a class="viewcode-back" href="../../api.html#queryearth.Rule.from_feature">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">from_feature</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">feature</span><span class="p">:</span> <span class="n">Mapping</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Rule</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Read one GeoJSON record (section 5); errors name the record's code.</span>
+
+<span class="sd">        Registry.add then checks its names, and each dimension its values.</span>
+<span class="sd">        """</span>
+        <span class="n">props</span> <span class="o">=</span> <span class="n">feature</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"properties"</span><span class="p">)</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">feature</span><span class="p">,</span> <span class="n">Mapping</span><span class="p">)</span> <span class="k">else</span> <span class="kc">None</span>
+        <span class="n">code</span> <span class="o">=</span> <span class="n">props</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"code"</span><span class="p">)</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">props</span><span class="p">,</span> <span class="n">Mapping</span><span class="p">)</span> <span class="k">else</span> <span class="kc">None</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">cls</span><span class="o">.</span><span class="n">_read</span><span class="p">(</span><span class="n">feature</span><span class="p">,</span> <span class="n">props</span><span class="p">)</span>
+        <span class="k">except</span> <span class="p">(</span><span class="ne">ValueError</span><span class="p">,</span> <span class="ne">TypeError</span><span class="p">,</span> <span class="ne">KeyError</span><span class="p">)</span> <span class="k">as</span> <span class="n">err</span><span class="p">:</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">code</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">or</span> <span class="nb">str</span><span class="p">(</span><span class="n">err</span><span class="p">)</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">code</span><span class="si">}</span><span class="s2">:"</span><span class="p">):</span>
+                <span class="k">raise</span>
+            <span class="k">raise</span> <span class="nb">type</span><span class="p">(</span><span class="n">err</span><span class="p">)(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">code</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">err</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="nn">err</span></div>
+
+
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_read</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">feature</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">props</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Rule</span><span class="p">:</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">feature</span><span class="p">,</span> <span class="n">Mapping</span><span class="p">)</span> <span class="ow">or</span> <span class="n">feature</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"type"</span><span class="p">)</span> <span class="o">!=</span> <span class="s2">"Feature"</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"a record is a GeoJSON Feature"</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">props</span><span class="p">,</span> <span class="n">Mapping</span><span class="p">)</span> <span class="ow">or</span> <span class="s2">"geometry"</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">feature</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"a record has properties and a geometry (null for none)"</span><span class="p">)</span>
+        <span class="n">unknown</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="n">feature</span><span class="p">)</span> <span class="o">-</span> <span class="n">_FEATURE_KEYS</span><span class="p">)</span> <span class="o">+</span> <span class="nb">sorted</span><span class="p">(</span>
+            <span class="n">k</span> <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">props</span> <span class="k">if</span> <span class="n">k</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">_RECORD_KEYS</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">_EXTENSION</span><span class="o">.</span><span class="n">fullmatch</span><span class="p">(</span><span class="n">k</span><span class="p">)</span>
+        <span class="p">)</span>
+        <span class="n">missing</span> <span class="o">=</span> <span class="p">[</span><span class="n">k</span> <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"code"</span><span class="p">,</span> <span class="s2">"title"</span><span class="p">,</span> <span class="s2">"message"</span><span class="p">)</span> <span class="k">if</span> <span class="n">k</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">props</span><span class="p">]</span>
+        <span class="k">if</span> <span class="n">unknown</span> <span class="ow">or</span> <span class="n">missing</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">"unknown members </span><span class="si">{</span><span class="n">unknown</span><span class="si">}</span><span class="s2">"</span> <span class="k">if</span> <span class="n">unknown</span> <span class="k">else</span> <span class="sa">f</span><span class="s2">"missing </span><span class="si">{</span><span class="n">missing</span><span class="si">}</span><span class="s2">"</span>
+            <span class="p">)</span>
+        <span class="k">if</span> <span class="p">(</span>
+            <span class="n">feature</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"place"</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+            <span class="ow">or</span> <span class="n">feature</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"coordRefSys"</span><span class="p">,</span> <span class="n">_CRS84</span><span class="p">)</span> <span class="o">!=</span> <span class="n">_CRS84</span>
+        <span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"place must be null, and coordRefSys </span><span class="si">{</span><span class="n">_CRS84</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">code</span> <span class="ow">in</span> <span class="p">(</span><span class="n">props</span><span class="p">[</span><span class="s2">"code"</span><span class="p">],</span> <span class="o">*</span><span class="n">props</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"supersedes"</span><span class="p">,</span> <span class="p">())):</span>
+            <span class="n">check_code</span><span class="p">(</span><span class="n">code</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">props</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"level"</span><span class="p">,</span> <span class="s2">"info"</span><span class="p">)</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"info"</span><span class="p">,</span> <span class="s2">"warning"</span><span class="p">,</span> <span class="s2">"error"</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"level is info, warning or error, not </span><span class="si">{</span><span class="n">props</span><span class="p">[</span><span class="s1">'level'</span><span class="p">]</span><span class="si">!r}</span><span class="s2">"</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">props</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"status"</span><span class="p">)</span> <span class="o">==</span> <span class="s2">"reviewed"</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">props</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"references"</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"a reviewed record cites at least one reference (Q54)"</span><span class="p">)</span>
+        <span class="n">box</span><span class="p">,</span> <span class="n">geometry</span> <span class="o">=</span> <span class="n">props</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"box"</span><span class="p">),</span> <span class="n">feature</span><span class="p">[</span><span class="s2">"geometry"</span><span class="p">]</span>
+        <span class="k">if</span> <span class="n">box</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">geometry</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"a record with a box has a null geometry"</span><span class="p">)</span>
+        <span class="n">space</span> <span class="o">=</span> <span class="kc">None</span> <span class="k">if</span> <span class="n">geometry</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">sp</span><span class="o">.</span><span class="n">polygon</span><span class="p">(</span><span class="n">geometry</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">box</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">space</span> <span class="o">=</span> <span class="n">box_of</span><span class="p">(</span><span class="n">box</span><span class="p">)</span>
+        <span class="n">time</span> <span class="o">=</span> <span class="n">parse_time</span><span class="p">(</span><span class="n">feature</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"time"</span><span class="p">),</span> <span class="o">**</span><span class="n">props</span><span class="p">)</span>
+        <span class="n">edge</span> <span class="o">=</span> <span class="n">props</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"edge"</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">edge</span><span class="p">,</span> <span class="nb">bool</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"edge is true or false, not </span><span class="si">{</span><span class="n">edge</span><span class="si">!r}</span><span class="s2">"</span><span class="p">)</span>
+        <span class="n">scope</span> <span class="o">=</span> <span class="n">Scope</span><span class="p">(</span><span class="n">space</span><span class="p">,</span> <span class="n">time</span><span class="p">,</span> <span class="n">props</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"dimensions"</span><span class="p">,</span> <span class="p">{}),</span> <span class="n">edge</span><span class="p">)</span>
+        <span class="n">fields</span> <span class="o">=</span> <span class="p">{</span><span class="n">k</span><span class="p">:</span> <span class="n">props</span><span class="p">[</span><span class="n">k</span><span class="p">]</span> <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">_RULE_KEYS</span> <span class="k">if</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">props</span><span class="p">}</span>
+        <span class="n">extensions</span> <span class="o">=</span> <span class="p">{</span><span class="n">k</span><span class="p">:</span> <span class="n">v</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">props</span><span class="o">.</span><span class="n">items</span><span class="p">()</span> <span class="k">if</span> <span class="n">k</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">"x_"</span><span class="p">)}</span>
+        <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span><span class="o">**</span><span class="n">fields</span><span class="p">,</span> <span class="n">scope</span><span class="o">=</span><span class="n">scope</span><span class="p">,</span> <span class="n">extensions</span><span class="o">=</span><span class="n">extensions</span><span class="p">)</span>
+
+<div class="viewcode-block" id="Rule.to_feature">
+<a class="viewcode-back" href="../../api.html#queryearth.Rule.to_feature">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">to_feature</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">"""This rule as a GeoJSON record, the inverse of from_feature.</span>
+
+<span class="sd">        Fields at their defaults are left out, a box is written as its polygon,</span>
+<span class="sd">        and time goes in the JSON-FG time member with periods and recurrence.</span>
+<span class="sd">        """</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">scope</span><span class="o">.</span><span class="n">space</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">scope</span><span class="o">.</span><span class="n">space</span><span class="o">.</span><span class="n">kind</span> <span class="o">!=</span> <span class="s2">"polygon"</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">code</span><span class="si">}</span><span class="s2">: a record's space is a polygon, not a point"</span><span class="p">)</span>
+        <span class="n">level</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLevelName</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">level</span><span class="p">)</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">level</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"info"</span><span class="p">,</span> <span class="s2">"warning"</span><span class="p">,</span> <span class="s2">"error"</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">code</span><span class="si">}</span><span class="s2">: a record's level is info, warning or error"</span><span class="p">)</span>
+        <span class="n">props</span> <span class="o">=</span> <span class="p">{</span><span class="n">k</span><span class="p">:</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">k</span><span class="p">)</span> <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">_RULE_KEYS</span><span class="p">}</span>
+        <span class="n">default</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">INFO</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">changes</span> <span class="k">else</span> <span class="n">logging</span><span class="o">.</span><span class="n">WARNING</span>
+        <span class="n">props</span><span class="p">[</span><span class="s2">"level"</span><span class="p">]</span> <span class="o">=</span> <span class="n">level</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">level</span> <span class="o">!=</span> <span class="n">default</span> <span class="k">else</span> <span class="kc">None</span>
+        <span class="n">props</span><span class="p">[</span><span class="s2">"dimensions"</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">scope</span><span class="o">.</span><span class="n">dimensions</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">scope</span><span class="o">.</span><span class="n">edge</span><span class="p">:</span>
+            <span class="n">props</span><span class="p">[</span><span class="s2">"edge"</span><span class="p">]</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="n">defaults</span> <span class="o">=</span> <span class="p">{</span><span class="n">f</span><span class="o">.</span><span class="n">name</span><span class="p">:</span> <span class="n">f</span><span class="o">.</span><span class="n">default</span> <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">dataclasses</span><span class="o">.</span><span class="n">fields</span><span class="p">(</span><span class="n">Rule</span><span class="p">)}</span>
+        <span class="n">props</span> <span class="o">=</span> <span class="p">{</span><span class="n">k</span><span class="p">:</span> <span class="n">v</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">props</span><span class="o">.</span><span class="n">items</span><span class="p">()</span> <span class="k">if</span> <span class="n">v</span> <span class="o">!=</span> <span class="n">defaults</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">k</span><span class="p">,</span> <span class="p">{})}</span>
+        <span class="n">time</span><span class="p">,</span> <span class="n">geometry</span><span class="p">,</span> <span class="n">spec</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">scope</span><span class="o">.</span><span class="n">time</span>
+        <span class="k">if</span> <span class="n">spec</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">precision</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">iv</span><span class="o">.</span><span class="n">precision</span> <span class="k">for</span> <span class="n">iv</span> <span class="ow">in</span> <span class="n">spec</span><span class="o">.</span><span class="n">intervals</span><span class="p">)</span>
+            <span class="n">extent</span> <span class="o">=</span> <span class="n">Interval</span><span class="p">(</span><span class="o">*</span><span class="n">spec</span><span class="o">.</span><span class="n">extent</span><span class="p">,</span> <span class="n">precision</span><span class="p">)</span><span class="o">.</span><span class="n">to_wire</span><span class="p">()</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">spec</span><span class="o">.</span><span class="n">intervals</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+                <span class="n">props</span><span class="p">[</span><span class="s2">"periods"</span><span class="p">]</span> <span class="o">=</span> <span class="n">spec</span><span class="o">.</span><span class="n">to_wire</span><span class="p">()</span>
+            <span class="k">if</span> <span class="n">extent</span> <span class="o">!=</span> <span class="p">(</span><span class="s2">".."</span><span class="p">,</span> <span class="s2">".."</span><span class="p">)</span> <span class="ow">or</span> <span class="s2">"periods"</span> <span class="ow">in</span> <span class="n">props</span><span class="p">:</span>
+                <span class="n">time</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"interval"</span><span class="p">:</span> <span class="n">extent</span><span class="p">}</span>
+            <span class="k">if</span> <span class="n">spec</span><span class="o">.</span><span class="n">months</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">props</span><span class="p">[</span><span class="s2">"recurrence"</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"months"</span><span class="p">:</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">spec</span><span class="o">.</span><span class="n">months</span><span class="p">)}</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">scope</span><span class="o">.</span><span class="n">space</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="c1"># Split edges longer than 180 degrees, which a reader would take the</span>
+            <span class="c1"># short way round; normalising makes the output the same every time.</span>
+            <span class="n">shape</span> <span class="o">=</span> <span class="n">shapely</span><span class="o">.</span><span class="n">segmentize</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">scope</span><span class="o">.</span><span class="n">space</span><span class="o">.</span><span class="n">geometry</span><span class="p">,</span> <span class="mf">180.0</span><span class="p">)</span>
+            <span class="n">shape</span> <span class="o">=</span> <span class="n">shapely</span><span class="o">.</span><span class="n">orient_polygons</span><span class="p">(</span><span class="n">shapely</span><span class="o">.</span><span class="n">normalize</span><span class="p">(</span><span class="n">shape</span><span class="p">))</span>
+            <span class="n">geometry</span> <span class="o">=</span> <span class="n">shapely</span><span class="o">.</span><span class="n">geometry</span><span class="o">.</span><span class="n">mapping</span><span class="p">(</span><span class="n">shape</span><span class="p">)</span>
+        <span class="n">feature</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"type"</span><span class="p">:</span> <span class="s2">"Feature"</span><span class="p">,</span> <span class="s2">"id"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">code</span><span class="p">,</span> <span class="s2">"geometry"</span><span class="p">:</span> <span class="n">geometry</span><span class="p">}</span>
+        <span class="n">feature</span> <span class="o">|=</span> <span class="p">{</span><span class="s2">"time"</span><span class="p">:</span> <span class="n">time</span><span class="p">,</span> <span class="s2">"properties"</span><span class="p">:</span> <span class="n">props</span> <span class="o">|</span> <span class="nb">dict</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">extensions</span><span class="p">)}</span>
+        <span class="k">return</span> <span class="n">_jsonable</span><span class="p">(</span><span class="n">feature</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Rule.evaluate">
+<a class="viewcode-back" href="../../api.html#queryearth.Rule.evaluate">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">evaluate</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">query</span><span class="p">:</span> <span class="n">Query</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">Finding</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">"""Findings for one query (section 4.3)."""</span>
+        <span class="n">bound</span> <span class="o">=</span> <span class="n">binding_of</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
+        <span class="n">found</span> <span class="o">=</span> <span class="n">match_scope</span><span class="p">(</span><span class="n">bound</span><span class="o">.</span><span class="n">registry</span><span class="p">,</span> <span class="n">bound</span><span class="o">.</span><span class="n">scope</span><span class="p">,</span> <span class="n">query</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">found</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="p">[]</span>
+        <span class="n">match</span><span class="p">,</span> <span class="n">details</span> <span class="o">=</span> <span class="n">found</span>
+        <span class="k">return</span> <span class="n">make_findings</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">match</span><span class="p">,</span> <span class="n">query</span><span class="p">,</span> <span class="n">source</span><span class="o">=</span><span class="n">bound</span><span class="o">.</span><span class="n">source</span><span class="p">,</span> <span class="n">details</span><span class="o">=</span><span class="n">details</span><span class="p">)</span></div>
+</div>
+
+
+
+<span class="c1"># ---- computed rules ---------------------------------------------------------------</span>
+<span class="n">OUTCOME_KEYS</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">f</span><span class="o">.</span><span class="n">name</span> <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">dataclasses</span><span class="o">.</span><span class="n">fields</span><span class="p">(</span><span class="n">Outcome</span><span class="p">)</span> <span class="k">if</span> <span class="n">f</span><span class="o">.</span><span class="n">name</span> <span class="o">!=</span> <span class="s2">"code"</span><span class="p">)</span>
+<span class="n">META_KEYS</span> <span class="o">=</span> <span class="nb">frozenset</span><span class="p">(</span>
+    <span class="n">OUTCOME_KEYS</span>
+    <span class="o">+</span> <span class="p">(</span><span class="s2">"dimensions"</span><span class="p">,</span> <span class="s2">"space"</span><span class="p">,</span> <span class="s2">"time"</span><span class="p">,</span> <span class="s2">"edge"</span><span class="p">,</span> <span class="s2">"requires"</span><span class="p">)</span>
+    <span class="o">+</span> <span class="p">(</span><span class="s2">"supersedes"</span><span class="p">,</span> <span class="s2">"withdrawn"</span><span class="p">)</span>
+<span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">check_meta</span><span class="p">(</span><span class="n">meta</span><span class="p">:</span> <span class="n">Mapping</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span> <span class="n">owner</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+    <span class="n">unknown</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">meta</span><span class="p">)</span> <span class="o">-</span> <span class="n">META_KEYS</span>
+    <span class="k">if</span> <span class="n">unknown</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">owner</span><span class="si">}</span><span class="s2">: unknown keywords </span><span class="si">{</span><span class="nb">sorted</span><span class="p">(</span><span class="n">unknown</span><span class="p">)</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="ComputedRule">
+<a class="viewcode-back" href="../../api.html#queryearth.ComputedRule">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">ComputedRule</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""A rule computed from the query or from data the caller holds.</span>
+
+<span class="sd">    Class keywords give its identity and scope: code, registry (default</span>
+<span class="sd">    Registry.default()), abstract, the Outcome fields (title and message</span>
+<span class="sd">    default to the docstring), space (a Space), edge (as Scope's), time,</span>
+<span class="sd">    dimensions and requires (keys of Query.context).</span>
+<span class="sd">    Defining a subclass registers one instance; a subclass inherits its bases'</span>
+<span class="sd">    keywords, merged, with its own winning (Q9).</span>
+
+<span class="sd">    check(query, match) runs only for a definite match and returns True (one</span>
+<span class="sd">    finding with the declared outcome), False or None (none), a mapping of</span>
+<span class="sd">    Finding fields to override, such as {"changes": [...]}, or several such</span>
+<span class="sd">    mappings. Without a declared level, a finding's level is the default for</span>
+<span class="sd">    its changes, as for any rule: INFO when check() returns changes.</span>
+<span class="sd">    """</span>
+
+    <span class="n">code</span><span class="p">:</span> <span class="n">ClassVar</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span>
+    <span class="n">meta</span><span class="p">:</span> <span class="n">ClassVar</span><span class="p">[</span><span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span>
+    <span class="n">scope</span><span class="p">:</span> <span class="n">Scope</span>  <span class="c1"># set by Registry.add from meta, after checking the declared names</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">__init_subclass__</span><span class="p">(</span>
+        <span class="bp">cls</span><span class="p">,</span> <span class="n">code</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">""</span><span class="p">,</span> <span class="n">registry</span><span class="p">:</span> <span class="n">Registry</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="o">**</span><span class="n">meta</span><span class="p">:</span> <span class="n">Any</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">__init_subclass__</span><span class="p">()</span>
+        <span class="n">abstract</span> <span class="o">=</span> <span class="n">meta</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">"abstract"</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span>
+        <span class="bp">cls</span><span class="o">.</span><span class="n">_qe_meta</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span>
+            <span class="n">meta</span><span class="p">,</span> <span class="o">**</span><span class="p">({}</span> <span class="k">if</span> <span class="n">registry</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="p">{</span><span class="s2">"registry"</span><span class="p">:</span> <span class="n">registry</span><span class="p">})</span>
+        <span class="p">)</span>
+        <span class="k">if</span> <span class="n">abstract</span><span class="p">:</span>
+            <span class="k">return</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">code</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="bp">cls</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2"> needs the class keyword code=..."</span><span class="p">)</span>
+        <span class="n">merged</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">for</span> <span class="n">base</span> <span class="ow">in</span> <span class="nb">reversed</span><span class="p">(</span><span class="bp">cls</span><span class="o">.</span><span class="vm">__mro__</span><span class="p">):</span>
+            <span class="n">merged</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">base</span><span class="o">.</span><span class="vm">__dict__</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"_qe_meta"</span><span class="p">,</span> <span class="p">{}))</span>
+        <span class="n">target</span> <span class="o">=</span> <span class="n">merged</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">"registry"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+        <span class="n">check_meta</span><span class="p">(</span><span class="n">merged</span><span class="p">,</span> <span class="bp">cls</span><span class="o">.</span><span class="vm">__name__</span><span class="p">)</span>
+        <span class="bp">cls</span><span class="o">.</span><span class="n">code</span><span class="p">,</span> <span class="bp">cls</span><span class="o">.</span><span class="n">meta</span> <span class="o">=</span> <span class="n">code</span><span class="p">,</span> <span class="n">merged</span>
+        <span class="k">if</span> <span class="n">target</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="kn">from</span><span class="w"> </span><span class="nn">queryearth.registry</span><span class="w"> </span><span class="kn">import</span> <span class="n">Registry</span>
+
+            <span class="n">target</span> <span class="o">=</span> <span class="n">Registry</span><span class="o">.</span><span class="n">default</span><span class="p">()</span>
+        <span class="n">target</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="bp">cls</span><span class="p">())</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_doc</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="vm">__doc__</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_qualname</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="vm">__module__</span><span class="si">}</span><span class="s2">.</span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="vm">__qualname__</span><span class="si">}</span><span class="s2">"</span>
+
+    <span class="nd">@cached_property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">outcome</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Outcome</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""The declared outcome, before check() overrides it."""</span>
+        <span class="n">fields</span> <span class="o">=</span> <span class="p">{</span><span class="n">k</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="n">k</span><span class="p">]</span> <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">OUTCOME_KEYS</span> <span class="k">if</span> <span class="n">k</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">meta</span><span class="p">}</span>
+        <span class="n">lines</span> <span class="o">=</span> <span class="n">inspect</span><span class="o">.</span><span class="n">cleandoc</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_doc</span><span class="p">()</span> <span class="ow">or</span> <span class="s2">""</span><span class="p">)</span><span class="o">.</span><span class="n">splitlines</span><span class="p">()</span>
+        <span class="n">fields</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">"title"</span><span class="p">,</span> <span class="n">lines</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">if</span> <span class="n">lines</span> <span class="k">else</span> <span class="s2">""</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">fields</span><span class="p">[</span><span class="s2">"title"</span><span class="p">]:</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">code</span><span class="si">}</span><span class="s2">: give a title= keyword or a docstring"</span><span class="p">)</span>
+        <span class="n">fields</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">"message"</span><span class="p">,</span> <span class="s2">"</span><span class="se">\n</span><span class="s2">"</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">lines</span><span class="p">[</span><span class="mi">1</span><span class="p">:])</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span> <span class="ow">or</span> <span class="n">fields</span><span class="p">[</span><span class="s2">"title"</span><span class="p">])</span>
+        <span class="k">return</span> <span class="n">Outcome</span><span class="p">(</span><span class="n">code</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">code</span><span class="p">,</span> <span class="o">**</span><span class="n">fields</span><span class="p">)</span>
+
+<div class="viewcode-block" id="ComputedRule.evaluate">
+<a class="viewcode-back" href="../../api.html#queryearth.ComputedRule.evaluate">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">evaluate</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">query</span><span class="p">:</span> <span class="n">Query</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">Finding</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">"""Findings for one query: the scope, then check() if definite."""</span>
+        <span class="n">bound</span> <span class="o">=</span> <span class="n">binding_of</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
+        <span class="n">found</span> <span class="o">=</span> <span class="n">match_scope</span><span class="p">(</span><span class="n">bound</span><span class="o">.</span><span class="n">registry</span><span class="p">,</span> <span class="n">bound</span><span class="o">.</span><span class="n">scope</span><span class="p">,</span> <span class="n">query</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">found</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="p">[]</span>
+        <span class="n">match</span><span class="p">,</span> <span class="n">details</span> <span class="o">=</span> <span class="n">found</span>
+        <span class="n">given</span> <span class="o">=</span> <span class="s2">"level"</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">meta</span>
+        <span class="k">return</span> <span class="n">computed_findings</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">outcome</span><span class="p">,</span> <span class="n">match</span><span class="p">,</span> <span class="n">query</span><span class="p">,</span> <span class="n">details</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">check</span><span class="p">,</span> <span class="n">level_given</span><span class="o">=</span><span class="n">given</span>
+        <span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="ComputedRule.check">
+<a class="viewcode-back" href="../../api.html#queryearth.ComputedRule.check">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">check</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">query</span><span class="p">:</span> <span class="n">Query</span><span class="p">,</span> <span class="n">match</span><span class="p">:</span> <span class="n">Match</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">CheckResult</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Override to compute the rule; the default gives one finding."""</span>
+        <span class="k">return</span> <span class="kc">True</span></div>
+
+
+<div class="viewcode-block" id="ComputedRule.mask">
+<a class="viewcode-back" href="../../api.html#queryearth.ComputedRule.mask">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">mask</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">lon</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">lat</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">query</span><span class="p">:</span> <span class="n">Query</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""A per-point mask for the bulk path; None means the rule has none."""</span>
+        <span class="k">return</span> <span class="kc">None</span></div>
+
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">"&lt;</span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="w"> </span><span class="s1">'code'</span><span class="p">,</span><span class="w"> </span><span class="s1">'?'</span><span class="p">)</span><span class="si">}</span><span class="s2">&gt;"</span></div>
+
+
+
+<span class="k">class</span><span class="w"> </span><span class="nc">FunctionRule</span><span class="p">(</span><span class="n">ComputedRule</span><span class="p">,</span> <span class="n">abstract</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""A plain function (query, match) -&gt; CheckResult, wrapped by Registry.rule()."""</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">func</span><span class="p">:</span> <span class="n">RuleFunc</span><span class="p">,</span> <span class="n">code</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">meta</span><span class="p">:</span> <span class="n">Mapping</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">check_meta</span><span class="p">(</span><span class="n">meta</span><span class="p">,</span> <span class="n">code</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">func</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">code</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">meta</span> <span class="o">=</span> <span class="n">func</span><span class="p">,</span> <span class="n">code</span><span class="p">,</span> <span class="nb">dict</span><span class="p">(</span><span class="n">meta</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_doc</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">func</span><span class="o">.</span><span class="vm">__doc__</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_qualname</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">func</span><span class="o">.</span><span class="vm">__module__</span><span class="si">}</span><span class="s2">.</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">func</span><span class="o">.</span><span class="vm">__qualname__</span><span class="si">}</span><span class="s2">"</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">check</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">query</span><span class="p">:</span> <span class="n">Query</span><span class="p">,</span> <span class="n">match</span><span class="p">:</span> <span class="n">Match</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">CheckResult</span><span class="p">:</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">func</span><span class="p">(</span><span class="n">query</span><span class="p">,</span> <span class="n">match</span><span class="p">)</span>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2026, Manish Venumuddula.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
