@@ -153,7 +153,7 @@ def test_fixture_17_axis_unit_in_a_record():
     registry.add(record("TST002", dimensions=km))
 
 
-class Pfafstetter:
+class Pfafstetter(qe.Dimension):
     """The basin dimension of section 4.13; parse_rule checks the record's value."""
 
     name = "basin"

@@ -107,15 +107,12 @@ def match_scope(
     found: dict[str, DimMatch] = {}
     for late in (False, True):
         for name, dimension in registry._dimensions.items():
-            if getattr(dimension, "late", False) != late:
+            if dimension.late != late:
                 continue
             rule, value = scope.values.get(name), parsed.get(name)
-            if rule is None and (
-                value is None or not getattr(dimension, "always", False)
-            ):
+            if rule is None and (value is None or not dimension.always):
                 continue  # unconstrained, and nothing to measure
-            comparable = getattr(dimension, "comparable", None)
-            if value is None or (comparable and not comparable(rule, value)):
+            if value is None or not dimension.comparable(rule, value):
                 undecided.add(name)
                 continue
             found[name] = dimension.match(rule, value)
@@ -124,11 +121,11 @@ def match_scope(
     hits: dict[str, DimMatch] = {}
     for name, dimension in registry._dimensions.items():
         if name in found:
-            hits[name] = found[name]
-            if hasattr(dimension, "to_json"):
-                hits[name] = dataclasses.replace(hits[name], to_json=dimension.to_json)
-        elif name in undecided and hasattr(dimension, "extent"):  # the rule's own
-            hits[name] = DimMatch(dimension.extent(scope.values[name]))
+            hits[name] = dataclasses.replace(found[name], to_json=dimension.to_json)
+        elif name in undecided:  # the rule's own extent, if the dimension has one
+            extent = dimension.extent(scope.values[name])
+            if extent is not None:
+                hits[name] = DimMatch(extent)
     details: dict[str, Any] = {}
     if "time" in undecided and scope.values["time"].months is not None:
         details["recurrence_months"] = sorted(scope.values["time"].months)

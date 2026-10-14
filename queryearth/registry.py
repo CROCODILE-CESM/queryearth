@@ -22,7 +22,7 @@ from typing import Any
 import numpy as np
 
 from queryearth import space as sp
-from queryearth.dimensions import SpaceDimension, TimeDimension
+from queryearth.dimensions import Dimension, SpaceDimension, TimeDimension
 from queryearth.objects import (
     KINDS,
     DuplicateCodeError,
@@ -115,14 +115,16 @@ class Registry:
                 f"declare a dimension with an object such as qe.Labels({dimension!r}),"
                 f" not the bare name {dimension!r}"
             )
+        if not isinstance(dimension, Dimension):
+            raise TypeError(
+                f"a dimension subclasses qe.Dimension, as qe.Axis, qe.Labels and "
+                f"qe.Versions do; {type(dimension).__name__} does not"
+            )
         name = getattr(dimension, "name", None)
         if not isinstance(name, str) or not _SLUG.fullmatch(name):
             raise ValueError(f"a dimension name is a lowercase slug, not {name!r}")
         if name in self._dimensions:
             raise ValueError(f"dimension name {name!r} is reserved or already declared")
-        for member in ("parse_rule", "parse_query", "match"):
-            if not callable(getattr(dimension, member, None)):
-                raise TypeError(f"dimension {name!r} has no {member}() method")
         self._dimensions[name] = dimension
 
     def add(self, rule: Any) -> None:
@@ -338,8 +340,8 @@ class Registry:
                     ]
                 )
                 for name, dimension in self._dimensions.items()
-                if callable(getattr(dimension, "build", None))
-                and not hasattr(dimension, "comparable")
+                if _overrides(dimension, "build")
+                and not _overrides(dimension, "comparable")
             }
         return self._prefilters_cache
 
@@ -460,3 +462,8 @@ class PointResult:
             if f.level >= floor and f.code in self.masks:
                 out |= self.masks[f.code]
         return out
+
+
+def _overrides(dimension: Dimension, member: str) -> bool:
+    """Whether a dimension's class replaces one of Dimension's default members."""
+    return getattr(type(dimension), member) is not getattr(Dimension, member)

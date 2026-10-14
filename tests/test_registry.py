@@ -274,7 +274,7 @@ def test_fixture_21_version_dimension():
 
 # ---- fixture 27: a plugin dimension --------------------------------------------------
 @dataclass(frozen=True)
-class Pfafstetter:
+class Pfafstetter(qe.Dimension):
     """HydroBASINS basin codes: basin 1423 lies inside basin 14 (section 4.13)."""
 
     name: str = "basin"
@@ -953,3 +953,59 @@ def test_random_queries_hide_only_conditional_findings():
 def test_a_bare_name_is_not_a_dimension():
     with pytest.raises(TypeError, match=r"qe.Labels\('product'\)"):
         qe.Registry("x", dimensions=["product"])
+
+
+def test_every_dimension_subclasses_dimension():
+    for dimension in (
+        qe.Axis("resolution", "km"),
+        qe.Labels("product"),
+        qe.Versions("v"),
+    ):
+        assert isinstance(dimension, qe.Dimension)
+
+    class Duck:  # the right methods, but not a Dimension
+        name = "duck"
+
+        def parse_rule(self, value):
+            return value
+
+        parse_query = parse_rule
+
+        def match(self, rule, query):
+            return qe.DimMatch(query, 1.0)
+
+    with pytest.raises(TypeError, match="subclasses qe.Dimension"):
+        qe.Registry("x", dimensions=[Duck()])
+
+
+def test_a_dimension_without_match_cannot_be_made():
+    class Half(qe.Dimension):
+        name = "half"
+
+        def parse_rule(self, value):
+            return value
+
+        parse_query = parse_rule
+
+    with pytest.raises(TypeError, match="abstract"):
+        Half()
+
+
+def test_dimension_defaults_change_nothing():
+    class Plain(qe.Dimension):
+        name = "plain"
+
+        def parse_rule(self, value):
+            return tuple(value)
+
+        def parse_query(self, value):
+            return value
+
+        def match(self, rule, query):
+            return qe.DimMatch(query, 1.0) if query in rule else None
+
+    plain = Plain()
+    assert (plain.late, plain.always) == (False, False)
+    assert plain.comparable(("a",), "a") is True
+    assert plain.build([(0, ("a",))]) is None and plain.extent(("a",)) is None
+    assert plain.to_json(("a",)) == ("a",)

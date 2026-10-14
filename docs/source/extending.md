@@ -14,7 +14,7 @@ Geometry and time semantics are not pluggable. Space and time are dimensions ins
 
 ## Dimension plugins
 
-[Dimensions](concepts.md#dimensions) lists the kinds that come with queryearth; `Axis`, `Labels` and `Versions` are written the same way as your own. A dimension has a `name` and three methods:
+[Dimensions](concepts.md#dimensions) lists the kinds that come with queryearth. Every dimension, `Axis`, `Labels` and `Versions` included, subclasses {class}`~queryearth.Dimension`, and so does your own. A subclass sets `name` and implements three methods; Python refuses to create one that leaves any of them out:
 
 - `parse_rule(value)` checks and parses a rule's value when the rule is added, from Python or from a record, and raises `ValueError` for a bad one;
 - `parse_query(value)` does the same for a query's value;
@@ -23,7 +23,7 @@ Geometry and time semantics are not pluggable. Space and time are dimensions ins
 The Registry does everything else: conditional findings, unknown names and sorting. This plugin matches HydroBASINS Pfafstetter basin codes, where basin 1423 lies inside basin 14:
 
 ```python
-class Pfafstetter:
+class Pfafstetter(qe.Dimension):
     name = "basin"
 
     def parse_rule(self, value):
@@ -58,13 +58,13 @@ registry.add(
 registry.query(dimensions={"basin": "1423"})  # BAS001, overlap ("14",), fraction 1.0
 ```
 
-A dimension may also define these optional members:
+`Dimension` also has these members, whose defaults change nothing; override only those you need:
 
-| Member | Effect |
-|---|---|
-| `comparable(rule, query)` | Returning False makes the finding conditional on the dimension instead of a non-match |
-| `build(pairs)` | Takes the `(position, rule value)` pairs of the rules that constrain the dimension and returns a prefilter whose `candidates(query)` gives the positions to keep, so a plugin can bring its own index |
-| `late = True` | Runs the dimension after the others; space sets it, so the costly spatial test runs last |
-| `always = True` | Calls `match(None, query)` when a rule leaves the dimension out, so the query is still measured |
-| `extent(rule)` | What a finding reports when the query leaves the dimension out |
-| `to_json(overlap)` | Serialises the overlap for `Finding.to_dict()` |
+| Member | Default | Override it to |
+|---|---|---|
+| `comparable(rule, query)` | `True` | return False to make the finding conditional on the dimension instead of a non-match |
+| `build(pairs)` | `None` (no index) | take the `(position, rule value)` pairs of the rules that constrain the dimension and return a prefilter whose `candidates(query)` gives the positions to keep, so the dimension brings its own index; not used if you also override `comparable` |
+| `late` | `False` | `True` runs the dimension after the others; space sets it, so the costly spatial test runs last |
+| `always` | `False` | `True` calls `match(None, query)` when a rule leaves the dimension out, so the query is still measured |
+| `extent(rule)` | `None` (nothing) | give what a finding reports when the query leaves the dimension out |
+| `to_json(overlap)` | the overlap unchanged | turn the overlap into JSON for `Finding.to_dict()` |

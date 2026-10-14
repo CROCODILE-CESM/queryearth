@@ -2,20 +2,21 @@
 
 A dimension decides only whether one rule value meets one query value; the
 Registry does everything else (conditional findings, unknown names, sorting).
-Space and time are built in on every Registry and cannot be replaced. Axis
-(numeric ranges), Labels (names matched by glob patterns) and Versions
-(OSV-style version ranges) are the built-in plugins, and a user plugin
-implements the same four members.
+Every dimension subclasses Dimension. Space and time are built in on every
+Registry and cannot be replaced; Axis (numeric ranges), Labels (names matched
+by glob patterns) and Versions (OSV-style version ranges) are declared, and a
+user's own dimension subclasses Dimension the same way.
 """
 
 from __future__ import annotations
 
+import abc
 import math
 import re
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from fnmatch import fnmatchcase
-from typing import Any, Protocol, runtime_checkable
+from typing import Any, ClassVar, Protocol
 
 import numpy as np
 
@@ -53,25 +54,49 @@ class DimMatch:
         return {"overlap": overlap, "fraction": self.fraction}
 
 
-@runtime_checkable
-class Dimension(Protocol):
+class Dimension(abc.ABC):
     """One kind of scope, declared on a Registry under a unique name.
 
-    Optional members, looked up with getattr: comparable(rule, query) -> bool
-    (False makes the finding conditional on the dimension); build(pairs) ->
-    Prefilter over the (position, rule value) pairs of the rules that constrain
-    it; to_json(overlap) for Finding.to_dict(); late = True to run after the
-    exact spatial test; extent(rule) for what an undecided finding reports;
-    always = True to call match(None, query) when a rule leaves it unconstrained.
+    A subclass sets name and implements parse_rule, parse_query and match; it
+    cannot be created without them. The other members have defaults that leave
+    the Registry's behaviour unchanged, and a subclass overrides only those it
+    needs.
     """
 
     name: str  # key in scopes, queries, records and conditional_on
+    late: ClassVar[bool] = False  # run after the others; space, so it runs last
+    always: ClassVar[bool] = False  # match(None, query) when a rule leaves it out
 
-    def parse_rule(self, value: Any) -> Any: ...  # at load; ValueError if invalid
+    @abc.abstractmethod
+    def parse_rule(self, value: Any) -> Any:
+        """A rule's value, parsed when the rule is added; ValueError if invalid."""
 
-    def parse_query(self, value: Any) -> Any: ...  # at query time; ValueError
+    @abc.abstractmethod
+    def parse_query(self, value: Any) -> Any:
+        """A query's value, parsed when the query runs; ValueError if invalid."""
 
-    def match(self, rule: Any, query: Any) -> DimMatch | None: ...  # None: no overlap
+    @abc.abstractmethod
+    def match(self, rule: Any, query: Any) -> DimMatch | None:
+        """How a rule's value meets a query's value; None when they do not."""
+
+    def comparable(self, rule: Any, query: Any) -> bool:
+        """False makes the finding conditional on this dimension, not a non-match."""
+        return True
+
+    def build(self, pairs: list[tuple[int, Any]]) -> Prefilter | None:
+        """An index over the (position, rule value) pairs of the rules that
+        constrain this dimension, to narrow them before match() runs; None for
+        no index. Not used by a dimension that overrides comparable()."""
+        return None
+
+    def extent(self, rule: Any) -> Any:
+        """What a finding reports when the query leaves this dimension out;
+        None for nothing."""
+        return None
+
+    def to_json(self, overlap: Any) -> Any:
+        """An overlap as JSON, for Finding.to_dict()."""
+        return overlap
 
 
 class Prefilter(Protocol):
@@ -81,7 +106,7 @@ class Prefilter(Protocol):
 
 
 # ---- space and time: built in on every Registry --------------------------------------
-class SpaceDimension:
+class SpaceDimension(Dimension):
     """Space: closed-set meeting, then the area fraction and overlap in km².
 
     It runs late, after the cheaper dimensions, and also measures the query
@@ -104,7 +129,7 @@ class SpaceDimension:
         return DimMatch(km2, fraction)
 
 
-class TimeDimension:
+class TimeDimension(Dimension):
     """Time: the overlapping periods and the share of the query they cover.
 
     It also measures the query against a rule that leaves time unconstrained,
@@ -184,7 +209,7 @@ def axis_intersection(rule: AxisOverlap, lo: float, hi: float) -> AxisOverlap | 
 
 
 @dataclass(frozen=True)
-class Axis:
+class Axis(Dimension):
     """A named, ordered, numeric dimension with exactly one unit.
 
     A rule states {gt, ge, lt, le, unit}; a query gives a number or a closed
@@ -268,7 +293,7 @@ class Patterns:
 
 
 @dataclass(frozen=True)
-class Labels:
+class Labels(Dimension):
     """A label dimension: names, which rules match with glob patterns (section 4.7)."""
 
     name: str
@@ -380,7 +405,7 @@ class VersionRange:
 
 
 @dataclass(frozen=True)
-class Versions:
+class Versions(Dimension):
     """A version dimension: rules give a union of OSV-style ranges (section 4.8)."""
 
     name: str
