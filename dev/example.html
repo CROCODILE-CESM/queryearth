@@ -6,14 +6,14 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>The toy example &mdash; queryearth 0.1.1.dev4</title>
+  <title>The toy example &mdash; queryearth 0.1.1.dev5</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
 
   
       <script src="_static/jquery.js?v=5d32c60e"></script>
       <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="_static/documentation_options.js?v=f56c220d"></script>
+      <script src="_static/documentation_options.js?v=5114a614"></script>
       <script src="_static/doctools.js?v=fd6eb6e6"></script>
       <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="_static/versions.js?v=58ec1786"></script>
@@ -128,25 +128,12 @@
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">show</span><span class="p">(</span><span class="n">findings</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">"""One line per finding, then any changes under it."""</span>
-    <span class="k">if</span> <span class="ow">not</span> <span class="n">findings</span><span class="p">:</span>
-        <span class="nb">print</span><span class="p">(</span><span class="s2">"  (no findings)"</span><span class="p">)</span>
-    <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">findings</span><span class="p">:</span>
-        <span class="n">area</span><span class="p">,</span> <span class="n">time</span> <span class="o">=</span> <span class="p">(</span>
-            <span class="s2">"-"</span> <span class="k">if</span> <span class="n">x</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">x</span><span class="si">:</span><span class="s2">.0%</span><span class="si">}</span><span class="s2">"</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="p">(</span><span class="n">f</span><span class="o">.</span><span class="n">area_fraction</span><span class="p">,</span> <span class="n">f</span><span class="o">.</span><span class="n">time_fraction</span><span class="p">)</span>
-        <span class="p">)</span>
-        <span class="n">level</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLevelName</span><span class="p">(</span><span class="n">f</span><span class="o">.</span><span class="n">level</span><span class="p">)</span>
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"  </span><span class="si">{</span><span class="n">f</span><span class="o">.</span><span class="n">code</span><span class="si">:</span><span class="s2">7</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">level</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"          </span><span class="si">{</span><span class="n">f</span><span class="o">.</span><span class="n">title</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"          area </span><span class="si">{</span><span class="n">area</span><span class="si">}</span><span class="s2">, time </span><span class="si">{</span><span class="n">time</span><span class="si">}</span><span class="s2">, periods </span><span class="si">{</span><span class="n">f</span><span class="o">.</span><span class="n">time_overlap</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
-        <span class="k">if</span> <span class="n">f</span><span class="o">.</span><span class="n">conditional_on</span><span class="p">:</span>
-            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"          conditional on </span><span class="si">{</span><span class="n">f</span><span class="o">.</span><span class="n">conditional_on</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
-        <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">f</span><span class="o">.</span><span class="n">changes</span><span class="p">:</span>
-            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"          -&gt; set </span><span class="si">{</span><span class="n">c</span><span class="o">.</span><span class="n">target</span><span class="si">}</span><span class="s2">:</span><span class="si">{</span><span class="n">c</span><span class="o">.</span><span class="n">key</span><span class="si">}</span><span class="s2"> = </span><span class="si">{</span><span class="n">c</span><span class="o">.</span><span class="n">value</span><span class="si">!r}</span><span class="s2">"</span><span class="p">)</span>
+<span class="w">    </span><span class="sd">"""Each finding's level, code and title, then its message and changes."""</span>
+    <span class="nb">print</span><span class="p">(</span><span class="n">qe</span><span class="o">.</span><span class="n">report</span><span class="p">(</span><span class="n">findings</span><span class="p">)</span> <span class="ow">or</span> <span class="s2">"(no findings)"</span><span class="p">,</span> <span class="n">end</span><span class="o">=</span><span class="s2">"</span><span class="se">\n\n</span><span class="s2">"</span><span class="p">)</span>
 
 
 <span class="c1"># %% 1. A Bering Sea domain that crosses the antimeridian, winter 2000-01, 8 km.</span>
-<span class="c1"># TOY002 covers only December to March, so its time fraction is below 1.</span>
+<span class="c1"># TOY002 covers only December to March, so it reports just those months.</span>
 <span class="c1"># TOY101 needs the Arctic, and only the top of this domain is north of 66.5N.</span>
 <span class="n">bering</span> <span class="o">=</span> <span class="n">sp</span><span class="o">.</span><span class="n">box</span><span class="p">(</span><span class="mi">165</span><span class="p">,</span> <span class="mi">52</span><span class="p">,</span> <span class="o">-</span><span class="mi">160</span><span class="p">,</span> <span class="mi">70</span><span class="p">)</span>  <span class="c1"># west, south, east, north</span>
 <span class="n">winter</span> <span class="o">=</span> <span class="n">qe</span><span class="o">.</span><span class="n">interval</span><span class="p">(</span><span class="s2">"2000-11-01"</span><span class="p">,</span> <span class="s2">"2001-03-31"</span><span class="p">)</span>

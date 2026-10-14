@@ -6,14 +6,14 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>API reference &mdash; queryearth 0.1.1.dev4</title>
+  <title>API reference &mdash; queryearth 0.1.1.dev5</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
 
   
       <script src="_static/jquery.js?v=5d32c60e"></script>
       <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="_static/documentation_options.js?v=f56c220d"></script>
+      <script src="_static/documentation_options.js?v=5114a614"></script>
       <script src="_static/doctools.js?v=fd6eb6e6"></script>
       <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="_static/versions.js?v=58ec1786"></script>
@@ -136,6 +136,7 @@
 </li>
 <li class="toctree-l2"><a class="reference internal" href="#queryearth.interval"><code class="docutils literal notranslate"><span class="pre">interval()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="#queryearth.parse_time"><code class="docutils literal notranslate"><span class="pre">parse_time()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#queryearth.report"><code class="docutils literal notranslate"><span class="pre">report()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="#module-queryearth.space">queryearth.space</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="#queryearth.space.Space"><code class="docutils literal notranslate"><span class="pre">Space</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#queryearth.space.area_km2"><code class="docutils literal notranslate"><span class="pre">area_km2()</span></code></a></li>
@@ -187,10 +188,10 @@
 <p>queryearth.time holds time keys, intervals and their measures,
 queryearth.space points, polygons and closed-set measures (imported as
 <code class="docutils literal notranslate"><span class="pre">from</span> <span class="pre">queryearth</span> <span class="pre">import</span> <span class="pre">space</span> <span class="pre">as</span> <span class="pre">sp</span></code>), and queryearth.converters turns other
-descriptions of a place, such as a model grid, into spaces. The rule engine is at the top level:
-a Registry of dimensions and rules answers queries with Finding
-objects, which callers log with the logging module. See docs/design.md for the
-design.</p>
+descriptions of a place, such as a model grid, into spaces. The rule engine is
+at the top level: a Registry of dimensions and rules answers queries with
+Finding objects, which callers log with the logging module or print with
+report(). See docs/design.md for the design.</p>
 <dl class="py class">
 <dt class="sig sig-object py" id="queryearth.Axis">
 <span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">queryearth.</span></span><span class="sig-name descname"><span class="pre">Axis</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">unit</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">description</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">''</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/queryearth/dimensions.html#Axis"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#queryearth.Axis" title="Link to this definition"></a></dt>
@@ -643,6 +644,15 @@ second, even at midnight.</p>
 time_end are read and the rest ignored. Returns None when the record has no
 time and no recurrence, which means always; an interval open at both ends,
 with no periods or recurrence, also means always.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="queryearth.report">
+<span class="sig-prename descclassname"><span class="pre">queryearth.</span></span><span class="sig-name descname"><span class="pre">report</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">findings</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Iterable</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#queryearth.Finding" title="queryearth.objects.Finding"><span class="pre">Finding</span></a><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">str</span></span></span><a class="reference internal" href="_modules/queryearth/objects.html#report"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#queryearth.report" title="Link to this definition"></a></dt>
+<dd><p>The text of findings for people to read, or “” for none.</p>
+<p>Each finding is its level and str(finding), then indented lines for its
+message, instruction, what a conditional finding is waiting on, and each
+change.</p>
 </dd></dl>
 
 <section id="module-queryearth.space">

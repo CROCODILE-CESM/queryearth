@@ -6,14 +6,14 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Using findings &mdash; queryearth 0.1.1.dev4</title>
+  <title>Using findings &mdash; queryearth 0.1.1.dev5</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
 
   
       <script src="_static/jquery.js?v=5d32c60e"></script>
       <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="_static/documentation_options.js?v=f56c220d"></script>
+      <script src="_static/documentation_options.js?v=5114a614"></script>
       <script src="_static/doctools.js?v=fd6eb6e6"></script>
       <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="_static/versions.js?v=58ec1786"></script>
@@ -84,7 +84,18 @@
 <h1>Using findings<a class="headerlink" href="#using-findings" title="Link to this heading"></a></h1>
 <section id="reporting-findings">
 <h2>Reporting findings<a class="headerlink" href="#reporting-findings" title="Link to this heading"></a></h2>
-<p>Findings are data: queryearth never warns, logs or raises for them. A finding’s <code class="docutils literal notranslate"><span class="pre">level</span></code> is a <code class="docutils literal notranslate"><span class="pre">logging</span></code> level, and <code class="docutils literal notranslate"><span class="pre">str(finding)</span></code> is a one-line message that starts with its code, such as <code class="docutils literal notranslate"><span class="pre">[TOY002]</span> <span class="pre">toy_ocean</span> <span class="pre">is</span> <span class="pre">too</span> <span class="pre">warm</span> <span class="pre">in</span> <span class="pre">the</span> <span class="pre">Bering</span> <span class="pre">Sea</span> <span class="pre">in</span> <span class="pre">winter</span> <span class="pre">(area</span> <span class="pre">83%;</span> <span class="pre">2000-12-01..2001-03-31;</span> <span class="pre">draft)</span></code>. So log them with the <code class="docutils literal notranslate"><span class="pre">logging</span></code> module:</p>
+<p>Findings are data: queryearth never prints, warns, logs or raises for them. To show them to people, print <a class="reference internal" href="api.html#queryearth.report" title="queryearth.report"><code class="xref py py-func docutils literal notranslate"><span class="pre">report()</span></code></a>, which gives each finding’s level and one-line text, then its message and changes, or <code class="docutils literal notranslate"><span class="pre">&quot;&quot;</span></code> when there are none:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="nb">print</span><span class="p">(</span><span class="n">qe</span><span class="o">.</span><span class="n">report</span><span class="p">(</span><span class="n">findings</span><span class="p">))</span>
+</pre></div>
+</div>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>WARNING [TOY002] toy_ocean is too warm in the Bering Sea in winter (area 83%; 2000-12-01..2001-03-31; draft)
+    From December to March, toy_ocean sea temperature in the Bering Sea runs about 1 K too warm.
+INFO [TOY102] Fine grid: turn off the coarse-grid eddy scheme (area 100%; 2000-11-01..2001-03-31; draft)
+    Below 10 km the model starts to resolve eddies itself.
+    Change: MOM_input TOY_EDDY_SCHEME = False (Made-up parameter name.)
+</pre></div>
+</div>
+<p>The first line of each is <code class="docutils literal notranslate"><span class="pre">str(finding)</span></code>: the code, the title, the share of the query’s area, the periods it applies to, and “draft” for a rule not yet reviewed. A finding’s <code class="docutils literal notranslate"><span class="pre">level</span></code> is a <code class="docutils literal notranslate"><span class="pre">logging</span></code> level, so to log findings instead, log that line at its level:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
 
 <span class="n">log</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="s2">"myapp"</span><span class="p">)</span>
