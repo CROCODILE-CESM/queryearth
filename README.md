@@ -2,7 +2,7 @@
 
 queryearth answers one question: given where (a point or a polygon, such as a lake outline or a model domain), when (a time range) and anything else that matters (grid resolution, product, variable and so on), which registered rules apply, how much of the query does each one cover, and what does it say to watch out for or to do?
 
-Rules are GeoJSON features or short Python classes. A query returns findings of two kinds: warnings ("these values are climatology, not observations", or "this product does not reach part of your area") and suggestions ("set this model parameter"). Each finding has a standard `logging` level, so you log findings with the `logging` module. queryearth ships no rules of its own; you bring yours.
+Rules are GeoJSON features or short Python classes. A query returns findings: each says what to watch out for ("these values are climatology, not observations", or "this product does not reach part of your area"), and some also list changes for your code to make ("set this model parameter"). Each finding has a standard `logging` level, so you log findings with the `logging` module. queryearth ships no rules of its own; you bring yours.
 
 **Documentation:** https://crocodile-cesm.github.io/queryearth/
 

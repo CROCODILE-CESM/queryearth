@@ -17,7 +17,6 @@ from queryearth import space as sp
 def warning_rule(code, level="warning", **scope):
     return qe.Rule(
         code=code,
-        kind="warning",
         title=code,
         message=code,
         level=level,
@@ -132,7 +131,6 @@ def random_bulk_registry(rng):
         registry.add(
             qe.Rule(
                 code=f"RND{k:03d}",
-                kind="warning",
                 title="t",
                 message="m",
                 level=level,

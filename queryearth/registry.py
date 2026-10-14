@@ -24,7 +24,6 @@ import numpy as np
 from queryearth import space as sp
 from queryearth.dimensions import Dimension, SpaceDimension, TimeDimension
 from queryearth.objects import (
-    KINDS,
     DuplicateCodeError,
     Finding,
     LoadError,
@@ -290,7 +289,7 @@ class Registry:
 
     # ---- queries ------------------------------------------------------------------
     def query(self, query: Query | None = None, /, **fields: Any) -> list[Finding]:
-        """Findings for one query, sorted by level, kind, then code.
+        """Findings for one query, sorted by level, changes, then code.
 
         fields are Query fields (they override those of query) and
         include_conditional, which also returns findings for rules the query
@@ -436,8 +435,8 @@ class Registry:
 
 
 def _sorted(findings: Iterable[Finding]) -> list[Finding]:
-    """By level (highest first), kind, then code."""
-    return sorted(findings, key=lambda f: (-f.level, KINDS.index(f.kind), f.code))
+    """By level (highest first), those without changes first, then code."""
+    return sorted(findings, key=lambda f: (-f.level, bool(f.changes), f.code))
 
 
 # ---- the result of the bulk path ----------------------------------------------------

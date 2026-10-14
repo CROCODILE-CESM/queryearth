@@ -38,9 +38,7 @@ def make_registry(*extra):
 
 
 def warning_rule(code, **scope):
-    return qe.Rule(
-        code=code, kind="warning", title=code, message=code, scope=qe.Scope(**scope)
-    )
+    return qe.Rule(code=code, title=code, message=code, scope=qe.Scope(**scope))
 
 
 def codes(findings):
@@ -81,23 +79,21 @@ def croc_registry():
     registry.add(
         qe.Rule(
             code="CROC101",
-            kind="suggestion",
             title="Arctic domain: consider active sea ice",
             message="m",
             scope=qe.Scope(
                 space=sp.box(-180, 66.5, 180, 90), dimensions={"model": "mom6"}
             ),
-            suggestions=(qe.Suggestion("compset", "ice_component", "CICE"),),
+            changes=(qe.Change("compset", "ice_component", "CICE"),),
         )
     )
     registry.add(
         qe.Rule(
             code="CROC102",
-            kind="suggestion",
             title="Eddy-resolving grid",
             message="m",
             scope=qe.Scope(dimensions={"resolution": {"lt": 10.0}}),
-            suggestions=(qe.Suggestion("MOM_input", "THICKNESSDIFFUSE", False),),
+            changes=(qe.Change("MOM_input", "THICKNESSDIFFUSE", False),),
         )
     )
     return registry
@@ -143,7 +139,6 @@ def cru_registry():
     registry.add(
         qe.Rule(
             code="CRU001",
-            kind="warning",
             title="CRU TS precipitation falls back to climatology",
             message="m",
             min_overlap=0.1,
@@ -450,14 +445,14 @@ def test_function_rule_croc104_suggests_a_time_step():
 
     @registry.rule(
         "CROC104",
-        kind="suggestion",
+        level="info",
         space=sp.box(-180, 66.5, 180, 90),
         dimensions={"resolution": {"gt": 0.0}, "model": "mom6"},
     )
     def arctic_time_step(query, match):
         """High-latitude domain: set the time step from the smallest cells"""
         seconds = 30.0 * match.dimensions["resolution"].overlap.lo
-        return {"suggestions": (qe.Suggestion("MOM_input", "DT", seconds, "why"),)}
+        return {"changes": (qe.Change("MOM_input", "DT", seconds, "why"),)}
 
     found = registry.query(
         space=sp.box(-180, 70.6, 180, 90),
@@ -467,7 +462,7 @@ def test_function_rule_croc104_suggests_a_time_step():
     assert codes(found) == ["CROC101", "CROC102", "CROC104"]
     croc104 = found[-1]
     assert croc104.level == logging.INFO and croc104.title.startswith("High-latitude")
-    assert croc104.suggestions == (qe.Suggestion("MOM_input", "DT", 240.0, "why"),)
+    assert croc104.changes == (qe.Change("MOM_input", "DT", 240.0, "why"),)
     resolution = [f.dimensions["resolution"].overlap for f in found[1:]]
     assert resolution == [
         qe.AxisOverlap(8.0, 10.0, True, False),
@@ -481,6 +476,47 @@ def test_function_rule_croc104_suggests_a_time_step():
     assert next(f for f in without if f.code == "CROC104").conditional_on == (
         "resolution",
     )
+
+
+def test_a_computed_rule_level_defaults_from_the_changes_it_returns():
+    registry = qe.Registry("changes")
+    dt = qe.Change("MOM_input", "DT", 240.0)
+
+    @registry.rule("CHG001")
+    def undeclared(query, match):
+        """Returns a change and declares no level, so it is INFO"""
+        return {"changes": [dt]}
+
+    @registry.rule("CHG002")
+    def no_change(query, match):
+        """Returns no change"""
+        return True
+
+    @registry.rule("CHG003", level="info")
+    def declared_info(query, match):
+        """Returns a change at a declared INFO"""
+        return {"changes": [{"target": "MOM_input", "key": "DT", "value": 240.0}]}
+
+    @registry.rule("CHG004", changes=[dt])
+    def declares_changes(query, match):
+        """Declares its change, so its level defaults to INFO"""
+        return True
+
+    @registry.rule("CHG006", level="warning")
+    def declared_warning(query, match):
+        """Returns a change at a declared WARNING"""
+        return {"changes": [dt]}
+
+    found = registry.query()
+    assert [(f.code, f.level, f.changes) for f in found] == [
+        ("CHG002", logging.WARNING, ()),
+        ("CHG006", logging.WARNING, (dt,)),
+        ("CHG001", logging.INFO, (dt,)),
+        ("CHG003", logging.INFO, (dt,)),
+        ("CHG004", logging.INFO, (dt,)),
+    ]
+    with pytest.raises(TypeError, match="unknown keywords"):
+        registry.rule("CHG005", kind="suggestion")(no_change)
 
 
 def test_gen001_compares_the_caller_area_with_the_support():
@@ -545,18 +581,18 @@ def test_computed_rule_keywords_inherit_from_an_abstract_base():  # Q9
         abstract=True,
         registry=registry,
         dimensions={"model": "mom6"},
-        kind="suggestion",
+        level="info",
     ):
         pass
 
     class Child(Family, code="FAM001"):
-        """Inherits the registry, the scope and the kind"""
+        """Inherits the registry, the scope and the level"""
 
     class Other(Family, code="FAM002", dimensions={"model": "cesm"}):
         """Its own dimensions win"""
 
     (child,) = registry.query(dimensions={"model": "mom6"})
-    assert (child.code, child.kind, child.level) == ("FAM001", "suggestion", 20)
+    assert (child.code, child.level) == ("FAM001", 20)
     assert codes(registry.query(dimensions={"model": "cesm"})) == ["FAM002"]
     with pytest.raises(TypeError):
 
@@ -630,17 +666,15 @@ def test_withdrawn_and_superseded_rules_never_match():
     registry.add(
         qe.Rule(
             code="CRU003",
-            kind="warning",
             title="t",
             message="m",
             withdrawn="2026-01-01T00:00:00Z",
         )
     )
-    registry.add(qe.Rule(code="CRU005", kind="warning", title="t", message="m"))
+    registry.add(qe.Rule(code="CRU005", title="t", message="m"))
     registry.add(
         qe.Rule(
             code="CRU004",
-            kind="warning",
             title="t",
             message="m",
             supersedes=("CRU005",),
@@ -651,12 +685,13 @@ def test_withdrawn_and_superseded_rules_never_match():
         registry.add(warning_rule("CRU003"))
 
 
-def test_findings_are_sorted_by_level_kind_and_code():
+def test_findings_are_sorted_by_level_changes_and_code():
     registry = make_registry()
+    change = {"target": "a", "key": "b", "value": 1}
+    registry.add(qe.Rule(code="SRT000", title="t", message="m", changes=[change]))
     registry.add(
         qe.Rule(
             code="SRT001",
-            kind="warning",
             title="t",
             message="m",
             level="info",
@@ -666,18 +701,15 @@ def test_findings_are_sorted_by_level_kind_and_code():
     registry.add(
         qe.Rule(
             code="SRT002",
-            kind="suggestion",
             title="t",
             message="m",
             level="error",
-            suggestions=({"target": "a", "key": "b", "value": 1},),
+            changes=(change,),
         )
     )
-    registry.add(
-        qe.Rule(code="SRT003", kind="warning", title="t", message="m", level="error")
-    )
+    registry.add(qe.Rule(code="SRT003", title="t", message="m", level="error"))
     found = registry.query(space=sp.point(0, 0), dimensions={"product": "era5"})
-    assert codes(found) == ["SRT003", "SRT002", "SRT001"]
+    assert codes(found) == ["SRT003", "SRT002", "SRT001", "SRT000"]
 
 
 def test_the_default_registry_is_made_once():
@@ -701,12 +733,12 @@ def test_third_party_rule_kinds():
         scope = qe.Scope(dimensions={"model": "mom6"})
 
         def evaluate(self, query):
-            return [qe.Finding(code=self.code, kind="warning", title="f", message="f")]
+            return [qe.Finding(code=self.code, title="f", message="f")]
 
     class Hooked:  # outcomes() runs after the Registry matches the scope (Q5)
         code = "HOK001"
         scope = qe.Scope(dimensions={"resolution": {"le": 5}})
-        outcome = qe.Outcome(code="HOK001", kind="warning", title="h", message="h")
+        outcome = qe.Outcome(code="HOK001", title="h", message="h")
 
         def outcomes(self, query, match):
             return {"details": {"lo": match.dimensions["resolution"].overlap.lo}}
@@ -877,7 +909,6 @@ def random_registry(rng):
         registry.add(
             qe.Rule(
                 code=f"RND{k:03d}",
-                kind="warning",
                 title="t",
                 message="m",
                 scope=random_rule_scope(rng),

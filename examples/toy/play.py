@@ -37,7 +37,7 @@ print("loaded:", registry.load(HERE / "rules.geojson"))
 
 
 def show(findings):
-    """One line per finding, then any suggestions under it."""
+    """One line per finding, then any changes under it."""
     if not findings:
         print("  (no findings)")
     for f in findings:
@@ -45,13 +45,13 @@ def show(findings):
             "-" if x is None else f"{x:.0%}" for x in (f.area_fraction, f.time_fraction)
         )
         level = logging.getLevelName(f.level)
-        print(f"  {f.code:7} {f.kind:10} {level}")
+        print(f"  {f.code:7} {level}")
         print(f"          {f.title}")
         print(f"          area {area}, time {time}, periods {f.time_overlap}")
         if f.conditional_on:
             print(f"          conditional on {f.conditional_on}")
-        for s in f.suggestions:
-            print(f"          -> set {s.target}:{s.key} = {s.value!r}")
+        for c in f.changes:
+            print(f"          -> set {c.target}:{c.key} = {c.value!r}")
 
 
 # %% 1. A Bering Sea domain that crosses the antimeridian, winter 2000-01, 8 km.
@@ -81,11 +81,10 @@ year_2005 = qe.interval("2005-01-01", "2005-12-31")
 show(registry.query(space=gulf, time=year_2005, dimensions=coastal))
 
 # %% 4. Rules written in Python. A static rule, and a computed rule whose
-# suggestion depends on the query (a made-up time step from the finest cells).
+# change depends on the query (a made-up time step from the finest cells).
 registry.add(
     qe.Rule(
         code="TOY201",
-        kind="warning",
         title="toy_atmos 2 m temperature is too cold over sea ice",
         message="Over sea ice, toy_atmos t2m runs a few kelvin too cold.",
         scope=qe.Scope(
@@ -97,14 +96,13 @@ registry.add(
 
 @registry.rule(
     "TOY202",
-    kind="suggestion",
     dimensions={"resolution": {"gt": 0}},  # conditional without a resolution
 )
 def time_step(query, match):
     """Set the toy time step from the finest cells"""
     finest_km = match.dimensions["resolution"].overlap.lo
     seconds = 30.0 * finest_km  # made up: 30 s per km
-    return {"suggestions": [qe.Suggestion("MOM_input", "TOY_DT", seconds, "made up")]}
+    return {"changes": [qe.Change("MOM_input", "TOY_DT", seconds, "made up")]}
 
 
 atmos = {"resolution": (4, 12), "product": ["toy_atmos"]}

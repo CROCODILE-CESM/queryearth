@@ -22,7 +22,7 @@ import shapely
 
 from queryearth import space as sp
 from queryearth.dimensions import DimMatch
-from queryearth.objects import LEVELS, Finding, Match, Outcome, Query, Scope, _jsonable
+from queryearth.objects import Finding, Match, Outcome, Query, Scope, _jsonable
 from queryearth.space import Space
 from queryearth.time import Interval, TimeSpec, overlap, parse_time, time_fraction
 
@@ -168,8 +168,13 @@ def make_findings(
     source: str,
     details: Mapping[str, Any] | None = None,
     result: Any = True,
+    level_given: bool = True,
 ) -> list[Finding]:
-    """Findings from an outcome and a match, applying check()-style results."""
+    """Findings from an outcome and a match, applying check()-style results.
+
+    When the rule declared no level, each finding takes the default for its own
+    changes, so changes returned by check() make it INFO.
+    """
     if isinstance(result, (bool, np.bool_)) or result is None:
         overrides = [{}] if result else []
     elif isinstance(result, Mapping):
@@ -189,6 +194,8 @@ def make_findings(
                 f"other than {sorted(_LOCKED)}"
             )
         fields = {**base, **override}
+        if not level_given and "level" not in override:
+            fields["level"] = None  # the default for this finding's changes
         if "time_overlap" in override:
             fields["time_overlap"], fields["time_fraction"] = _time_override(
                 override["time_overlap"], query.time
@@ -203,12 +210,13 @@ def computed_findings(
     query: Query,
     details: Mapping[str, Any],
     check: Callable[[Query, Match], Any],
+    level_given: bool = True,
 ) -> list[Finding]:
     """A computed rule's findings: check() runs only for a definite match."""
+    kwargs = {"source": "computed", "level_given": level_given}
     if match.conditional_on:
-        return make_findings(outcome, match, query, source="computed", details=details)
-    result = check(query, match)
-    return make_findings(outcome, match, query, source="computed", result=result)
+        return make_findings(outcome, match, query, details=details, **kwargs)
+    return make_findings(outcome, match, query, result=check(query, match), **kwargs)
 
 
 # ---- static records ---------------------------------------------------------------
@@ -257,8 +265,6 @@ class Rule(Outcome):
 
     def __post_init__(self) -> None:
         Outcome.__post_init__(self)
-        if self.kind == "suggestion" and not self.suggestions:
-            raise ValueError(f"{self.code}: a suggestion lists one or more suggestions")
         if not isinstance(self.scope, Scope):
             raise TypeError(f"{self.code}: scope is a Scope")
         for name in ("supersedes", "aliases"):
@@ -292,7 +298,7 @@ class Rule(Outcome):
         unknown = sorted(set(feature) - _FEATURE_KEYS) + sorted(
             k for k in props if k not in _RECORD_KEYS and not _EXTENSION.fullmatch(k)
         )
-        missing = [k for k in ("code", "kind", "title", "message") if k not in props]
+        missing = [k for k in ("code", "title", "message") if k not in props]
         if unknown or missing:
             raise ValueError(
                 f"unknown members {unknown}" if unknown else f"missing {missing}"
@@ -332,7 +338,8 @@ class Rule(Outcome):
         if level not in ("info", "warning", "error"):
             raise ValueError(f"{self.code}: a record's level is info, warning or error")
         props = {k: getattr(self, k) for k in _RULE_KEYS}
-        props["level"] = level if self.level != LEVELS[self.kind] else None
+        default = logging.INFO if self.changes else logging.WARNING
+        props["level"] = level if self.level != default else None
         props["dimensions"] = self.scope.dimensions
         defaults = {f.name: f.default for f in dataclasses.fields(Rule)}
         props = {k: v for k, v in props.items() if v != defaults.get(k, {})}
@@ -385,15 +392,17 @@ class ComputedRule:
     """A rule computed from the query or from data the caller holds.
 
     Class keywords give its identity and scope: code, registry (default
-    Registry.default()), abstract, the Outcome fields (kind defaults to warning,
-    level to the kind's default, title and message to the docstring), space (a
-    Space), time, dimensions and requires (keys of Query.context).
+    Registry.default()), abstract, the Outcome fields (title and message
+    default to the docstring), space (a Space), time, dimensions and requires
+    (keys of Query.context).
     Defining a subclass registers one instance; a subclass inherits its bases'
     keywords, merged, with its own winning (Q9).
 
     check(query, match) runs only for a definite match and returns True (one
     finding with the declared outcome), False or None (none), a mapping of
-    Finding fields to override, or several such mappings.
+    Finding fields to override, such as {"changes": [...]}, or several such
+    mappings. Without a declared level, a finding's level is the default for
+    its changes, as for any rule: INFO when check() returns changes.
     """
 
     code: ClassVar[str]
@@ -434,7 +443,6 @@ class ComputedRule:
     def outcome(self) -> Outcome:
         """The declared outcome, before check() overrides it."""
         fields = {k: self.meta[k] for k in OUTCOME_KEYS if k in self.meta}
-        fields.setdefault("kind", "warning")
         lines = inspect.cleandoc(self._doc() or "").splitlines()
         fields.setdefault("title", lines[0] if lines else "")
         if not fields["title"]:
@@ -449,7 +457,10 @@ class ComputedRule:
         if found is None:
             return []
         match, details = found
-        return computed_findings(self.outcome, match, query, details, self.check)
+        given = "level" in self.meta
+        return computed_findings(
+            self.outcome, match, query, details, self.check, level_given=given
+        )
 
     def check(self, query: Query, match: Match) -> CheckResult:
         """Override to compute the rule; the default gives one finding."""

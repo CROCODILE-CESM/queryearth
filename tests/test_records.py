@@ -19,7 +19,7 @@ TOY_FEATURES = json.loads(TOY.read_text())["features"]
 
 
 def record(code="TST001", **props):
-    base = {"code": code, "kind": "warning", "title": "t", "message": "m"}
+    base = {"code": code, "title": "t", "message": "m"}
     return {"type": "Feature", "geometry": None, "properties": {**base, **props}}
 
 
@@ -55,7 +55,7 @@ def test_load_adds_the_rules_of_one_file(tmp_path):
 
 def test_load_reports_every_problem_and_leaves_the_registry_unchanged(tmp_path):
     registry = qe.Registry("x", dimensions=[qe.Axis("resolution", "km")])
-    registry.add(qe.Rule(code="OLD001", kind="warning", title="t", message="m"))
+    registry.add(qe.Rule(code="OLD001", title="t", message="m"))
     deg = {"resolution": {"lt": 10, "unit": "deg"}}  # fixture 17
     features = [
         record("TST001"),
@@ -189,7 +189,6 @@ def test_fixture_27_plugin_values_in_records_are_checked_by_the_plugin():
 
 # ---- the loader refuses broken records ------------------------------------------------
 BAD = {
-    "suggestion without suggestions": {"kind": "suggestion"},
     "unknown property": {"colour": "red"},
     "a region_ref": {"region_ref": "ar6:CAF"},
     "level not info, warning or error": {"level": "critical"},
@@ -236,6 +235,14 @@ def test_old_scope_members_are_unknown_members(member):
     registry = qe.Registry("x", dimensions=[qe.Labels("variable")])
     with pytest.raises(ValueError, match=rf"TST001: unknown members \['{member}'\]"):
         registry.add(record(**{member: {"variable": ["pre"]}}))
+
+
+@pytest.mark.parametrize("member", ["kind", "suggestions"])  # the members of 0.1.0
+def test_kind_and_suggestions_are_unknown_members(member):
+    """A record has no kind, and lists any changes under "changes"."""
+    value = "warning" if member == "kind" else [{"target": "a", "key": "b", "value": 1}]
+    with pytest.raises(ValueError, match=rf"TST001: unknown members \['{member}'\]"):
+        qe.Registry("x").add(record(**{member: value}))
 
 
 # ---- Rule.to_feature ----------------------------------------------------------------
@@ -342,9 +349,8 @@ EDGES = {
         "aliases": ["OLD-1"],
         "evidence": [{"stations": 3}],
     },
-    "suggestion with an axis and a plugin dimension": {
-        "kind": "suggestion",
-        "suggestions": [{"target": "a", "key": "b", "value": [1, None]}],
+    "changes with an axis and a plugin dimension": {
+        "changes": [{"target": "a", "key": "b", "value": [1, None]}],
         "dimensions": {"resolution": {"lt": 10, "unit": "km"}, "basin": ["14"]},
     },
 }
@@ -376,17 +382,38 @@ def test_to_feature_leaves_out_defaults():
         "time": None,
         "properties": {
             "code": "TST001",
-            "kind": "warning",
             "title": "t",
             "message": "m",
         },
     }
 
 
+@pytest.mark.parametrize(
+    "level, changes, written",
+    [
+        ("warning", 0, None),
+        ("info", 0, "info"),
+        ("info", 1, None),
+        ("warning", 1, "warning"),
+        ("error", 2, "error"),
+    ],
+)
+def test_to_feature_writes_a_level_other_than_the_default(level, changes, written):
+    """The default is warning without changes and info with them."""
+    listed = [
+        {"target": "a", "key": f"k{i}", "value": i, "rationale": ""}
+        for i in range(changes)
+    ]
+    rule = qe.Rule.from_feature(record(level=level, changes=listed))
+    assert rule.changes == tuple(qe.Change(**c) for c in listed)
+    feature = assert_round_trip(rule)
+    assert feature["properties"].get("level") == written
+    assert feature["properties"].get("changes", []) == listed
+
+
 def test_to_feature_of_a_rule_built_in_python():
     rule = qe.Rule(
         code="PY001",
-        kind="warning",
         title="t",
         message="m",
         level="info",
@@ -421,7 +448,6 @@ def test_to_feature_and_from_feature_round_trip_every_kind_of_dimension():
     }
     rule = qe.Rule(
         code="ALL001",
-        kind="warning",
         title="t",
         message="m",
         scope=qe.Scope(dimensions=dimensions),
@@ -459,9 +485,9 @@ def test_to_feature_and_from_feature_round_trip_every_kind_of_dimension():
 
 def test_to_feature_refuses_what_a_record_cannot_hold():
     point = qe.Scope(space=sp.point(0, 0))
-    rule = qe.Rule(code="PY002", kind="warning", title="t", message="m", scope=point)
+    rule = qe.Rule(code="PY002", title="t", message="m", scope=point)
     with pytest.raises(ValueError, match="PY002: a record's space is a polygon"):
         rule.to_feature()
-    rule = qe.Rule(code="PY003", kind="warning", title="t", message="m", level=50)
+    rule = qe.Rule(code="PY003", title="t", message="m", level=50)
     with pytest.raises(ValueError, match="PY003: a record's level is info"):
         rule.to_feature()

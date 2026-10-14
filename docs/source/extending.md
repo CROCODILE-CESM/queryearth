@@ -49,7 +49,6 @@ registry = qe.Registry("basins", dimensions=[Pfafstetter()])
 registry.add(
     qe.Rule(
         code="BAS001",
-        kind="warning",
         title="Gauges sparse in basins 14 and 62",
         message="Few gauges report in these basins.",
         scope=qe.Scope(dimensions={"basin": ["14", "62"]}),

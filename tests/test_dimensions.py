@@ -161,22 +161,25 @@ def test_built_in_plugins_are_dimensions():
 
 
 # ---- core objects -------------------------------------------------------------------
-def test_levels_default_by_kind_and_accept_level_names():
-    def level(kind, **given):
-        return qe.Outcome(code="X001", kind=kind, title="t", message="m", **given).level
+def test_levels_default_by_changes_and_accept_level_names():
+    def level(*changes, **given):
+        outcome = qe.Outcome(
+            code="X001", title="t", message="m", changes=changes, **given
+        )
+        return outcome.level
 
-    assert [level(k) for k in ("warning", "suggestion")] == [30, 20]
-    assert level("warning", level="Error") == logging.ERROR
-    assert level("suggestion", level=logging.CRITICAL) == 50
+    change = qe.Change("MOM_input", "DT", 240.0)
+    assert [level(), level(change)] == [logging.WARNING, logging.INFO]
+    assert level(level="Error") == logging.ERROR
+    assert level(change, level=logging.CRITICAL) == 50
+    assert level(change, level="warning") == logging.WARNING
     with pytest.raises(ValueError):
-        level("warning", level="severe")
+        level(level="severe")
 
 
 def test_finding_str_is_the_text_to_log():
     def finding(code, **fields):
-        return qe.Finding(
-            code=code, kind="warning", title=f"{code} title", message="m", **fields
-        )
+        return qe.Finding(code=code, title=f"{code} title", message="m", **fields)
 
     assert str(finding("CROC102")) == "[CROC102] CROC102 title (draft)"
     assert str(finding("CRU001", query_label="lake 1234", area_fraction=1.0)) == (
@@ -215,10 +218,12 @@ def test_objects_with_mappings_compare_by_value_but_do_not_hash():
 @pytest.mark.parametrize(
     "build",
     [
-        lambda: qe.Outcome(code="X001", kind="note", title="t", message="m"),
+        lambda: qe.Outcome(code="X001", title="t", message="m", min_overlap=2),
         lambda: qe.Outcome(
-            code="X001", kind="warning", title="t", message="m", min_overlap=2
+            code="X001", title="t", message="m", changes=qe.Change("a", "b", 1)
         ),
+        lambda: qe.Outcome(code="X001", title="t", message="m", changes=[{"key": "b"}]),
+        lambda: qe.Change("", "b", 1),
     ],
 )
 def test_constructors_reject_bad_values(build):
@@ -226,20 +231,12 @@ def test_constructors_reject_bad_values(build):
         build()
 
 
-def test_rule_requires_suggestions_for_a_suggestion():
-    with pytest.raises(ValueError):
-        qe.Rule(code="X001", kind="suggestion", title="t", message="m")
-    with pytest.raises(ValueError):
-        qe.Rule(code="X001", kind="coverage", title="t", message="m")
-
-
 def test_finding_to_dict_is_json_ready():
     finding = qe.Finding(
         code="CROC102",
-        kind="suggestion",
         title="t",
         message="m",
-        suggestions=({"target": "MOM_input", "key": "DT", "value": 240.0},),
+        changes=({"target": "MOM_input", "key": "DT", "value": 240.0},),
         time_overlap=[("2020-01-01", "..")],
         dimensions={
             "resolution": qe.DimMatch(qe.AxisOverlap(-math.inf, 10.0, False, False)),
@@ -248,7 +245,7 @@ def test_finding_to_dict_is_json_ready():
     )
     out = finding.to_dict()
     assert out["level"] == logging.INFO
-    assert out["suggestions"] == [
+    assert out["changes"] == [
         {"target": "MOM_input", "key": "DT", "value": 240.0, "rationale": ""}
     ]
     assert out["time_overlap"] == [["2020-01-01", ".."]]

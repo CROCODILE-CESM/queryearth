@@ -2,7 +2,11 @@
 
 ## Rules and their scope
 
-A **rule** has a code, an outcome (what it says) and a scope (where, when and for what it applies). Rules are written in Python or as records in GeoJSON rule files, and both kinds are added to a {class}`~queryearth.Registry`, the object you query (see [Writing rules](rules.md)). A scope is given on [dimensions](#dimensions), such as space, time and grid resolution.
+A **rule** has a code, a title, a message and a level, and may list changes. Its scope says where, when and for what it applies. Rules are written in Python or as records in GeoJSON rule files, and both are added to a {class}`~queryearth.Registry`, the object you query (see [Writing rules](rules.md)). A scope is given on [dimensions](#dimensions), such as space, time and grid resolution.
+
+A rule without changes is a warning or a note, such as "these values are climatology, not observations". A rule with changes suggests what to do: each change is a {class}`~queryearth.Change` with a `target`, a `key`, a `value` and an optional `rationale`, such as `qe.Change("MOM_input", "DT", 900.0)`. queryearth never interprets changes; your code applies them, for example to a model's settings.
+
+The **level** is a standard `logging` level, or its name: `"info"`, `"warning"` or `"error"`. It defaults to `logging.WARNING` (30) for a rule without changes and `logging.INFO` (20) for a rule with changes.
 
 A **code** is a prefix plus three or four digits, such as `CRU001`, or `ERA5-014` (a prefix that ends in a digit needs the hyphen).
 
@@ -41,16 +45,13 @@ Scopes and queries give space and time as `space=` and `time=`, and the other di
 
 ## Queries and findings
 
-A {class}`~queryearth.Query` gives values on any subset of the dimensions. "Resolution 8 km" on its own is a complete query. {meth}`Registry.query() <queryearth.Registry.query>` takes a `Query` or its fields as keywords, and returns a sorted list of {class}`~queryearth.Finding` objects: highest level first, then by kind and code.
+A {class}`~queryearth.Query` gives values on any subset of the dimensions. "Resolution 8 km" on its own is a complete query. {meth}`Registry.query() <queryearth.Registry.query>` takes a `Query` or its fields as keywords, and returns a sorted list of {class}`~queryearth.Finding` objects: highest level first, then those without changes before those with changes, then by code.
 
-A finding is the rule's outcome plus how it matched:
+A finding carries the rule's `code`, `title`, `message`, `level` and `changes`, plus how it matched:
 
-- `kind` is `warning` or `suggestion`;
-- `level` is a `logging` level: by default `logging.WARNING` (30) for a warning and `logging.INFO` (20) for a suggestion;
 - `area_fraction` and `overlap_km2` give how much of the query's area the rule covers;
 - `time_overlap` and `time_fraction` give the overlapping periods and their share of the query's time;
-- `dimensions` holds, for each other dimension, a {class}`~queryearth.DimMatch` with its `overlap` and, where it can be measured, its `fraction` of the query's values;
-- `suggestions` holds structured actions (`target`, `key`, `value`, `rationale`) for a suggestion. queryearth never interprets them; your code applies them.
+- `dimensions` holds, for each other dimension, a {class}`~queryearth.DimMatch` with its `overlap` and, where it can be measured, its `fraction` of the query's values.
 
 `Finding.to_dict()` gives a JSON-ready dictionary.
 

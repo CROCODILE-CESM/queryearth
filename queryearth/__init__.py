@@ -27,17 +27,16 @@ from queryearth.dimensions import (
 from queryearth.registry import Registry, PointResult
 from queryearth.objects import (
     Action,
+    Change,
     Confidence,
     DuplicateCodeError,
     Finding,
-    Kind,
     LoadError,
     Match,
     Outcome,
     Query,
     Scope,
     Status,
-    Suggestion,
     UnknownNameError,
 )
 from queryearth.rules import CheckResult, ComputedRule, Rule, RuleFunc, RuleKind
@@ -48,6 +47,7 @@ __all__ = [
     "Action",
     "Axis",
     "AxisOverlap",
+    "Change",
     "CheckResult",
     "ComputedRule",
     "Confidence",
@@ -57,7 +57,6 @@ __all__ = [
     "Finding",
     "Registry",
     "Interval",
-    "Kind",
     "Labels",
     "LoadError",
     "Match",
@@ -71,7 +70,6 @@ __all__ = [
     "Scope",
     "Space",
     "Status",
-    "Suggestion",
     "TimeSpec",
     "UnknownNameError",
     "Versions",

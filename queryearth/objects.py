@@ -25,27 +25,23 @@ if TYPE_CHECKING:
 
 __all__ = [
     "Action",
+    "Change",
     "Confidence",
     "DuplicateCodeError",
     "Finding",
-    "Kind",
     "LoadError",
     "Match",
     "Outcome",
     "Query",
     "Scope",
     "Status",
-    "Suggestion",
     "UnknownNameError",
 ]
 
-Kind = Literal["warning", "suggestion"]
 Confidence = Literal["observed", "likely", "possible", "unknown"]  # CAP certainty
 Action = Literal["can_be_used", "use_with_caution", "do_not_use", "replaced"]
 Status = Literal["draft", "reviewed", "deprecated"]
 
-KINDS = ("warning", "suggestion")  # in the order findings sort
-LEVELS = {"warning": logging.WARNING, "suggestion": logging.INFO}
 CONFIDENCES = ("observed", "likely", "possible", "unknown")
 ACTIONS = ("can_be_used", "use_with_caution", "do_not_use", "replaced")
 STATUSES = ("draft", "reviewed", "deprecated")
@@ -143,8 +139,8 @@ def _jsonable(value: Any) -> Any:
 
 # ---- outcomes, matches, findings -----------------------------------------------
 @dataclass(frozen=True)
-class Suggestion:
-    """A structured action; the engine never interprets target or key."""
+class Change:
+    """A structured change for the caller to apply; never interpreted here."""
 
     target: str
     key: str
@@ -154,35 +150,35 @@ class Suggestion:
     def __post_init__(self) -> None:
         for name in ("target", "key"):
             if not isinstance(getattr(self, name), str) or not getattr(self, name):
-                raise ValueError(f"a suggestion's {name} is a non-empty string")
+                raise ValueError(f"a change's {name} is a non-empty string")
         if not isinstance(self.rationale, str):
-            raise TypeError("a suggestion's rationale is a string")
+            raise TypeError("a change's rationale is a string")
 
 
-def suggestion_of(value: Any) -> Suggestion:
-    """A Suggestion from itself or a {target, key, value, rationale} mapping."""
-    if isinstance(value, Suggestion):
+def change_of(value: Any) -> Change:
+    """A Change from itself or a {target, key, value, rationale} mapping."""
+    if isinstance(value, Change):
         return value
     if isinstance(value, Mapping):
-        return Suggestion(**value)
-    raise TypeError(f"a suggestion is a Suggestion or a mapping, not {value!r}")
+        return Change(**value)
+    raise TypeError(f"a change is a Change or a mapping, not {value!r}")
 
 
 def _outcome_post_init(o: Any) -> None:
     if not isinstance(o.code, str) or not o.code:
         raise ValueError("a code is a non-empty string")
-    _choice(o.kind, KINDS, "kind")
     for name in ("title", "message", "instruction"):
         if not isinstance(getattr(o, name), str):
             raise TypeError(f"{name} must be a string")
-    _set(o, "level", LEVELS[o.kind] if o.level is None else level_of(o.level))
     _choice(o.confidence, CONFIDENCES, "confidence")
     if o.action is not None:
         _choice(o.action, ACTIONS, "action")
     _choice(o.status, STATUSES, "status")
-    if isinstance(o.suggestions, (Suggestion, Mapping)):
-        raise TypeError("suggestions is a sequence of suggestions")
-    _set(o, "suggestions", tuple(suggestion_of(s) for s in o.suggestions))
+    if isinstance(o.changes, (Change, Mapping)):
+        raise TypeError("changes is a sequence of changes")
+    _set(o, "changes", tuple(change_of(c) for c in o.changes))
+    default = logging.INFO if o.changes else logging.WARNING
+    _set(o, "level", default if o.level is None else level_of(o.level))
     minimum = _number(o.min_overlap, "min_overlap")
     if not 0.0 <= minimum <= 1.0:
         raise ValueError(f"min_overlap must lie in [0, 1], not {minimum}")
@@ -199,14 +195,13 @@ class Outcome:
     """What a rule says; shared by Rule and Finding."""
 
     code: str
-    kind: Kind
     title: str
     message: str
-    level: int | str | None = None  # a logging level; None takes the kind's default
+    level: int | str | None = None  # a logging level; None: WARNING, INFO with changes
     confidence: Confidence = "unknown"
     action: Action | None = None
     instruction: str = ""
-    suggestions: tuple[Suggestion, ...] = ()
+    changes: tuple[Change, ...] = ()
     min_overlap: float = 0.0  # a smaller area_fraction is too small to count
     status: Status = "draft"
     references: tuple[Mapping[str, str], ...] = ()
