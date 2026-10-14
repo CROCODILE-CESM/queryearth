@@ -5,14 +5,14 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>queryearth.dimensions &mdash; queryearth 0.1.1.dev5</title>
+  <title>queryearth.dimensions &mdash; queryearth 0.1.1.dev6</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
 
   
       <script src="../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../_static/documentation_options.js?v=5114a614"></script>
+      <script src="../../_static/documentation_options.js?v=66ec2c7e"></script>
       <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../_static/versions.js?v=58ec1786"></script>
@@ -326,8 +326,9 @@
 <span class="k">class</span><span class="w"> </span><span class="nc">Axis</span><span class="p">(</span><span class="n">Dimension</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""A named, ordered, numeric dimension with exactly one unit.</span>
 
-<span class="sd">    A rule states {gt, ge, lt, le, unit}; a query gives a number or a closed</span>
-<span class="sd">    range (lo, hi). The overlap is the intersection, keeping open ends.</span>
+<span class="sd">    A rule gives a range {gt, ge, lt, le, unit}, or a list of ranges that do</span>
+<span class="sd">    not overlap; a query gives a number or a closed range (lo, hi). The overlap</span>
+<span class="sd">    is the intersections with the rule's ranges, lowest first, keeping open ends.</span>
 <span class="sd">    """</span>
 
     <span class="n">name</span><span class="p">:</span> <span class="nb">str</span>
@@ -340,16 +341,35 @@
 
 <div class="viewcode-block" id="Axis.parse_rule">
 <a class="viewcode-back" href="../../api.html#queryearth.Axis.parse_rule">[docs]</a>
-    <span class="k">def</span><span class="w"> </span><span class="nf">parse_rule</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">AxisOverlap</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">parse_rule</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">AxisOverlap</span><span class="p">,</span> <span class="o">...</span><span class="p">]:</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">Mapping</span><span class="p">):</span>
+            <span class="n">value</span> <span class="o">=</span> <span class="p">[</span><span class="n">value</span><span class="p">]</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="p">(</span><span class="nb">str</span><span class="p">,</span> <span class="nb">bytes</span><span class="p">))</span> <span class="ow">or</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">Iterable</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">"axis </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="si">!r}</span><span class="s2"> takes a range of gt, ge, lt, le and unit, or "</span>
+                <span class="sa">f</span><span class="s2">"a list of them, not </span><span class="si">{</span><span class="n">value</span><span class="si">!r}</span><span class="s2">"</span>
+            <span class="p">)</span>
+        <span class="n">ranges</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="n">_range</span><span class="p">(</span><span class="n">item</span><span class="p">)</span> <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">value</span><span class="p">),</span> <span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">r</span><span class="p">:</span> <span class="n">r</span><span class="o">.</span><span class="n">lo</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">ranges</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"axis </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="si">!r}</span><span class="s2"> needs at least one range"</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">a</span><span class="p">,</span> <span class="n">b</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">ranges</span><span class="p">,</span> <span class="n">ranges</span><span class="p">[</span><span class="mi">1</span><span class="p">:]):</span>
+            <span class="k">if</span> <span class="n">a</span><span class="o">.</span><span class="n">hi</span> <span class="o">&gt;</span> <span class="n">b</span><span class="o">.</span><span class="n">lo</span> <span class="ow">or</span> <span class="p">(</span><span class="n">a</span><span class="o">.</span><span class="n">hi</span> <span class="o">==</span> <span class="n">b</span><span class="o">.</span><span class="n">lo</span> <span class="ow">and</span> <span class="n">a</span><span class="o">.</span><span class="n">hi_closed</span> <span class="ow">and</span> <span class="n">b</span><span class="o">.</span><span class="n">lo_closed</span><span class="p">):</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">"the ranges of axis </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="si">!r}</span><span class="s2"> overlap; join them into one"</span>
+                <span class="p">)</span>
+        <span class="k">return</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">ranges</span><span class="p">)</span></div>
+
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_range</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">AxisOverlap</span><span class="p">:</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">Mapping</span><span class="p">):</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"an axis bound is a mapping of gt, ge, lt, le, unit"</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"an axis range is a mapping of gt, ge, lt, le, unit"</span><span class="p">)</span>
         <span class="n">unknown</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">value</span><span class="p">)</span> <span class="o">-</span> <span class="p">{</span><span class="s2">"gt"</span><span class="p">,</span> <span class="s2">"ge"</span><span class="p">,</span> <span class="s2">"lt"</span><span class="p">,</span> <span class="s2">"le"</span><span class="p">,</span> <span class="s2">"unit"</span><span class="p">}</span>
         <span class="k">if</span> <span class="n">unknown</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"unknown axis bound keys </span><span class="si">{</span><span class="nb">sorted</span><span class="p">(</span><span class="n">unknown</span><span class="p">)</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
         <span class="k">if</span> <span class="p">{</span><span class="s2">"gt"</span><span class="p">,</span> <span class="s2">"ge"</span><span class="p">}</span> <span class="o">&lt;=</span> <span class="nb">set</span><span class="p">(</span><span class="n">value</span><span class="p">)</span> <span class="ow">or</span> <span class="p">{</span><span class="s2">"lt"</span><span class="p">,</span> <span class="s2">"le"</span><span class="p">}</span> <span class="o">&lt;=</span> <span class="nb">set</span><span class="p">(</span><span class="n">value</span><span class="p">):</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"give at most one of gt and ge, and one of lt and le"</span><span class="p">)</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="nb">set</span><span class="p">(</span><span class="n">value</span><span class="p">)</span> <span class="o">&amp;</span> <span class="p">{</span><span class="s2">"gt"</span><span class="p">,</span> <span class="s2">"ge"</span><span class="p">,</span> <span class="s2">"lt"</span><span class="p">,</span> <span class="s2">"le"</span><span class="p">}:</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"an axis bound needs at least one of gt, ge, lt, le"</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"an axis range needs at least one of gt, ge, lt, le"</span><span class="p">)</span>
         <span class="n">unit</span> <span class="o">=</span> <span class="n">value</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"unit"</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">unit</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">unit</span> <span class="o">!=</span> <span class="bp">self</span><span class="o">.</span><span class="n">unit</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
@@ -366,9 +386,8 @@
         <span class="k">if</span> <span class="s2">"le"</span> <span class="ow">in</span> <span class="n">value</span><span class="p">:</span>
             <span class="n">hi</span><span class="p">,</span> <span class="n">hi_closed</span> <span class="o">=</span> <span class="n">_number</span><span class="p">(</span><span class="n">value</span><span class="p">[</span><span class="s2">"le"</span><span class="p">],</span> <span class="s2">"le"</span><span class="p">),</span> <span class="kc">True</span>
         <span class="k">if</span> <span class="n">lo</span> <span class="o">&gt;</span> <span class="n">hi</span> <span class="ow">or</span> <span class="p">(</span><span class="n">lo</span> <span class="o">==</span> <span class="n">hi</span> <span class="ow">and</span> <span class="ow">not</span> <span class="p">(</span><span class="n">lo_closed</span> <span class="ow">and</span> <span class="n">hi_closed</span><span class="p">)):</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"the axis bounds </span><span class="si">{</span><span class="nb">dict</span><span class="p">(</span><span class="n">value</span><span class="p">)</span><span class="si">}</span><span class="s2"> leave no value"</span><span class="p">)</span>
-        <span class="k">return</span> <span class="n">AxisOverlap</span><span class="p">(</span><span class="n">lo</span><span class="p">,</span> <span class="n">hi</span><span class="p">,</span> <span class="n">lo_closed</span><span class="p">,</span> <span class="n">hi_closed</span><span class="p">)</span></div>
-
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"the axis range </span><span class="si">{</span><span class="nb">dict</span><span class="p">(</span><span class="n">value</span><span class="p">)</span><span class="si">}</span><span class="s2"> leaves no value"</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">AxisOverlap</span><span class="p">(</span><span class="n">lo</span><span class="p">,</span> <span class="n">hi</span><span class="p">,</span> <span class="n">lo_closed</span><span class="p">,</span> <span class="n">hi_closed</span><span class="p">)</span>
 
 <div class="viewcode-block" id="Axis.parse_query">
 <a class="viewcode-back" href="../../api.html#queryearth.Axis.parse_query">[docs]</a>
@@ -387,19 +406,22 @@
 
 <div class="viewcode-block" id="Axis.match">
 <a class="viewcode-back" href="../../api.html#queryearth.Axis.match">[docs]</a>
-    <span class="k">def</span><span class="w"> </span><span class="nf">match</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">rule</span><span class="p">:</span> <span class="n">AxisOverlap</span><span class="p">,</span> <span class="n">query</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">DimMatch</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">match</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">rule</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">AxisOverlap</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span> <span class="n">query</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">]</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">DimMatch</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
         <span class="n">lo</span><span class="p">,</span> <span class="n">hi</span> <span class="o">=</span> <span class="n">query</span>
-        <span class="n">found</span> <span class="o">=</span> <span class="n">axis_intersection</span><span class="p">(</span><span class="n">rule</span><span class="p">,</span> <span class="n">lo</span><span class="p">,</span> <span class="n">hi</span><span class="p">)</span>
-        <span class="k">if</span> <span class="n">found</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">pieces</span> <span class="o">=</span> <span class="p">(</span><span class="n">axis_intersection</span><span class="p">(</span><span class="n">r</span><span class="p">,</span> <span class="n">lo</span><span class="p">,</span> <span class="n">hi</span><span class="p">)</span> <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">rule</span><span class="p">)</span>
+        <span class="n">found</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">piece</span> <span class="k">for</span> <span class="n">piece</span> <span class="ow">in</span> <span class="n">pieces</span> <span class="k">if</span> <span class="n">piece</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">found</span><span class="p">:</span>
             <span class="k">return</span> <span class="kc">None</span>
-        <span class="n">fraction</span> <span class="o">=</span> <span class="mf">1.0</span> <span class="k">if</span> <span class="n">hi</span> <span class="o">==</span> <span class="n">lo</span> <span class="k">else</span> <span class="p">(</span><span class="n">found</span><span class="o">.</span><span class="n">hi</span> <span class="o">-</span> <span class="n">found</span><span class="o">.</span><span class="n">lo</span><span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="n">hi</span> <span class="o">-</span> <span class="n">lo</span><span class="p">)</span>
+        <span class="n">fraction</span> <span class="o">=</span> <span class="mf">1.0</span> <span class="k">if</span> <span class="n">hi</span> <span class="o">==</span> <span class="n">lo</span> <span class="k">else</span> <span class="nb">sum</span><span class="p">(</span><span class="n">f</span><span class="o">.</span><span class="n">hi</span> <span class="o">-</span> <span class="n">f</span><span class="o">.</span><span class="n">lo</span> <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">found</span><span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="n">hi</span> <span class="o">-</span> <span class="n">lo</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">DimMatch</span><span class="p">(</span><span class="n">found</span><span class="p">,</span> <span class="n">fraction</span><span class="p">)</span></div>
 
 
 <div class="viewcode-block" id="Axis.extent">
 <a class="viewcode-back" href="../../api.html#queryearth.Axis.extent">[docs]</a>
-    <span class="k">def</span><span class="w"> </span><span class="nf">extent</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">rule</span><span class="p">:</span> <span class="n">AxisOverlap</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">AxisOverlap</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">"""The rule's own interval, reported when the query omits the axis."""</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">extent</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">rule</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">AxisOverlap</span><span class="p">,</span> <span class="o">...</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">AxisOverlap</span><span class="p">,</span> <span class="o">...</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">"""The rule's own ranges, reported when the query omits the axis."""</span>
         <span class="k">return</span> <span class="n">rule</span></div>
 </div>
 

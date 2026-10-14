@@ -16,16 +16,16 @@ Everything a rule can be scoped by is a dimension. Each dimension has a set of v
 
 | Kind | Values | A rule gives | A query gives | Declare it with |
 |---|---|---|---|---|
-| Space (built in) | points on the sphere | a polygon or box | a point or polygon | — |
+| Space (built in) | points on the sphere | a polygon, several (a MultiPolygon), or a box | a point or polygon | — |
 | Time (built in) | the time line | intervals, optionally some months each year | an interval | — |
-| Axis | numbers, with a unit | a range: `{"lt": 10}`, with any of `gt`, `ge`, `lt`, `le` (and optionally the declared `"unit"`) | a number or a range, such as `8` or `(5, 10)` | `qe.Axis("resolution", "km")` |
+| Axis | numbers, with a unit | a range: `{"lt": 10}`, with any of `gt`, `ge`, `lt`, `le` (and optionally the declared `"unit"`); or a list of ranges that do not overlap: `[{"lt": 5}, {"gt": 50}]` | a number or a range, such as `8` or `(5, 10)` | `qe.Axis("resolution", "km")` |
 | Labels | names | names, with `*` and `?` wildcards: `["glorys", "era5*"]`; or `{"any_of": [...], "none_of": [...]}` | one or more names, such as `"era5"` | `qe.Labels("product")` |
 | Versions | versions, such as `4.07` or `ERA5T` | ranges or exact versions: `{"introduced": "4.00", "fixed": "4.09"}`, `{"versions": ["ERA5T"]}`, or a list of them | one or more versions, such as `"4.07"` | `qe.Versions("version")` |
 | Your own | anything | anything | anything | a class with `name`, `parse_rule`, `parse_query` and `match` |
 
 A rule's values are written the same way in Python (`Scope(dimensions=...)`) and in a rule file (the record's `"dimensions"` member).
 
-A scope picks values on some dimensions and leaves the rest open: a dimension the rule leaves out matches anything. A rule applies when its scope and the query overlap on every dimension. A query that leaves out a dimension the rule constrains gets a [conditional finding](#conditional-findings).
+Within a dimension, a rule's values are alternatives: several polygons, periods, ranges, names or versions mean any of them. Across dimensions, all must hold: a rule applies when its scope and the query overlap on every dimension the rule constrains, and a dimension it leaves out matches anything. So "or" within one dimension is one rule, and "or" across dimensions, such as "the Arctic in northern winter, or the Antarctic in southern winter", is two rules. A query that leaves out a dimension the rule constrains gets a [conditional finding](#conditional-findings).
 
 Space and time are built into every Registry. Every other dimension is declared, in one list, when you make the Registry, and its name is the key that rules and queries use:
 
@@ -51,7 +51,7 @@ A finding carries the rule's `code`, `title`, `message`, `level` and `changes`, 
 
 - `area_fraction` and `overlap_km2` give how much of the query's area the rule covers;
 - `time_overlap` and `time_fraction` give the overlapping periods and their share of the query's time;
-- `dimensions` holds, for each other dimension, a {class}`~queryearth.DimMatch` with its `overlap` and, where it can be measured, its `fraction` of the query's values.
+- `dimensions` holds, for each other dimension, a {class}`~queryearth.DimMatch` with its `overlap` and, where it can be measured, its `fraction` of the query's values. For an axis, `overlap` lists the parts of the rule's ranges that the query meets, lowest first, so `overlap[0].lo` is the lowest matching value.
 
 `Finding.to_dict()` gives a JSON-ready dictionary.
 

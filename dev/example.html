@@ -6,14 +6,14 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>The toy example &mdash; queryearth 0.1.1.dev5</title>
+  <title>The toy example &mdash; queryearth 0.1.1.dev6</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
 
   
       <script src="_static/jquery.js?v=5d32c60e"></script>
       <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="_static/documentation_options.js?v=5114a614"></script>
+      <script src="_static/documentation_options.js?v=66ec2c7e"></script>
       <script src="_static/doctools.js?v=fd6eb6e6"></script>
       <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="_static/versions.js?v=58ec1786"></script>
@@ -178,7 +178,7 @@
 <span class="p">)</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">time_step</span><span class="p">(</span><span class="n">query</span><span class="p">,</span> <span class="n">match</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""Set the toy time step from the finest cells"""</span>
-    <span class="n">finest_km</span> <span class="o">=</span> <span class="n">match</span><span class="o">.</span><span class="n">dimensions</span><span class="p">[</span><span class="s2">"resolution"</span><span class="p">]</span><span class="o">.</span><span class="n">overlap</span><span class="o">.</span><span class="n">lo</span>
+    <span class="n">finest_km</span> <span class="o">=</span> <span class="n">match</span><span class="o">.</span><span class="n">dimensions</span><span class="p">[</span><span class="s2">"resolution"</span><span class="p">]</span><span class="o">.</span><span class="n">overlap</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">lo</span>
     <span class="n">seconds</span> <span class="o">=</span> <span class="mf">30.0</span> <span class="o">*</span> <span class="n">finest_km</span>  <span class="c1"># made up: 30 s per km</span>
     <span class="k">return</span> <span class="p">{</span><span class="s2">"changes"</span><span class="p">:</span> <span class="p">[</span><span class="n">qe</span><span class="o">.</span><span class="n">Change</span><span class="p">(</span><span class="s2">"MOM_input"</span><span class="p">,</span> <span class="s2">"TOY_DT"</span><span class="p">,</span> <span class="n">seconds</span><span class="p">,</span> <span class="s2">"made up"</span><span class="p">)]}</span>
 
