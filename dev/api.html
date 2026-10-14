@@ -6,14 +6,14 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>API reference &mdash; queryearth 0.1.1.dev2</title>
+  <title>API reference &mdash; queryearth 0.1.1.dev3</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
 
   
       <script src="_static/jquery.js?v=5d32c60e"></script>
       <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="_static/documentation_options.js?v=9a9d36d9"></script>
+      <script src="_static/documentation_options.js?v=3ee5b2c0"></script>
       <script src="_static/doctools.js?v=fd6eb6e6"></script>
       <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="_static/versions.js?v=58ec1786"></script>
@@ -50,6 +50,9 @@
 <li class="toctree-l1"><a class="reference internal" href="example.html">The toy example</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">API reference</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="#queryearth.Axis"><code class="docutils literal notranslate"><span class="pre">Axis</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#queryearth.Axis.parse_rule"><code class="docutils literal notranslate"><span class="pre">Axis.parse_rule()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#queryearth.Axis.parse_query"><code class="docutils literal notranslate"><span class="pre">Axis.parse_query()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#queryearth.Axis.match"><code class="docutils literal notranslate"><span class="pre">Axis.match()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#queryearth.Axis.extent"><code class="docutils literal notranslate"><span class="pre">Axis.extent()</span></code></a></li>
 </ul>
 </li>
@@ -65,7 +68,16 @@
 <li class="toctree-l3"><a class="reference internal" href="#queryearth.DimMatch.to_dict"><code class="docutils literal notranslate"><span class="pre">DimMatch.to_dict()</span></code></a></li>
 </ul>
 </li>
-<li class="toctree-l2"><a class="reference internal" href="#queryearth.Dimension"><code class="docutils literal notranslate"><span class="pre">Dimension</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#queryearth.Dimension"><code class="docutils literal notranslate"><span class="pre">Dimension</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#queryearth.Dimension.parse_rule"><code class="docutils literal notranslate"><span class="pre">Dimension.parse_rule()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#queryearth.Dimension.parse_query"><code class="docutils literal notranslate"><span class="pre">Dimension.parse_query()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#queryearth.Dimension.match"><code class="docutils literal notranslate"><span class="pre">Dimension.match()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#queryearth.Dimension.comparable"><code class="docutils literal notranslate"><span class="pre">Dimension.comparable()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#queryearth.Dimension.build"><code class="docutils literal notranslate"><span class="pre">Dimension.build()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#queryearth.Dimension.extent"><code class="docutils literal notranslate"><span class="pre">Dimension.extent()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#queryearth.Dimension.to_json"><code class="docutils literal notranslate"><span class="pre">Dimension.to_json()</span></code></a></li>
+</ul>
+</li>
 <li class="toctree-l2"><a class="reference internal" href="#queryearth.DuplicateCodeError"><code class="docutils literal notranslate"><span class="pre">DuplicateCodeError</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="#queryearth.Finding"><code class="docutils literal notranslate"><span class="pre">Finding</span></code></a><ul>
 <li class="toctree-l3"><a class="reference internal" href="#queryearth.Finding.to_dict"><code class="docutils literal notranslate"><span class="pre">Finding.to_dict()</span></code></a></li>
@@ -85,7 +97,12 @@
 <li class="toctree-l3"><a class="reference internal" href="#queryearth.Interval.to_wire"><code class="docutils literal notranslate"><span class="pre">Interval.to_wire()</span></code></a></li>
 </ul>
 </li>
-<li class="toctree-l2"><a class="reference internal" href="#queryearth.Labels"><code class="docutils literal notranslate"><span class="pre">Labels</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#queryearth.Labels"><code class="docutils literal notranslate"><span class="pre">Labels</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#queryearth.Labels.parse_rule"><code class="docutils literal notranslate"><span class="pre">Labels.parse_rule()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#queryearth.Labels.parse_query"><code class="docutils literal notranslate"><span class="pre">Labels.parse_query()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#queryearth.Labels.match"><code class="docutils literal notranslate"><span class="pre">Labels.match()</span></code></a></li>
+</ul>
+</li>
 <li class="toctree-l2"><a class="reference internal" href="#queryearth.LoadError"><code class="docutils literal notranslate"><span class="pre">LoadError</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="#queryearth.Match"><code class="docutils literal notranslate"><span class="pre">Match</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="#queryearth.Outcome"><code class="docutils literal notranslate"><span class="pre">Outcome</span></code></a></li>
@@ -111,7 +128,12 @@
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="#queryearth.UnknownNameError"><code class="docutils literal notranslate"><span class="pre">UnknownNameError</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="#queryearth.Versions"><code class="docutils literal notranslate"><span class="pre">Versions</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#queryearth.Versions"><code class="docutils literal notranslate"><span class="pre">Versions</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#queryearth.Versions.parse_rule"><code class="docutils literal notranslate"><span class="pre">Versions.parse_rule()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#queryearth.Versions.parse_query"><code class="docutils literal notranslate"><span class="pre">Versions.parse_query()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#queryearth.Versions.match"><code class="docutils literal notranslate"><span class="pre">Versions.match()</span></code></a></li>
+</ul>
+</li>
 <li class="toctree-l2"><a class="reference internal" href="#queryearth.interval"><code class="docutils literal notranslate"><span class="pre">interval()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="#queryearth.parse_time"><code class="docutils literal notranslate"><span class="pre">parse_time()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="#module-queryearth.space">queryearth.space</a><ul>
@@ -175,6 +197,24 @@ design.</p>
 <dd><p>A named, ordered, numeric dimension with exactly one unit.</p>
 <p>A rule states {gt, ge, lt, le, unit}; a query gives a number or a closed
 range (lo, hi). The overlap is the intersection, keeping open ends.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="queryearth.Axis.parse_rule">
+<span class="sig-name descname"><span class="pre">parse_rule</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#queryearth.AxisOverlap" title="queryearth.dimensions.AxisOverlap"><span class="pre">AxisOverlap</span></a></span></span><a class="reference internal" href="_modules/queryearth/dimensions.html#Axis.parse_rule"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#queryearth.Axis.parse_rule" title="Link to this definition"></a></dt>
+<dd><p>A rule’s value, parsed when the rule is added; ValueError if invalid.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="queryearth.Axis.parse_query">
+<span class="sig-name descname"><span class="pre">parse_query</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">float</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">float</span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="_modules/queryearth/dimensions.html#Axis.parse_query"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#queryearth.Axis.parse_query" title="Link to this definition"></a></dt>
+<dd><p>A query’s value, parsed when the query runs; ValueError if invalid.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="queryearth.Axis.match">
+<span class="sig-name descname"><span class="pre">match</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">rule</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#queryearth.AxisOverlap" title="queryearth.dimensions.AxisOverlap"><span class="pre">AxisOverlap</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">query</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">float</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">float</span><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#queryearth.DimMatch" title="queryearth.dimensions.DimMatch"><span class="pre">DimMatch</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span></span><a class="reference internal" href="_modules/queryearth/dimensions.html#Axis.match"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#queryearth.Axis.match" title="Link to this definition"></a></dt>
+<dd><p>How a rule’s value meets a query’s value; None when they do not.</p>
+</dd></dl>
+
 <dl class="py method">
 <dt class="sig sig-object py" id="queryearth.Axis.extent">
 <span class="sig-name descname"><span class="pre">extent</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">rule</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#queryearth.AxisOverlap" title="queryearth.dimensions.AxisOverlap"><span class="pre">AxisOverlap</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#queryearth.AxisOverlap" title="queryearth.dimensions.AxisOverlap"><span class="pre">AxisOverlap</span></a></span></span><a class="reference internal" href="_modules/queryearth/dimensions.html#Axis.extent"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#queryearth.Axis.extent" title="Link to this definition"></a></dt>
@@ -243,14 +283,57 @@ Finding fields to override, or several such mappings.</p>
 
 <dl class="py class">
 <dt class="sig sig-object py" id="queryearth.Dimension">
-<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">queryearth.</span></span><span class="sig-name descname"><span class="pre">Dimension</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/queryearth/dimensions.html#Dimension"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#queryearth.Dimension" title="Link to this definition"></a></dt>
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">queryearth.</span></span><span class="sig-name descname"><span class="pre">Dimension</span></span><a class="reference internal" href="_modules/queryearth/dimensions.html#Dimension"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#queryearth.Dimension" title="Link to this definition"></a></dt>
 <dd><p>One kind of scope, declared on a Registry under a unique name.</p>
-<p>Optional members, looked up with getattr: comparable(rule, query) -&gt; bool
-(False makes the finding conditional on the dimension); build(pairs) -&gt;
-Prefilter over the (position, rule value) pairs of the rules that constrain
-it; to_json(overlap) for Finding.to_dict(); late = True to run after the
-exact spatial test; extent(rule) for what an undecided finding reports;
-always = True to call match(None, query) when a rule leaves it unconstrained.</p>
+<p>A subclass sets name and implements parse_rule, parse_query and match; it
+cannot be created without them. The other members have defaults that leave
+the Registry’s behaviour unchanged, and a subclass overrides only those it
+needs.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="queryearth.Dimension.parse_rule">
+<span class="property"><span class="k"><span class="pre">abstractmethod</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">parse_rule</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Any</span></span></span><a class="reference internal" href="_modules/queryearth/dimensions.html#Dimension.parse_rule"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#queryearth.Dimension.parse_rule" title="Link to this definition"></a></dt>
+<dd><p>A rule’s value, parsed when the rule is added; ValueError if invalid.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="queryearth.Dimension.parse_query">
+<span class="property"><span class="k"><span class="pre">abstractmethod</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">parse_query</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Any</span></span></span><a class="reference internal" href="_modules/queryearth/dimensions.html#Dimension.parse_query"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#queryearth.Dimension.parse_query" title="Link to this definition"></a></dt>
+<dd><p>A query’s value, parsed when the query runs; ValueError if invalid.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="queryearth.Dimension.match">
+<span class="property"><span class="k"><span class="pre">abstractmethod</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">match</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">rule</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">query</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#queryearth.DimMatch" title="queryearth.dimensions.DimMatch"><span class="pre">DimMatch</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span></span><a class="reference internal" href="_modules/queryearth/dimensions.html#Dimension.match"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#queryearth.Dimension.match" title="Link to this definition"></a></dt>
+<dd><p>How a rule’s value meets a query’s value; None when they do not.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="queryearth.Dimension.comparable">
+<span class="sig-name descname"><span class="pre">comparable</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">rule</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">query</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">bool</span></span></span><a class="reference internal" href="_modules/queryearth/dimensions.html#Dimension.comparable"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#queryearth.Dimension.comparable" title="Link to this definition"></a></dt>
+<dd><p>False makes the finding conditional on this dimension, not a non-match.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="queryearth.Dimension.build">
+<span class="sig-name descname"><span class="pre">build</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">pairs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#queryearth.Prefilter" title="queryearth.dimensions.Prefilter"><span class="pre">Prefilter</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span></span><a class="reference internal" href="_modules/queryearth/dimensions.html#Dimension.build"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#queryearth.Dimension.build" title="Link to this definition"></a></dt>
+<dd><p>An index over the (position, rule value) pairs of the rules that
+constrain this dimension, to narrow them before match() runs; None for
+no index. Not used by a dimension that overrides comparable().</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="queryearth.Dimension.extent">
+<span class="sig-name descname"><span class="pre">extent</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">rule</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Any</span></span></span><a class="reference internal" href="_modules/queryearth/dimensions.html#Dimension.extent"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#queryearth.Dimension.extent" title="Link to this definition"></a></dt>
+<dd><p>What a finding reports when the query leaves this dimension out;
+None for nothing.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="queryearth.Dimension.to_json">
+<span class="sig-name descname"><span class="pre">to_json</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">overlap</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Any</span></span></span><a class="reference internal" href="_modules/queryearth/dimensions.html#Dimension.to_json"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#queryearth.Dimension.to_json" title="Link to this definition"></a></dt>
+<dd><p>An overlap as JSON, for Finding.to_dict().</p>
+</dd></dl>
+
 </dd></dl>
 
 <dl class="py exception">
@@ -358,6 +441,24 @@ interval has its ends at midnight and is written back as dates.</p>
 <dt class="sig sig-object py" id="queryearth.Labels">
 <span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">queryearth.</span></span><span class="sig-name descname"><span class="pre">Labels</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">description</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">''</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/queryearth/dimensions.html#Labels"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#queryearth.Labels" title="Link to this definition"></a></dt>
 <dd><p>A label dimension: names, which rules match with glob patterns (section 4.7).</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="queryearth.Labels.parse_rule">
+<span class="sig-name descname"><span class="pre">parse_rule</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Patterns</span></span></span><a class="reference internal" href="_modules/queryearth/dimensions.html#Labels.parse_rule"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#queryearth.Labels.parse_rule" title="Link to this definition"></a></dt>
+<dd><p>A rule’s value, parsed when the rule is added; ValueError if invalid.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="queryearth.Labels.parse_query">
+<span class="sig-name descname"><span class="pre">parse_query</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="_modules/queryearth/dimensions.html#Labels.parse_query"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#queryearth.Labels.parse_query" title="Link to this definition"></a></dt>
+<dd><p>A query’s value, parsed when the query runs; ValueError if invalid.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="queryearth.Labels.match">
+<span class="sig-name descname"><span class="pre">match</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">rule</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Patterns</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">query</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#queryearth.DimMatch" title="queryearth.dimensions.DimMatch"><span class="pre">DimMatch</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span></span><a class="reference internal" href="_modules/queryearth/dimensions.html#Labels.match"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#queryearth.Labels.match" title="Link to this definition"></a></dt>
+<dd><p>How a rule’s value meets a query’s value; None when they do not.</p>
+</dd></dl>
+
 </dd></dl>
 
 <dl class="py exception">
@@ -503,6 +604,24 @@ refuses it in rules and queries alike (sections 4.6 and 4.7).</p>
 <dt class="sig sig-object py" id="queryearth.Versions">
 <span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">queryearth.</span></span><span class="sig-name descname"><span class="pre">Versions</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/queryearth/dimensions.html#Versions"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#queryearth.Versions" title="Link to this definition"></a></dt>
 <dd><p>A version dimension: rules give a union of OSV-style ranges (section 4.8).</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="queryearth.Versions.parse_rule">
+<span class="sig-name descname"><span class="pre">parse_rule</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">VersionRange</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="_modules/queryearth/dimensions.html#Versions.parse_rule"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#queryearth.Versions.parse_rule" title="Link to this definition"></a></dt>
+<dd><p>A rule’s value, parsed when the rule is added; ValueError if invalid.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="queryearth.Versions.parse_query">
+<span class="sig-name descname"><span class="pre">parse_query</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="_modules/queryearth/dimensions.html#Versions.parse_query"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#queryearth.Versions.parse_query" title="Link to this definition"></a></dt>
+<dd><p>A query’s value, parsed when the query runs; ValueError if invalid.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="queryearth.Versions.match">
+<span class="sig-name descname"><span class="pre">match</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">rule</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">VersionRange</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">query</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#queryearth.DimMatch" title="queryearth.dimensions.DimMatch"><span class="pre">DimMatch</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span></span><a class="reference internal" href="_modules/queryearth/dimensions.html#Versions.match"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#queryearth.Versions.match" title="Link to this definition"></a></dt>
+<dd><p>How a rule’s value meets a query’s value; None when they do not.</p>
+</dd></dl>
+
 </dd></dl>
 
 <dl class="py function">

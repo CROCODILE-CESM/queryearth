@@ -6,14 +6,14 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Extending queryearth &mdash; queryearth 0.1.1.dev2</title>
+  <title>Extending queryearth &mdash; queryearth 0.1.1.dev3</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
 
   
       <script src="_static/jquery.js?v=5d32c60e"></script>
       <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="_static/documentation_options.js?v=9a9d36d9"></script>
+      <script src="_static/documentation_options.js?v=3ee5b2c0"></script>
       <script src="_static/doctools.js?v=fd6eb6e6"></script>
       <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="_static/versions.js?v=58ec1786"></script>
@@ -109,14 +109,14 @@
 <p>Geometry and time semantics are not pluggable. Space and time are dimensions inside the engine, but <code class="docutils literal notranslate"><span class="pre">SpaceDimension</span></code> and <code class="docutils literal notranslate"><span class="pre">TimeDimension</span></code> are built into every Registry and cannot be replaced, so “overlaps” means the same thing for every rule.</p>
 <section id="dimension-plugins">
 <h2>Dimension plugins<a class="headerlink" href="#dimension-plugins" title="Link to this heading"></a></h2>
-<p><a class="reference internal" href="concepts.html#dimensions"><span class="std std-ref">Dimensions</span></a> lists the kinds that come with queryearth; <code class="docutils literal notranslate"><span class="pre">Axis</span></code>, <code class="docutils literal notranslate"><span class="pre">Labels</span></code> and <code class="docutils literal notranslate"><span class="pre">Versions</span></code> are written the same way as your own. A dimension has a <code class="docutils literal notranslate"><span class="pre">name</span></code> and three methods:</p>
+<p><a class="reference internal" href="concepts.html#dimensions"><span class="std std-ref">Dimensions</span></a> lists the kinds that come with queryearth. Every dimension, <code class="docutils literal notranslate"><span class="pre">Axis</span></code>, <code class="docutils literal notranslate"><span class="pre">Labels</span></code> and <code class="docutils literal notranslate"><span class="pre">Versions</span></code> included, subclasses <a class="reference internal" href="api.html#queryearth.Dimension" title="queryearth.Dimension"><code class="xref py py-class docutils literal notranslate"><span class="pre">Dimension</span></code></a>, and so does your own. A subclass sets <code class="docutils literal notranslate"><span class="pre">name</span></code> and implements three methods; Python refuses to create one that leaves any of them out:</p>
 <ul class="simple">
 <li><p><code class="docutils literal notranslate"><span class="pre">parse_rule(value)</span></code> checks and parses a rule’s value when the rule is added, from Python or from a record, and raises <code class="docutils literal notranslate"><span class="pre">ValueError</span></code> for a bad one;</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">parse_query(value)</span></code> does the same for a query’s value;</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">match(rule,</span> <span class="pre">query)</span></code> returns a <code class="docutils literal notranslate"><span class="pre">DimMatch(overlap,</span> <span class="pre">fraction)</span></code> when they meet, or <code class="docutils literal notranslate"><span class="pre">None</span></code> when they do not.</p></li>
 </ul>
 <p>The Registry does everything else: conditional findings, unknown names and sorting. This plugin matches HydroBASINS Pfafstetter basin codes, where basin 1423 lies inside basin 14:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">Pfafstetter</span><span class="p">:</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">Pfafstetter</span><span class="p">(</span><span class="n">qe</span><span class="o">.</span><span class="n">Dimension</span><span class="p">):</span>
     <span class="n">name</span> <span class="o">=</span> <span class="s2">"basin"</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">parse_rule</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
@@ -151,31 +151,38 @@
 <span class="n">registry</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="n">dimensions</span><span class="o">=</span><span class="p">{</span><span class="s2">"basin"</span><span class="p">:</span> <span class="s2">"1423"</span><span class="p">})</span>  <span class="c1"># BAS001, overlap ("14",), fraction 1.0</span>
 </pre></div>
 </div>
-<p>A dimension may also define these optional members:</p>
+<p><code class="docutils literal notranslate"><span class="pre">Dimension</span></code> also has these members, whose defaults change nothing; override only those you need:</p>
 <table class="docutils align-default">
 <thead>
 <tr class="row-odd"><th class="head"><p>Member</p></th>
-<th class="head"><p>Effect</p></th>
+<th class="head"><p>Default</p></th>
+<th class="head"><p>Override it to</p></th>
 </tr>
 </thead>
 <tbody>
 <tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">comparable(rule,</span> <span class="pre">query)</span></code></p></td>
-<td><p>Returning False makes the finding conditional on the dimension instead of a non-match</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">True</span></code></p></td>
+<td><p>return False to make the finding conditional on the dimension instead of a non-match</p></td>
 </tr>
 <tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">build(pairs)</span></code></p></td>
-<td><p>Takes the <code class="docutils literal notranslate"><span class="pre">(position,</span> <span class="pre">rule</span> <span class="pre">value)</span></code> pairs of the rules that constrain the dimension and returns a prefilter whose <code class="docutils literal notranslate"><span class="pre">candidates(query)</span></code> gives the positions to keep, so a plugin can bring its own index</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">None</span></code> (no index)</p></td>
+<td><p>take the <code class="docutils literal notranslate"><span class="pre">(position,</span> <span class="pre">rule</span> <span class="pre">value)</span></code> pairs of the rules that constrain the dimension and return a prefilter whose <code class="docutils literal notranslate"><span class="pre">candidates(query)</span></code> gives the positions to keep, so the dimension brings its own index; not used if you also override <code class="docutils literal notranslate"><span class="pre">comparable</span></code></p></td>
 </tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">late</span> <span class="pre">=</span> <span class="pre">True</span></code></p></td>
-<td><p>Runs the dimension after the others; space sets it, so the costly spatial test runs last</p></td>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">late</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">False</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">True</span></code> runs the dimension after the others; space sets it, so the costly spatial test runs last</p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">always</span> <span class="pre">=</span> <span class="pre">True</span></code></p></td>
-<td><p>Calls <code class="docutils literal notranslate"><span class="pre">match(None,</span> <span class="pre">query)</span></code> when a rule leaves the dimension out, so the query is still measured</p></td>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">always</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">False</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">True</span></code> calls <code class="docutils literal notranslate"><span class="pre">match(None,</span> <span class="pre">query)</span></code> when a rule leaves the dimension out, so the query is still measured</p></td>
 </tr>
 <tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">extent(rule)</span></code></p></td>
-<td><p>What a finding reports when the query leaves the dimension out</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">None</span></code> (nothing)</p></td>
+<td><p>give what a finding reports when the query leaves the dimension out</p></td>
 </tr>
 <tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">to_json(overlap)</span></code></p></td>
-<td><p>Serialises the overlap for <code class="docutils literal notranslate"><span class="pre">Finding.to_dict()</span></code></p></td>
+<td><p>the overlap unchanged</p></td>
+<td><p>turn the overlap into JSON for <code class="docutils literal notranslate"><span class="pre">Finding.to_dict()</span></code></p></td>
 </tr>
 </tbody>
 </table>

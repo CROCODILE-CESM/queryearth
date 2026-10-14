@@ -5,14 +5,14 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>queryearth.dimensions &mdash; queryearth 0.1.1.dev2</title>
+  <title>queryearth.dimensions &mdash; queryearth 0.1.1.dev3</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
 
   
       <script src="../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../_static/documentation_options.js?v=9a9d36d9"></script>
+      <script src="../../_static/documentation_options.js?v=3ee5b2c0"></script>
       <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../_static/versions.js?v=58ec1786"></script>
@@ -78,20 +78,21 @@
 
 <span class="sd">A dimension decides only whether one rule value meets one query value; the</span>
 <span class="sd">Registry does everything else (conditional findings, unknown names, sorting).</span>
-<span class="sd">Space and time are built in on every Registry and cannot be replaced. Axis</span>
-<span class="sd">(numeric ranges), Labels (names matched by glob patterns) and Versions</span>
-<span class="sd">(OSV-style version ranges) are the built-in plugins, and a user plugin</span>
-<span class="sd">implements the same four members.</span>
+<span class="sd">Every dimension subclasses Dimension. Space and time are built in on every</span>
+<span class="sd">Registry and cannot be replaced; Axis (numeric ranges), Labels (names matched</span>
+<span class="sd">by glob patterns) and Versions (OSV-style version ranges) are declared, and a</span>
+<span class="sd">user's own dimension subclasses Dimension the same way.</span>
 <span class="sd">"""</span>
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
 
+<span class="kn">import</span><span class="w"> </span><span class="nn">abc</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">math</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">re</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">collections.abc</span><span class="w"> </span><span class="kn">import</span> <span class="n">Callable</span><span class="p">,</span> <span class="n">Iterable</span><span class="p">,</span> <span class="n">Mapping</span><span class="p">,</span> <span class="n">Sequence</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">dataclasses</span><span class="w"> </span><span class="kn">import</span> <span class="n">dataclass</span><span class="p">,</span> <span class="n">field</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">fnmatch</span><span class="w"> </span><span class="kn">import</span> <span class="n">fnmatchcase</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Protocol</span><span class="p">,</span> <span class="n">runtime_checkable</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">ClassVar</span><span class="p">,</span> <span class="n">Protocol</span>
 
 <span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
 
@@ -137,25 +138,70 @@
 
 <div class="viewcode-block" id="Dimension">
 <a class="viewcode-back" href="../../api.html#queryearth.Dimension">[docs]</a>
-<span class="nd">@runtime_checkable</span>
-<span class="k">class</span><span class="w"> </span><span class="nc">Dimension</span><span class="p">(</span><span class="n">Protocol</span><span class="p">):</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">Dimension</span><span class="p">(</span><span class="n">abc</span><span class="o">.</span><span class="n">ABC</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""One kind of scope, declared on a Registry under a unique name.</span>
 
-<span class="sd">    Optional members, looked up with getattr: comparable(rule, query) -&gt; bool</span>
-<span class="sd">    (False makes the finding conditional on the dimension); build(pairs) -&gt;</span>
-<span class="sd">    Prefilter over the (position, rule value) pairs of the rules that constrain</span>
-<span class="sd">    it; to_json(overlap) for Finding.to_dict(); late = True to run after the</span>
-<span class="sd">    exact spatial test; extent(rule) for what an undecided finding reports;</span>
-<span class="sd">    always = True to call match(None, query) when a rule leaves it unconstrained.</span>
+<span class="sd">    A subclass sets name and implements parse_rule, parse_query and match; it</span>
+<span class="sd">    cannot be created without them. The other members have defaults that leave</span>
+<span class="sd">    the Registry's behaviour unchanged, and a subclass overrides only those it</span>
+<span class="sd">    needs.</span>
 <span class="sd">    """</span>
 
     <span class="n">name</span><span class="p">:</span> <span class="nb">str</span>  <span class="c1"># key in scopes, queries, records and conditional_on</span>
+    <span class="n">late</span><span class="p">:</span> <span class="n">ClassVar</span><span class="p">[</span><span class="nb">bool</span><span class="p">]</span> <span class="o">=</span> <span class="kc">False</span>  <span class="c1"># run after the others; space, so it runs last</span>
+    <span class="n">always</span><span class="p">:</span> <span class="n">ClassVar</span><span class="p">[</span><span class="nb">bool</span><span class="p">]</span> <span class="o">=</span> <span class="kc">False</span>  <span class="c1"># match(None, query) when a rule leaves it out</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="nf">parse_rule</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span> <span class="o">...</span>  <span class="c1"># at load; ValueError if invalid</span>
+<div class="viewcode-block" id="Dimension.parse_rule">
+<a class="viewcode-back" href="../../api.html#queryearth.Dimension.parse_rule">[docs]</a>
+    <span class="nd">@abc</span><span class="o">.</span><span class="n">abstractmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">parse_rule</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""A rule's value, parsed when the rule is added; ValueError if invalid."""</span></div>
 
-    <span class="k">def</span><span class="w"> </span><span class="nf">parse_query</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span> <span class="o">...</span>  <span class="c1"># at query time; ValueError</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="nf">match</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">rule</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">query</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">DimMatch</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span> <span class="o">...</span>  <span class="c1"># None: no overlap</span></div>
+<div class="viewcode-block" id="Dimension.parse_query">
+<a class="viewcode-back" href="../../api.html#queryearth.Dimension.parse_query">[docs]</a>
+    <span class="nd">@abc</span><span class="o">.</span><span class="n">abstractmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">parse_query</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""A query's value, parsed when the query runs; ValueError if invalid."""</span></div>
+
+
+<div class="viewcode-block" id="Dimension.match">
+<a class="viewcode-back" href="../../api.html#queryearth.Dimension.match">[docs]</a>
+    <span class="nd">@abc</span><span class="o">.</span><span class="n">abstractmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">match</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">rule</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">query</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">DimMatch</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""How a rule's value meets a query's value; None when they do not."""</span></div>
+
+
+<div class="viewcode-block" id="Dimension.comparable">
+<a class="viewcode-back" href="../../api.html#queryearth.Dimension.comparable">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">comparable</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">rule</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">query</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""False makes the finding conditional on this dimension, not a non-match."""</span>
+        <span class="k">return</span> <span class="kc">True</span></div>
+
+
+<div class="viewcode-block" id="Dimension.build">
+<a class="viewcode-back" href="../../api.html#queryearth.Dimension.build">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">build</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">pairs</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Any</span><span class="p">]])</span> <span class="o">-&gt;</span> <span class="n">Prefilter</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""An index over the (position, rule value) pairs of the rules that</span>
+<span class="sd">        constrain this dimension, to narrow them before match() runs; None for</span>
+<span class="sd">        no index. Not used by a dimension that overrides comparable()."""</span>
+        <span class="k">return</span> <span class="kc">None</span></div>
+
+
+<div class="viewcode-block" id="Dimension.extent">
+<a class="viewcode-back" href="../../api.html#queryearth.Dimension.extent">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">extent</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">rule</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""What a finding reports when the query leaves this dimension out;</span>
+<span class="sd">        None for nothing."""</span>
+        <span class="k">return</span> <span class="kc">None</span></div>
+
+
+<div class="viewcode-block" id="Dimension.to_json">
+<a class="viewcode-back" href="../../api.html#queryearth.Dimension.to_json">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">to_json</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">overlap</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""An overlap as JSON, for Finding.to_dict()."""</span>
+        <span class="k">return</span> <span class="n">overlap</span></div>
+</div>
 
 
 
@@ -169,7 +215,7 @@
 
 
 <span class="c1"># ---- space and time: built in on every Registry --------------------------------------</span>
-<span class="k">class</span><span class="w"> </span><span class="nc">SpaceDimension</span><span class="p">:</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">SpaceDimension</span><span class="p">(</span><span class="n">Dimension</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""Space: closed-set meeting, then the area fraction and overlap in km².</span>
 
 <span class="sd">    It runs late, after the cheaper dimensions, and also measures the query</span>
@@ -192,7 +238,7 @@
         <span class="k">return</span> <span class="n">DimMatch</span><span class="p">(</span><span class="n">km2</span><span class="p">,</span> <span class="n">fraction</span><span class="p">)</span>
 
 
-<span class="k">class</span><span class="w"> </span><span class="nc">TimeDimension</span><span class="p">:</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">TimeDimension</span><span class="p">(</span><span class="n">Dimension</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""Time: the overlapping periods and the share of the query they cover.</span>
 
 <span class="sd">    It also measures the query against a rule that leaves time unconstrained,</span>
@@ -277,7 +323,7 @@
 <div class="viewcode-block" id="Axis">
 <a class="viewcode-back" href="../../api.html#queryearth.Axis">[docs]</a>
 <span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-<span class="k">class</span><span class="w"> </span><span class="nc">Axis</span><span class="p">:</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">Axis</span><span class="p">(</span><span class="n">Dimension</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""A named, ordered, numeric dimension with exactly one unit.</span>
 
 <span class="sd">    A rule states {gt, ge, lt, le, unit}; a query gives a number or a closed</span>
@@ -292,6 +338,8 @@
         <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">unit</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">or</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">unit</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"axis </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="si">!r}</span><span class="s2"> needs a unit"</span><span class="p">)</span>
 
+<div class="viewcode-block" id="Axis.parse_rule">
+<a class="viewcode-back" href="../../api.html#queryearth.Axis.parse_rule">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">parse_rule</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">AxisOverlap</span><span class="p">:</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">Mapping</span><span class="p">):</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"an axis bound is a mapping of gt, ge, lt, le, unit"</span><span class="p">)</span>
@@ -319,8 +367,11 @@
             <span class="n">hi</span><span class="p">,</span> <span class="n">hi_closed</span> <span class="o">=</span> <span class="n">_number</span><span class="p">(</span><span class="n">value</span><span class="p">[</span><span class="s2">"le"</span><span class="p">],</span> <span class="s2">"le"</span><span class="p">),</span> <span class="kc">True</span>
         <span class="k">if</span> <span class="n">lo</span> <span class="o">&gt;</span> <span class="n">hi</span> <span class="ow">or</span> <span class="p">(</span><span class="n">lo</span> <span class="o">==</span> <span class="n">hi</span> <span class="ow">and</span> <span class="ow">not</span> <span class="p">(</span><span class="n">lo_closed</span> <span class="ow">and</span> <span class="n">hi_closed</span><span class="p">)):</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"the axis bounds </span><span class="si">{</span><span class="nb">dict</span><span class="p">(</span><span class="n">value</span><span class="p">)</span><span class="si">}</span><span class="s2"> leave no value"</span><span class="p">)</span>
-        <span class="k">return</span> <span class="n">AxisOverlap</span><span class="p">(</span><span class="n">lo</span><span class="p">,</span> <span class="n">hi</span><span class="p">,</span> <span class="n">lo_closed</span><span class="p">,</span> <span class="n">hi_closed</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">AxisOverlap</span><span class="p">(</span><span class="n">lo</span><span class="p">,</span> <span class="n">hi</span><span class="p">,</span> <span class="n">lo_closed</span><span class="p">,</span> <span class="n">hi_closed</span><span class="p">)</span></div>
 
+
+<div class="viewcode-block" id="Axis.parse_query">
+<a class="viewcode-back" href="../../api.html#queryearth.Axis.parse_query">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">parse_query</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">]:</span>
         <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="p">(</span><span class="nb">str</span><span class="p">,</span> <span class="nb">bytes</span><span class="p">))</span> <span class="ow">or</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">Sequence</span><span class="p">):</span>
             <span class="n">v</span> <span class="o">=</span> <span class="n">_number</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="sa">f</span><span class="s2">"axis </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="si">!r}</span><span class="s2">"</span><span class="p">)</span>
@@ -331,15 +382,19 @@
             <span class="n">lo</span><span class="p">,</span> <span class="n">hi</span> <span class="o">=</span> <span class="p">(</span><span class="n">_number</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="sa">f</span><span class="s2">"axis </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="si">!r}</span><span class="s2">"</span><span class="p">)</span> <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">value</span><span class="p">)</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span><span class="n">math</span><span class="o">.</span><span class="n">isfinite</span><span class="p">(</span><span class="n">lo</span><span class="p">)</span> <span class="ow">and</span> <span class="n">math</span><span class="o">.</span><span class="n">isfinite</span><span class="p">(</span><span class="n">hi</span><span class="p">))</span> <span class="ow">or</span> <span class="n">lo</span> <span class="o">&gt;</span> <span class="n">hi</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"axis </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="si">!r}</span><span class="s2"> needs a finite range lo &lt;= hi"</span><span class="p">)</span>
-        <span class="k">return</span> <span class="n">lo</span><span class="p">,</span> <span class="n">hi</span>
+        <span class="k">return</span> <span class="n">lo</span><span class="p">,</span> <span class="n">hi</span></div>
 
+
+<div class="viewcode-block" id="Axis.match">
+<a class="viewcode-back" href="../../api.html#queryearth.Axis.match">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">match</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">rule</span><span class="p">:</span> <span class="n">AxisOverlap</span><span class="p">,</span> <span class="n">query</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">DimMatch</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
         <span class="n">lo</span><span class="p">,</span> <span class="n">hi</span> <span class="o">=</span> <span class="n">query</span>
         <span class="n">found</span> <span class="o">=</span> <span class="n">axis_intersection</span><span class="p">(</span><span class="n">rule</span><span class="p">,</span> <span class="n">lo</span><span class="p">,</span> <span class="n">hi</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">found</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
             <span class="k">return</span> <span class="kc">None</span>
         <span class="n">fraction</span> <span class="o">=</span> <span class="mf">1.0</span> <span class="k">if</span> <span class="n">hi</span> <span class="o">==</span> <span class="n">lo</span> <span class="k">else</span> <span class="p">(</span><span class="n">found</span><span class="o">.</span><span class="n">hi</span> <span class="o">-</span> <span class="n">found</span><span class="o">.</span><span class="n">lo</span><span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="n">hi</span> <span class="o">-</span> <span class="n">lo</span><span class="p">)</span>
-        <span class="k">return</span> <span class="n">DimMatch</span><span class="p">(</span><span class="n">found</span><span class="p">,</span> <span class="n">fraction</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">DimMatch</span><span class="p">(</span><span class="n">found</span><span class="p">,</span> <span class="n">fraction</span><span class="p">)</span></div>
+
 
 <div class="viewcode-block" id="Axis.extent">
 <a class="viewcode-back" href="../../api.html#queryearth.Axis.extent">[docs]</a>
@@ -367,12 +422,14 @@
 <div class="viewcode-block" id="Labels">
 <a class="viewcode-back" href="../../api.html#queryearth.Labels">[docs]</a>
 <span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-<span class="k">class</span><span class="w"> </span><span class="nc">Labels</span><span class="p">:</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">Labels</span><span class="p">(</span><span class="n">Dimension</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""A label dimension: names, which rules match with glob patterns (section 4.7)."""</span>
 
     <span class="n">name</span><span class="p">:</span> <span class="nb">str</span>
     <span class="n">description</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">""</span>
 
+<div class="viewcode-block" id="Labels.parse_rule">
+<a class="viewcode-back" href="../../api.html#queryearth.Labels.parse_rule">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">parse_rule</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Patterns</span><span class="p">:</span>
         <span class="n">what</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"label dimension </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="si">!r}</span><span class="s2">"</span>
         <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">Patterns</span><span class="p">):</span>
@@ -391,17 +448,24 @@
         <span class="n">none_of</span> <span class="o">=</span> <span class="p">()</span>
         <span class="k">if</span> <span class="s2">"none_of"</span> <span class="ow">in</span> <span class="n">value</span><span class="p">:</span>
             <span class="n">none_of</span> <span class="o">=</span> <span class="n">_string_list</span><span class="p">(</span><span class="n">value</span><span class="p">[</span><span class="s2">"none_of"</span><span class="p">],</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">what</span><span class="si">}</span><span class="s2"> none_of"</span><span class="p">)</span>
-        <span class="k">return</span> <span class="n">Patterns</span><span class="p">(</span><span class="n">any_of</span><span class="p">,</span> <span class="n">none_of</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">Patterns</span><span class="p">(</span><span class="n">any_of</span><span class="p">,</span> <span class="n">none_of</span><span class="p">)</span></div>
 
+
+<div class="viewcode-block" id="Labels.parse_query">
+<a class="viewcode-back" href="../../api.html#queryearth.Labels.parse_query">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">parse_query</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="o">...</span><span class="p">]:</span>
         <span class="n">what</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"label dimension </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="si">!r}</span><span class="s2">"</span>
-        <span class="k">return</span> <span class="nb">tuple</span><span class="p">(</span><span class="nb">dict</span><span class="o">.</span><span class="n">fromkeys</span><span class="p">(</span><span class="n">_string_list</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">what</span><span class="p">)))</span>
+        <span class="k">return</span> <span class="nb">tuple</span><span class="p">(</span><span class="nb">dict</span><span class="o">.</span><span class="n">fromkeys</span><span class="p">(</span><span class="n">_string_list</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">what</span><span class="p">)))</span></div>
 
+
+<div class="viewcode-block" id="Labels.match">
+<a class="viewcode-back" href="../../api.html#queryearth.Labels.match">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">match</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">rule</span><span class="p">:</span> <span class="n">Patterns</span><span class="p">,</span> <span class="n">query</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="o">...</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">DimMatch</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
         <span class="n">hits</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">v</span> <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">query</span> <span class="k">if</span> <span class="n">rule</span><span class="o">.</span><span class="n">admits</span><span class="p">(</span><span class="n">v</span><span class="p">))</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="n">hits</span><span class="p">:</span>
             <span class="k">return</span> <span class="kc">None</span>
         <span class="k">return</span> <span class="n">DimMatch</span><span class="p">(</span><span class="n">hits</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">hits</span><span class="p">)</span> <span class="o">/</span> <span class="nb">len</span><span class="p">(</span><span class="n">query</span><span class="p">))</span></div>
+</div>
 
 
 
@@ -482,11 +546,13 @@
 <div class="viewcode-block" id="Versions">
 <a class="viewcode-back" href="../../api.html#queryearth.Versions">[docs]</a>
 <span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-<span class="k">class</span><span class="w"> </span><span class="nc">Versions</span><span class="p">:</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">Versions</span><span class="p">(</span><span class="n">Dimension</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""A version dimension: rules give a union of OSV-style ranges (section 4.8)."""</span>
 
     <span class="n">name</span><span class="p">:</span> <span class="nb">str</span>
 
+<div class="viewcode-block" id="Versions.parse_rule">
+<a class="viewcode-back" href="../../api.html#queryearth.Versions.parse_rule">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">parse_rule</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">VersionRange</span><span class="p">,</span> <span class="o">...</span><span class="p">]:</span>
         <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">Mapping</span><span class="p">):</span>
             <span class="n">value</span> <span class="o">=</span> <span class="p">[</span><span class="n">value</span><span class="p">]</span>
@@ -511,11 +577,17 @@
             <span class="n">ranges</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">VersionRange</span><span class="p">(</span><span class="o">**</span><span class="n">fields</span><span class="p">))</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="n">ranges</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"dimension </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="si">!r}</span><span class="s2"> needs at least one range"</span><span class="p">)</span>
-        <span class="k">return</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">ranges</span><span class="p">)</span>
+        <span class="k">return</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">ranges</span><span class="p">)</span></div>
 
+
+<div class="viewcode-block" id="Versions.parse_query">
+<a class="viewcode-back" href="../../api.html#queryearth.Versions.parse_query">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">parse_query</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="o">...</span><span class="p">]:</span>
-        <span class="k">return</span> <span class="nb">tuple</span><span class="p">(</span><span class="nb">dict</span><span class="o">.</span><span class="n">fromkeys</span><span class="p">(</span><span class="n">_string_list</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="sa">f</span><span class="s2">"dimension </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="si">!r}</span><span class="s2">"</span><span class="p">)))</span>
+        <span class="k">return</span> <span class="nb">tuple</span><span class="p">(</span><span class="nb">dict</span><span class="o">.</span><span class="n">fromkeys</span><span class="p">(</span><span class="n">_string_list</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="sa">f</span><span class="s2">"dimension </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="si">!r}</span><span class="s2">"</span><span class="p">)))</span></div>
 
+
+<div class="viewcode-block" id="Versions.match">
+<a class="viewcode-back" href="../../api.html#queryearth.Versions.match">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">match</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span> <span class="n">rule</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">VersionRange</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span> <span class="n">query</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">DimMatch</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
@@ -523,6 +595,7 @@
         <span class="k">if</span> <span class="ow">not</span> <span class="n">hits</span><span class="p">:</span>
             <span class="k">return</span> <span class="kc">None</span>
         <span class="k">return</span> <span class="n">DimMatch</span><span class="p">(</span><span class="n">hits</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">hits</span><span class="p">)</span> <span class="o">/</span> <span class="nb">len</span><span class="p">(</span><span class="n">query</span><span class="p">))</span></div>
+</div>
 
 </pre></div>
 
