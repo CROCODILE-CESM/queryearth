@@ -104,7 +104,7 @@ def test_fixture_17_resolution_only():
     (only,) = registry.query(dimensions={"resolution": 8.0})
     assert only.code == "CROC102" and only.conditional_on == ()
     eight = qe.AxisOverlap(8.0, 8.0, True, True)
-    assert only.dimensions == {"resolution": qe.DimMatch(eight, 1.0)}
+    assert only.dimensions == {"resolution": qe.DimMatch((eight,), 1.0)}
     found = registry.query(dimensions={"resolution": 8.0}, include_conditional=True)
     assert [(f.code, f.conditional_on) for f in found] == [
         ("CROC101", ("space", "model")),
@@ -112,7 +112,7 @@ def test_fixture_17_resolution_only():
     ]
     (ranged,) = registry.query(dimensions={"resolution": (8.0, 12.0)})
     below_ten = qe.AxisOverlap(8.0, 10.0, True, False)
-    assert ranged.dimensions["resolution"] == qe.DimMatch(below_ten, 0.5)
+    assert ranged.dimensions["resolution"] == qe.DimMatch((below_ten,), 0.5)
     assert registry.query(dimensions={"resolution": 10.0}) == []
     with pytest.raises(qe.UnknownNameError):
         registry.query(dimensions={"resolutoin": 8.0})
@@ -129,7 +129,7 @@ def test_undecided_axis_reports_the_rule_interval():
     found = registry.query(include_conditional=True)
     croc102 = next(f for f in found if f.code == "CROC102")
     assert croc102.conditional_on == ("resolution",)
-    assert croc102.dimensions["resolution"].overlap.hi == 10.0
+    assert croc102.dimensions["resolution"].overlap[0].hi == 10.0
     assert croc102.dimensions["resolution"].fraction is None
 
 
@@ -451,7 +451,7 @@ def test_function_rule_croc104_suggests_a_time_step():
     )
     def arctic_time_step(query, match):
         """High-latitude domain: set the time step from the smallest cells"""
-        seconds = 30.0 * match.dimensions["resolution"].overlap.lo
+        seconds = 30.0 * match.dimensions["resolution"].overlap[0].lo
         return {"changes": (qe.Change("MOM_input", "DT", seconds, "why"),)}
 
     found = registry.query(
@@ -465,8 +465,8 @@ def test_function_rule_croc104_suggests_a_time_step():
     assert croc104.changes == (qe.Change("MOM_input", "DT", 240.0, "why"),)
     resolution = [f.dimensions["resolution"].overlap for f in found[1:]]
     assert resolution == [
-        qe.AxisOverlap(8.0, 10.0, True, False),
-        qe.AxisOverlap(8.0, 12.0, True, True),
+        (qe.AxisOverlap(8.0, 10.0, True, False),),
+        (qe.AxisOverlap(8.0, 12.0, True, True),),
     ]
     without = registry.query(
         space=sp.box(-180, 70.6, 180, 90),
@@ -741,7 +741,7 @@ def test_third_party_rule_kinds():
         outcome = qe.Outcome(code="HOK001", title="h", message="h")
 
         def outcomes(self, query, match):
-            return {"details": {"lo": match.dimensions["resolution"].overlap.lo}}
+            return {"details": {"lo": match.dimensions["resolution"].overlap[0].lo}}
 
         def evaluate(self, query):
             raise AssertionError("the Registry calls outcomes() instead")
@@ -790,12 +790,12 @@ def test_every_kind_of_dimension_is_declared_in_one_list():
         "product": qe.DimMatch(("era5",), 1.0),
         "basin": qe.DimMatch(("14",), 1.0),
         "version": qe.DimMatch(("1.2",), 1.0),
-        "resolution": qe.DimMatch(qe.AxisOverlap(5.0, 10.0, True, False), 0.5),
+        "resolution": qe.DimMatch((qe.AxisOverlap(5.0, 10.0, True, False),), 0.5),
     }
     (undecided,) = registry.query(include_conditional=True)
     assert undecided.conditional_on == ("space", *names)
     below_ten = qe.AxisOverlap(-np.inf, 10.0, False, False)  # Axis reports its extent
-    assert undecided.dimensions == {"resolution": qe.DimMatch(below_ten)}
+    assert undecided.dimensions == {"resolution": qe.DimMatch((below_ten,))}
 
 
 def test_undeclared_names_raise():

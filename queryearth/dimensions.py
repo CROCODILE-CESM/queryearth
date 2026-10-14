@@ -212,8 +212,9 @@ def axis_intersection(rule: AxisOverlap, lo: float, hi: float) -> AxisOverlap | 
 class Axis(Dimension):
     """A named, ordered, numeric dimension with exactly one unit.
 
-    A rule states {gt, ge, lt, le, unit}; a query gives a number or a closed
-    range (lo, hi). The overlap is the intersection, keeping open ends.
+    A rule gives a range {gt, ge, lt, le, unit}, or a list of ranges that do
+    not overlap; a query gives a number or a closed range (lo, hi). The overlap
+    is the intersections with the rule's ranges, lowest first, keeping open ends.
     """
 
     name: str
@@ -224,16 +225,34 @@ class Axis(Dimension):
         if not isinstance(self.unit, str) or not self.unit:
             raise ValueError(f"axis {self.name!r} needs a unit")
 
-    def parse_rule(self, value: Any) -> AxisOverlap:
+    def parse_rule(self, value: Any) -> tuple[AxisOverlap, ...]:
+        if isinstance(value, Mapping):
+            value = [value]
+        if isinstance(value, (str, bytes)) or not isinstance(value, Iterable):
+            raise ValueError(
+                f"axis {self.name!r} takes a range of gt, ge, lt, le and unit, or "
+                f"a list of them, not {value!r}"
+            )
+        ranges = sorted((self._range(item) for item in value), key=lambda r: r.lo)
+        if not ranges:
+            raise ValueError(f"axis {self.name!r} needs at least one range")
+        for a, b in zip(ranges, ranges[1:]):
+            if a.hi > b.lo or (a.hi == b.lo and a.hi_closed and b.lo_closed):
+                raise ValueError(
+                    f"the ranges of axis {self.name!r} overlap; join them into one"
+                )
+        return tuple(ranges)
+
+    def _range(self, value: Any) -> AxisOverlap:
         if not isinstance(value, Mapping):
-            raise ValueError(f"an axis bound is a mapping of gt, ge, lt, le, unit")
+            raise ValueError(f"an axis range is a mapping of gt, ge, lt, le, unit")
         unknown = set(value) - {"gt", "ge", "lt", "le", "unit"}
         if unknown:
             raise ValueError(f"unknown axis bound keys {sorted(unknown)}")
         if {"gt", "ge"} <= set(value) or {"lt", "le"} <= set(value):
             raise ValueError("give at most one of gt and ge, and one of lt and le")
         if not set(value) & {"gt", "ge", "lt", "le"}:
-            raise ValueError("an axis bound needs at least one of gt, ge, lt, le")
+            raise ValueError("an axis range needs at least one of gt, ge, lt, le")
         unit = value.get("unit")
         if unit is not None and unit != self.unit:
             raise ValueError(
@@ -250,7 +269,7 @@ class Axis(Dimension):
         if "le" in value:
             hi, hi_closed = _number(value["le"], "le"), True
         if lo > hi or (lo == hi and not (lo_closed and hi_closed)):
-            raise ValueError(f"the axis bounds {dict(value)} leave no value")
+            raise ValueError(f"the axis range {dict(value)} leaves no value")
         return AxisOverlap(lo, hi, lo_closed, hi_closed)
 
     def parse_query(self, value: Any) -> tuple[float, float]:
@@ -265,16 +284,19 @@ class Axis(Dimension):
             raise ValueError(f"axis {self.name!r} needs a finite range lo <= hi")
         return lo, hi
 
-    def match(self, rule: AxisOverlap, query: tuple[float, float]) -> DimMatch | None:
+    def match(
+        self, rule: tuple[AxisOverlap, ...], query: tuple[float, float]
+    ) -> DimMatch | None:
         lo, hi = query
-        found = axis_intersection(rule, lo, hi)
-        if found is None:
+        pieces = (axis_intersection(r, lo, hi) for r in rule)
+        found = tuple(piece for piece in pieces if piece is not None)
+        if not found:
             return None
-        fraction = 1.0 if hi == lo else (found.hi - found.lo) / (hi - lo)
+        fraction = 1.0 if hi == lo else sum(f.hi - f.lo for f in found) / (hi - lo)
         return DimMatch(found, fraction)
 
-    def extent(self, rule: AxisOverlap) -> AxisOverlap:
-        """The rule's own interval, reported when the query omits the axis."""
+    def extent(self, rule: tuple[AxisOverlap, ...]) -> tuple[AxisOverlap, ...]:
+        """The rule's own ranges, reported when the query omits the axis."""
         return rule
 
 

@@ -16,16 +16,28 @@ AXIS = qe.Axis("resolution", "km", "horizontal grid spacing")
 
 
 # ---- Axis ---------------------------------------------------------------------------
+def piece(lo, hi, lo_closed=True, hi_closed=True):
+    return qe.AxisOverlap(lo, hi, lo_closed, hi_closed)
+
+
 @pytest.mark.parametrize(
     ("bounds", "query", "expected"),
     [
-        ({"lt": 10.0}, 8.0, qe.AxisOverlap(8.0, 8.0, True, True)),
-        ({"lt": 10.0}, (8.0, 12.0), qe.AxisOverlap(8.0, 10.0, True, False)),
+        ({"lt": 10.0}, 8.0, (piece(8.0, 8.0),)),
+        ({"lt": 10.0}, (8.0, 12.0), (piece(8.0, 10.0, True, False),)),
         ({"lt": 10.0}, 10.0, None),  # strict bound
-        ({"le": 10.0}, 10.0, qe.AxisOverlap(10.0, 10.0, True, True)),
-        ({"ge": 25.0}, (8.0, 30.0), qe.AxisOverlap(25.0, 30.0, True, True)),
-        ({"gt": 0.0}, (8.0, 12.0), qe.AxisOverlap(8.0, 12.0, True, True)),
+        ({"le": 10.0}, 10.0, (piece(10.0, 10.0),)),
+        ({"ge": 25.0}, (8.0, 30.0), (piece(25.0, 30.0),)),
+        ({"gt": 0.0}, (8.0, 12.0), (piece(8.0, 12.0),)),
         ({"gt": 1.0, "le": 2.0}, (0.0, 1.0), None),
+        # a list of ranges is any of them; the overlap lists each piece, lowest first
+        ([{"gt": 50}, {"lt": 5}], 3.0, (piece(3.0, 3.0),)),
+        ([{"gt": 50}, {"lt": 5}], 20.0, None),
+        (
+            [{"gt": 50}, {"lt": 5}],
+            (0.0, 100.0),
+            (piece(0.0, 5.0, True, False), piece(50.0, 100.0, False, True)),
+        ),
     ],
 )
 def test_axis_match_keeps_open_ends(bounds, query, expected):
@@ -36,11 +48,13 @@ def test_axis_match_keeps_open_ends(bounds, query, expected):
 def test_axis_fraction_is_the_share_of_the_query_range():
     found = AXIS.match(AXIS.parse_rule({"lt": 10.0}), (8.0, 12.0))
     assert found.fraction == 0.5
+    found = AXIS.match(AXIS.parse_rule([{"lt": 5}, {"gt": 50}]), (0.0, 100.0))
+    assert found.fraction == pytest.approx(0.55)
 
 
-def test_axis_extent_reports_the_rule_interval_with_open_infinite_ends():
+def test_axis_extent_reports_the_rule_ranges_with_open_infinite_ends():
     rule = AXIS.parse_rule({"lt": 10})
-    assert AXIS.extent(rule) == qe.AxisOverlap(-math.inf, 10.0, False, False)
+    assert AXIS.extent(rule) == (piece(-math.inf, 10.0, False, False),)
 
 
 @pytest.mark.parametrize(
@@ -54,11 +68,22 @@ def test_axis_extent_reports_the_rule_interval_with_open_infinite_ends():
         {"gt": 5, "lt": 5},
         {"lt": "ten"},
         [10],
+        "lt 10",
+        [],
+        [{"lt": 8}, {"lt": 5}],  # ranges that overlap
+        [{"le": 5}, {"ge": 5}],  # share the value 5
     ],
 )
 def test_axis_rejects_bad_bounds(bounds):
     with pytest.raises(ValueError):
         AXIS.parse_rule(bounds)
+
+
+def test_axis_ranges_may_touch_at_an_open_end():
+    assert AXIS.parse_rule([{"lt": 5}, {"ge": 5, "lt": 8}]) == (
+        piece(-math.inf, 5.0, False, False),
+        piece(5.0, 8.0, True, False),
+    )
 
 
 @pytest.mark.parametrize("value", [(2.0, 1.0), (1.0, 2.0, 3.0), float("nan"), "8"])
@@ -279,7 +304,7 @@ def test_finding_to_dict_is_json_ready():
         changes=({"target": "MOM_input", "key": "DT", "value": 240.0},),
         time_overlap=[("2020-01-01", "..")],
         dimensions={
-            "resolution": qe.DimMatch(qe.AxisOverlap(-math.inf, 10.0, False, False)),
+            "resolution": qe.DimMatch((piece(-math.inf, 10.0, False, False),)),
             "basin": qe.DimMatch(("14",), 1.0),
         },
     )
@@ -290,7 +315,7 @@ def test_finding_to_dict_is_json_ready():
     ]
     assert out["time_overlap"] == [["2020-01-01", ".."]]
     assert out["dimensions"]["resolution"] == {
-        "overlap": {"lo": None, "hi": 10.0, "lo_closed": False, "hi_closed": False},
+        "overlap": [{"lo": None, "hi": 10.0, "lo_closed": False, "hi_closed": False}],
         "fraction": None,
     }
     assert out["dimensions"]["basin"] == {"overlap": ["14"], "fraction": 1.0}

@@ -40,7 +40,7 @@ A computed rule decides its outcome from the query, or from data the caller pass
 @registry.rule("MINE102", dimensions={"resolution": {"gt": 0}})
 def time_step(query, match):
     """Set the time step from the finest cells"""
-    finest_km = match.dimensions["resolution"].overlap.lo
+    finest_km = match.dimensions["resolution"].overlap[0].lo
     return {"changes": [qe.Change("settings", "dt", 30.0 * finest_km)]}
 ```
 

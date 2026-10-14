@@ -87,7 +87,7 @@ registry.add(
 )
 def time_step(query, match):
     """Set the toy time step from the finest cells"""
-    finest_km = match.dimensions["resolution"].overlap.lo
+    finest_km = match.dimensions["resolution"].overlap[0].lo
     seconds = 30.0 * finest_km  # made up: 30 s per km
     return {"changes": [qe.Change("MOM_input", "TOY_DT", seconds, "made up")]}
 
