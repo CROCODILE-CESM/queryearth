@@ -6,14 +6,14 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>queryearth &mdash; queryearth 0.1.1.dev3</title>
+  <title>queryearth &mdash; queryearth 0.1.1.dev4</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
 
   
       <script src="_static/jquery.js?v=5d32c60e"></script>
       <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="_static/documentation_options.js?v=3ee5b2c0"></script>
+      <script src="_static/documentation_options.js?v=f56c220d"></script>
       <script src="_static/doctools.js?v=fd6eb6e6"></script>
       <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="_static/versions.js?v=58ec1786"></script>
@@ -78,11 +78,7 @@
   <section id="queryearth">
 <h1>queryearth<a class="headerlink" href="#queryearth" title="Link to this heading"></a></h1>
 <p>queryearth answers one question: given where (a point or a polygon), when (a time range) and anything else that matters (grid resolution, product, variable, model and so on), which registered rules apply, how much of the query does each one cover, and what does it say to watch out for or to do? Each of these is a <a class="reference internal" href="concepts.html#dimensions"><span class="std std-ref">dimension</span></a>.</p>
-<p>Rules are short Python objects or GeoJSON records. A query returns <strong>findings</strong> of two kinds:</p>
-<ul class="simple">
-<li><p><strong>warnings</strong>, such as “these values are climatology, not observations” or “this product does not reach part of your area”;</p></li>
-<li><p><strong>suggestions</strong> of structured actions, such as “set this model parameter”.</p></li>
-</ul>
+<p>Rules are short Python objects or GeoJSON records. A query returns <strong>findings</strong>, one for each rule that applies. Each has a <code class="docutils literal notranslate"><span class="pre">logging</span></code> level and says what to watch out for, such as “these values are climatology, not observations” or “this product does not reach part of your area”; some also list <strong>changes</strong> for your code to make, such as “set this model parameter”.</p>
 <p>queryearth is an engine only: it ships no rules of its own. You bring yours.</p>
 <section id="install">
 <h2>Install<a class="headerlink" href="#install" title="Link to this heading"></a></h2>
@@ -93,14 +89,15 @@
 </section>
 <section id="a-first-query">
 <h2>A first query<a class="headerlink" href="#a-first-query" title="Link to this heading"></a></h2>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">queryearth</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">qe</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">queryearth</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">qe</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">queryearth</span><span class="w"> </span><span class="kn">import</span> <span class="n">space</span> <span class="k">as</span> <span class="n">sp</span>
 
 <span class="n">registry</span> <span class="o">=</span> <span class="n">qe</span><span class="o">.</span><span class="n">Registry</span><span class="p">(</span><span class="s2">"demo"</span><span class="p">,</span> <span class="n">dimensions</span><span class="o">=</span><span class="p">[</span><span class="n">qe</span><span class="o">.</span><span class="n">Axis</span><span class="p">(</span><span class="s2">"resolution"</span><span class="p">,</span> <span class="s2">"km"</span><span class="p">)])</span>
 <span class="n">registry</span><span class="o">.</span><span class="n">add</span><span class="p">(</span>
     <span class="n">qe</span><span class="o">.</span><span class="n">Rule</span><span class="p">(</span>
         <span class="n">code</span><span class="o">=</span><span class="s2">"DEMO001"</span><span class="p">,</span>
-        <span class="n">kind</span><span class="o">=</span><span class="s2">"warning"</span><span class="p">,</span>
         <span class="n">title</span><span class="o">=</span><span class="s2">"Sparse observations south of 50S before 2004"</span><span class="p">,</span>
         <span class="n">message</span><span class="o">=</span><span class="s2">"Few observations constrain this period, so values drift."</span><span class="p">,</span>
         <span class="n">scope</span><span class="o">=</span><span class="n">qe</span><span class="o">.</span><span class="n">Scope</span><span class="p">(</span>
@@ -112,11 +109,10 @@
 <span class="n">registry</span><span class="o">.</span><span class="n">add</span><span class="p">(</span>
     <span class="n">qe</span><span class="o">.</span><span class="n">Rule</span><span class="p">(</span>
         <span class="n">code</span><span class="o">=</span><span class="s2">"DEMO101"</span><span class="p">,</span>
-        <span class="n">kind</span><span class="o">=</span><span class="s2">"suggestion"</span><span class="p">,</span>
         <span class="n">title</span><span class="o">=</span><span class="s2">"Fine grid: turn off the coarse-grid scheme"</span><span class="p">,</span>
         <span class="n">message</span><span class="o">=</span><span class="s2">"Below 10 km the model resolves this process itself."</span><span class="p">,</span>
         <span class="n">scope</span><span class="o">=</span><span class="n">qe</span><span class="o">.</span><span class="n">Scope</span><span class="p">(</span><span class="n">dimensions</span><span class="o">=</span><span class="p">{</span><span class="s2">"resolution"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"lt"</span><span class="p">:</span> <span class="mi">10</span><span class="p">}}),</span>
-        <span class="n">suggestions</span><span class="o">=</span><span class="p">[</span><span class="n">qe</span><span class="o">.</span><span class="n">Suggestion</span><span class="p">(</span><span class="s2">"settings"</span><span class="p">,</span> <span class="s2">"coarse_scheme"</span><span class="p">,</span> <span class="kc">False</span><span class="p">)],</span>
+        <span class="n">changes</span><span class="o">=</span><span class="p">[</span><span class="n">qe</span><span class="o">.</span><span class="n">Change</span><span class="p">(</span><span class="s2">"settings"</span><span class="p">,</span> <span class="s2">"coarse_scheme"</span><span class="p">,</span> <span class="kc">False</span><span class="p">)],</span>
     <span class="p">)</span>
 <span class="p">)</span>
 
@@ -125,10 +121,11 @@
     <span class="n">time</span><span class="o">=</span><span class="n">qe</span><span class="o">.</span><span class="n">interval</span><span class="p">(</span><span class="s2">"2000-01-01"</span><span class="p">,</span> <span class="s2">"2005-12-31"</span><span class="p">),</span>
     <span class="n">dimensions</span><span class="o">=</span><span class="p">{</span><span class="s2">"resolution"</span><span class="p">:</span> <span class="mi">8</span><span class="p">},</span>
 <span class="p">):</span>
-    <span class="nb">print</span><span class="p">(</span><span class="n">f</span><span class="o">.</span><span class="n">code</span><span class="p">,</span> <span class="n">f</span><span class="o">.</span><span class="n">kind</span><span class="p">,</span> <span class="sa">f</span><span class="s2">"area </span><span class="si">{</span><span class="n">f</span><span class="o">.</span><span class="n">area_fraction</span><span class="si">:</span><span class="s2">.0%</span><span class="si">}</span><span class="s2">"</span><span class="p">,</span> <span class="sa">f</span><span class="s2">"time </span><span class="si">{</span><span class="n">f</span><span class="o">.</span><span class="n">time_fraction</span><span class="si">:</span><span class="s2">.0%</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+    <span class="n">level</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLevelName</span><span class="p">(</span><span class="n">f</span><span class="o">.</span><span class="n">level</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="n">f</span><span class="o">.</span><span class="n">code</span><span class="p">,</span> <span class="n">level</span><span class="p">,</span> <span class="sa">f</span><span class="s2">"area </span><span class="si">{</span><span class="n">f</span><span class="o">.</span><span class="n">area_fraction</span><span class="si">:</span><span class="s2">.0%</span><span class="si">}</span><span class="s2">"</span><span class="p">,</span> <span class="sa">f</span><span class="s2">"time </span><span class="si">{</span><span class="n">f</span><span class="o">.</span><span class="n">time_fraction</span><span class="si">:</span><span class="s2">.0%</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 </pre></div>
 </div>
-<p>This prints DEMO001 first, because a warning’s level, WARNING, is above a suggestion’s, INFO. DEMO001 covers 58% of the box’s area and 67% of its period. Then it prints DEMO101, which applies to the whole query at 8 km.</p>
+<p>This prints DEMO001 first, at WARNING, because findings come highest <a class="reference internal" href="concepts.html#rules-and-their-scope"><span class="std std-ref">level</span></a> first. DEMO001 covers 58% of the box’s area and 67% of its period. Then it prints DEMO101, at INFO, which applies to the whole query at 8 km.</p>
 <div class="toctree-wrapper compound">
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="concepts.html">Concepts</a><ul>
@@ -165,6 +162,7 @@
 <li class="toctree-l1"><a class="reference internal" href="api.html">API reference</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="api.html#queryearth.Axis"><code class="docutils literal notranslate"><span class="pre">Axis</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="api.html#queryearth.AxisOverlap"><code class="docutils literal notranslate"><span class="pre">AxisOverlap</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#queryearth.Change"><code class="docutils literal notranslate"><span class="pre">Change</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="api.html#queryearth.ComputedRule"><code class="docutils literal notranslate"><span class="pre">ComputedRule</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="api.html#queryearth.DimMatch"><code class="docutils literal notranslate"><span class="pre">DimMatch</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="api.html#queryearth.Dimension"><code class="docutils literal notranslate"><span class="pre">Dimension</span></code></a></li>
@@ -183,7 +181,6 @@
 <li class="toctree-l2"><a class="reference internal" href="api.html#queryearth.RuleKind"><code class="docutils literal notranslate"><span class="pre">RuleKind</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="api.html#queryearth.Scope"><code class="docutils literal notranslate"><span class="pre">Scope</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="api.html#queryearth.Space"><code class="docutils literal notranslate"><span class="pre">Space</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="api.html#queryearth.Suggestion"><code class="docutils literal notranslate"><span class="pre">Suggestion</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="api.html#queryearth.TimeSpec"><code class="docutils literal notranslate"><span class="pre">TimeSpec</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="api.html#queryearth.UnknownNameError"><code class="docutils literal notranslate"><span class="pre">UnknownNameError</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="api.html#queryearth.Versions"><code class="docutils literal notranslate"><span class="pre">Versions</span></code></a></li>

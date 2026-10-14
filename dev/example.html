@@ -6,14 +6,14 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>The toy example &mdash; queryearth 0.1.1.dev3</title>
+  <title>The toy example &mdash; queryearth 0.1.1.dev4</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
 
   
       <script src="_static/jquery.js?v=5d32c60e"></script>
       <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="_static/documentation_options.js?v=3ee5b2c0"></script>
+      <script src="_static/documentation_options.js?v=f56c220d"></script>
       <script src="_static/doctools.js?v=fd6eb6e6"></script>
       <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="_static/versions.js?v=58ec1786"></script>
@@ -128,7 +128,7 @@
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">show</span><span class="p">(</span><span class="n">findings</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">"""One line per finding, then any suggestions under it."""</span>
+<span class="w">    </span><span class="sd">"""One line per finding, then any changes under it."""</span>
     <span class="k">if</span> <span class="ow">not</span> <span class="n">findings</span><span class="p">:</span>
         <span class="nb">print</span><span class="p">(</span><span class="s2">"  (no findings)"</span><span class="p">)</span>
     <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">findings</span><span class="p">:</span>
@@ -136,13 +136,13 @@
             <span class="s2">"-"</span> <span class="k">if</span> <span class="n">x</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">x</span><span class="si">:</span><span class="s2">.0%</span><span class="si">}</span><span class="s2">"</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="p">(</span><span class="n">f</span><span class="o">.</span><span class="n">area_fraction</span><span class="p">,</span> <span class="n">f</span><span class="o">.</span><span class="n">time_fraction</span><span class="p">)</span>
         <span class="p">)</span>
         <span class="n">level</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLevelName</span><span class="p">(</span><span class="n">f</span><span class="o">.</span><span class="n">level</span><span class="p">)</span>
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"  </span><span class="si">{</span><span class="n">f</span><span class="o">.</span><span class="n">code</span><span class="si">:</span><span class="s2">7</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">f</span><span class="o">.</span><span class="n">kind</span><span class="si">:</span><span class="s2">10</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">level</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"  </span><span class="si">{</span><span class="n">f</span><span class="o">.</span><span class="n">code</span><span class="si">:</span><span class="s2">7</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">level</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
         <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"          </span><span class="si">{</span><span class="n">f</span><span class="o">.</span><span class="n">title</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
         <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"          area </span><span class="si">{</span><span class="n">area</span><span class="si">}</span><span class="s2">, time </span><span class="si">{</span><span class="n">time</span><span class="si">}</span><span class="s2">, periods </span><span class="si">{</span><span class="n">f</span><span class="o">.</span><span class="n">time_overlap</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">f</span><span class="o">.</span><span class="n">conditional_on</span><span class="p">:</span>
             <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"          conditional on </span><span class="si">{</span><span class="n">f</span><span class="o">.</span><span class="n">conditional_on</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
-        <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">f</span><span class="o">.</span><span class="n">suggestions</span><span class="p">:</span>
-            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"          -&gt; set </span><span class="si">{</span><span class="n">s</span><span class="o">.</span><span class="n">target</span><span class="si">}</span><span class="s2">:</span><span class="si">{</span><span class="n">s</span><span class="o">.</span><span class="n">key</span><span class="si">}</span><span class="s2"> = </span><span class="si">{</span><span class="n">s</span><span class="o">.</span><span class="n">value</span><span class="si">!r}</span><span class="s2">"</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">f</span><span class="o">.</span><span class="n">changes</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"          -&gt; set </span><span class="si">{</span><span class="n">c</span><span class="o">.</span><span class="n">target</span><span class="si">}</span><span class="s2">:</span><span class="si">{</span><span class="n">c</span><span class="o">.</span><span class="n">key</span><span class="si">}</span><span class="s2"> = </span><span class="si">{</span><span class="n">c</span><span class="o">.</span><span class="n">value</span><span class="si">!r}</span><span class="s2">"</span><span class="p">)</span>
 
 
 <span class="c1"># %% 1. A Bering Sea domain that crosses the antimeridian, winter 2000-01, 8 km.</span>
@@ -172,11 +172,10 @@
 <span class="n">show</span><span class="p">(</span><span class="n">registry</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="n">space</span><span class="o">=</span><span class="n">gulf</span><span class="p">,</span> <span class="n">time</span><span class="o">=</span><span class="n">year_2005</span><span class="p">,</span> <span class="n">dimensions</span><span class="o">=</span><span class="n">coastal</span><span class="p">))</span>
 
 <span class="c1"># %% 4. Rules written in Python. A static rule, and a computed rule whose</span>
-<span class="c1"># suggestion depends on the query (a made-up time step from the finest cells).</span>
+<span class="c1"># change depends on the query (a made-up time step from the finest cells).</span>
 <span class="n">registry</span><span class="o">.</span><span class="n">add</span><span class="p">(</span>
     <span class="n">qe</span><span class="o">.</span><span class="n">Rule</span><span class="p">(</span>
         <span class="n">code</span><span class="o">=</span><span class="s2">"TOY201"</span><span class="p">,</span>
-        <span class="n">kind</span><span class="o">=</span><span class="s2">"warning"</span><span class="p">,</span>
         <span class="n">title</span><span class="o">=</span><span class="s2">"toy_atmos 2 m temperature is too cold over sea ice"</span><span class="p">,</span>
         <span class="n">message</span><span class="o">=</span><span class="s2">"Over sea ice, toy_atmos t2m runs a few kelvin too cold."</span><span class="p">,</span>
         <span class="n">scope</span><span class="o">=</span><span class="n">qe</span><span class="o">.</span><span class="n">Scope</span><span class="p">(</span>
@@ -188,14 +187,13 @@
 
 <span class="nd">@registry</span><span class="o">.</span><span class="n">rule</span><span class="p">(</span>
     <span class="s2">"TOY202"</span><span class="p">,</span>
-    <span class="n">kind</span><span class="o">=</span><span class="s2">"suggestion"</span><span class="p">,</span>
     <span class="n">dimensions</span><span class="o">=</span><span class="p">{</span><span class="s2">"resolution"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"gt"</span><span class="p">:</span> <span class="mi">0</span><span class="p">}},</span>  <span class="c1"># conditional without a resolution</span>
 <span class="p">)</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">time_step</span><span class="p">(</span><span class="n">query</span><span class="p">,</span> <span class="n">match</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""Set the toy time step from the finest cells"""</span>
     <span class="n">finest_km</span> <span class="o">=</span> <span class="n">match</span><span class="o">.</span><span class="n">dimensions</span><span class="p">[</span><span class="s2">"resolution"</span><span class="p">]</span><span class="o">.</span><span class="n">overlap</span><span class="o">.</span><span class="n">lo</span>
     <span class="n">seconds</span> <span class="o">=</span> <span class="mf">30.0</span> <span class="o">*</span> <span class="n">finest_km</span>  <span class="c1"># made up: 30 s per km</span>
-    <span class="k">return</span> <span class="p">{</span><span class="s2">"suggestions"</span><span class="p">:</span> <span class="p">[</span><span class="n">qe</span><span class="o">.</span><span class="n">Suggestion</span><span class="p">(</span><span class="s2">"MOM_input"</span><span class="p">,</span> <span class="s2">"TOY_DT"</span><span class="p">,</span> <span class="n">seconds</span><span class="p">,</span> <span class="s2">"made up"</span><span class="p">)]}</span>
+    <span class="k">return</span> <span class="p">{</span><span class="s2">"changes"</span><span class="p">:</span> <span class="p">[</span><span class="n">qe</span><span class="o">.</span><span class="n">Change</span><span class="p">(</span><span class="s2">"MOM_input"</span><span class="p">,</span> <span class="s2">"TOY_DT"</span><span class="p">,</span> <span class="n">seconds</span><span class="p">,</span> <span class="s2">"made up"</span><span class="p">)]}</span>
 
 
 <span class="n">atmos</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"resolution"</span><span class="p">:</span> <span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="mi">12</span><span class="p">),</span> <span class="s2">"product"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"toy_atmos"</span><span class="p">]}</span>
@@ -263,7 +261,6 @@
 <span class="w">      </span><span class="p">},</span>
 <span class="w">      </span><span class="nt">"properties"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
 <span class="w">        </span><span class="nt">"code"</span><span class="p">:</span><span class="w"> </span><span class="s2">"TOY001"</span><span class="p">,</span>
-<span class="w">        </span><span class="nt">"kind"</span><span class="p">:</span><span class="w"> </span><span class="s2">"warning"</span><span class="p">,</span>
 <span class="w">        </span><span class="nt">"title"</span><span class="p">:</span><span class="w"> </span><span class="s2">"toy_ocean salinity is poorly constrained before 2004"</span><span class="p">,</span>
 <span class="w">        </span><span class="nt">"message"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Few salinity profiles went into toy_ocean before 2004, so its salinity drifts in that period."</span><span class="p">,</span>
 <span class="w">        </span><span class="nt">"instruction"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Start after 2004 if you can."</span><span class="p">,</span>
@@ -312,7 +309,6 @@
 <span class="w">      </span><span class="nt">"time"</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span>
 <span class="w">      </span><span class="nt">"properties"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
 <span class="w">        </span><span class="nt">"code"</span><span class="p">:</span><span class="w"> </span><span class="s2">"TOY002"</span><span class="p">,</span>
-<span class="w">        </span><span class="nt">"kind"</span><span class="p">:</span><span class="w"> </span><span class="s2">"warning"</span><span class="p">,</span>
 <span class="w">        </span><span class="nt">"title"</span><span class="p">:</span><span class="w"> </span><span class="s2">"toy_ocean is too warm in the Bering Sea in winter"</span><span class="p">,</span>
 <span class="w">        </span><span class="nt">"message"</span><span class="p">:</span><span class="w"> </span><span class="s2">"From December to March, toy_ocean sea temperature in the Bering Sea runs about 1 K too warm."</span><span class="p">,</span>
 <span class="w">        </span><span class="nt">"dimensions"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
@@ -346,7 +342,6 @@
 <span class="w">      </span><span class="p">},</span>
 <span class="w">      </span><span class="nt">"properties"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
 <span class="w">        </span><span class="nt">"code"</span><span class="p">:</span><span class="w"> </span><span class="s2">"TOY003"</span><span class="p">,</span>
-<span class="w">        </span><span class="nt">"kind"</span><span class="p">:</span><span class="w"> </span><span class="s2">"warning"</span><span class="p">,</span>
 <span class="w">        </span><span class="nt">"title"</span><span class="p">:</span><span class="w"> </span><span class="s2">"toy_atmos precipitation is broken in summer 2015"</span><span class="p">,</span>
 <span class="w">        </span><span class="nt">"message"</span><span class="p">:</span><span class="w"> </span><span class="s2">"toy_atmos precipitation from June to August 2015 was produced with a faulty input file."</span><span class="p">,</span>
 <span class="w">        </span><span class="nt">"level"</span><span class="p">:</span><span class="w"> </span><span class="s2">"error"</span><span class="p">,</span>
@@ -374,7 +369,6 @@
 <span class="w">      </span><span class="p">},</span>
 <span class="w">      </span><span class="nt">"properties"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
 <span class="w">        </span><span class="nt">"code"</span><span class="p">:</span><span class="w"> </span><span class="s2">"TOY004"</span><span class="p">,</span>
-<span class="w">        </span><span class="nt">"kind"</span><span class="p">:</span><span class="w"> </span><span class="s2">"warning"</span><span class="p">,</span>
 <span class="w">        </span><span class="nt">"title"</span><span class="p">:</span><span class="w"> </span><span class="s2">"toy_coastal starts in 2010"</span><span class="p">,</span>
 <span class="w">        </span><span class="nt">"message"</span><span class="p">:</span><span class="w"> </span><span class="s2">"toy_coastal has no data before 2010."</span><span class="p">,</span>
 <span class="w">        </span><span class="nt">"level"</span><span class="p">:</span><span class="w"> </span><span class="s2">"error"</span><span class="p">,</span>
@@ -399,7 +393,6 @@
 <span class="w">      </span><span class="p">},</span>
 <span class="w">      </span><span class="nt">"properties"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
 <span class="w">        </span><span class="nt">"code"</span><span class="p">:</span><span class="w"> </span><span class="s2">"TOY005"</span><span class="p">,</span>
-<span class="w">        </span><span class="nt">"kind"</span><span class="p">:</span><span class="w"> </span><span class="s2">"warning"</span><span class="p">,</span>
 <span class="w">        </span><span class="nt">"title"</span><span class="p">:</span><span class="w"> </span><span class="s2">"toy_coastal ends in 2023"</span><span class="p">,</span>
 <span class="w">        </span><span class="nt">"message"</span><span class="p">:</span><span class="w"> </span><span class="s2">"toy_coastal has no data after 2023."</span><span class="p">,</span>
 <span class="w">        </span><span class="nt">"level"</span><span class="p">:</span><span class="w"> </span><span class="s2">"error"</span><span class="p">,</span>
@@ -467,7 +460,6 @@
 <span class="w">      </span><span class="nt">"time"</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span>
 <span class="w">      </span><span class="nt">"properties"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
 <span class="w">        </span><span class="nt">"code"</span><span class="p">:</span><span class="w"> </span><span class="s2">"TOY006"</span><span class="p">,</span>
-<span class="w">        </span><span class="nt">"kind"</span><span class="p">:</span><span class="w"> </span><span class="s2">"warning"</span><span class="p">,</span>
 <span class="w">        </span><span class="nt">"title"</span><span class="p">:</span><span class="w"> </span><span class="s2">"toy_coastal covers only the Gulf of Mexico"</span><span class="p">,</span>
 <span class="w">        </span><span class="nt">"message"</span><span class="p">:</span><span class="w"> </span><span class="s2">"toy_coastal has data only in one box, roughly the Gulf of Mexico."</span><span class="p">,</span>
 <span class="w">        </span><span class="nt">"level"</span><span class="p">:</span><span class="w"> </span><span class="s2">"error"</span><span class="p">,</span>
@@ -487,7 +479,6 @@
 <span class="w">      </span><span class="nt">"time"</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span>
 <span class="w">      </span><span class="nt">"properties"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
 <span class="w">        </span><span class="nt">"code"</span><span class="p">:</span><span class="w"> </span><span class="s2">"TOY101"</span><span class="p">,</span>
-<span class="w">        </span><span class="nt">"kind"</span><span class="p">:</span><span class="w"> </span><span class="s2">"suggestion"</span><span class="p">,</span>
 <span class="w">        </span><span class="nt">"title"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Arctic domain: consider active sea ice"</span><span class="p">,</span>
 <span class="w">        </span><span class="nt">"message"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Part of this domain lies north of the Arctic Circle, where sea ice matters."</span><span class="p">,</span>
 <span class="w">        </span><span class="nt">"box"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
@@ -501,7 +492,7 @@
 <span class="w">            </span><span class="s2">"mom6"</span>
 <span class="w">          </span><span class="p">]</span>
 <span class="w">        </span><span class="p">},</span>
-<span class="w">        </span><span class="nt">"suggestions"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">        </span><span class="nt">"changes"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
 <span class="w">          </span><span class="p">{</span>
 <span class="w">            </span><span class="nt">"target"</span><span class="p">:</span><span class="w"> </span><span class="s2">"compset"</span><span class="p">,</span>
 <span class="w">            </span><span class="nt">"key"</span><span class="p">:</span><span class="w"> </span><span class="s2">"ice_component"</span><span class="p">,</span>
@@ -519,7 +510,6 @@
 <span class="w">      </span><span class="nt">"time"</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span>
 <span class="w">      </span><span class="nt">"properties"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
 <span class="w">        </span><span class="nt">"code"</span><span class="p">:</span><span class="w"> </span><span class="s2">"TOY102"</span><span class="p">,</span>
-<span class="w">        </span><span class="nt">"kind"</span><span class="p">:</span><span class="w"> </span><span class="s2">"suggestion"</span><span class="p">,</span>
 <span class="w">        </span><span class="nt">"title"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Fine grid: turn off the coarse-grid eddy scheme"</span><span class="p">,</span>
 <span class="w">        </span><span class="nt">"message"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Below 10 km the model starts to resolve eddies itself."</span><span class="p">,</span>
 <span class="w">        </span><span class="nt">"dimensions"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
@@ -528,7 +518,7 @@
 <span class="w">            </span><span class="nt">"unit"</span><span class="p">:</span><span class="w"> </span><span class="s2">"km"</span>
 <span class="w">          </span><span class="p">}</span>
 <span class="w">        </span><span class="p">},</span>
-<span class="w">        </span><span class="nt">"suggestions"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">        </span><span class="nt">"changes"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
 <span class="w">          </span><span class="p">{</span>
 <span class="w">            </span><span class="nt">"target"</span><span class="p">:</span><span class="w"> </span><span class="s2">"MOM_input"</span><span class="p">,</span>
 <span class="w">            </span><span class="nt">"key"</span><span class="p">:</span><span class="w"> </span><span class="s2">"TOY_EDDY_SCHEME"</span><span class="p">,</span>
@@ -546,7 +536,6 @@
 <span class="w">      </span><span class="nt">"time"</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span>
 <span class="w">      </span><span class="nt">"properties"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
 <span class="w">        </span><span class="nt">"code"</span><span class="p">:</span><span class="w"> </span><span class="s2">"TOY103"</span><span class="p">,</span>
-<span class="w">        </span><span class="nt">"kind"</span><span class="p">:</span><span class="w"> </span><span class="s2">"suggestion"</span><span class="p">,</span>
 <span class="w">        </span><span class="nt">"title"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Coarse grid: raise the toy viscosity"</span><span class="p">,</span>
 <span class="w">        </span><span class="nt">"message"</span><span class="p">:</span><span class="w"> </span><span class="s2">"At 50 km or coarser, the toy model needs more viscosity to stay stable."</span><span class="p">,</span>
 <span class="w">        </span><span class="nt">"dimensions"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
@@ -555,7 +544,7 @@
 <span class="w">            </span><span class="nt">"unit"</span><span class="p">:</span><span class="w"> </span><span class="s2">"km"</span>
 <span class="w">          </span><span class="p">}</span>
 <span class="w">        </span><span class="p">},</span>
-<span class="w">        </span><span class="nt">"suggestions"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">        </span><span class="nt">"changes"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
 <span class="w">          </span><span class="p">{</span>
 <span class="w">            </span><span class="nt">"target"</span><span class="p">:</span><span class="w"> </span><span class="s2">"MOM_input"</span><span class="p">,</span>
 <span class="w">            </span><span class="nt">"key"</span><span class="p">:</span><span class="w"> </span><span class="s2">"TOY_VISCOSITY"</span><span class="p">,</span>

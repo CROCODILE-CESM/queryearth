@@ -5,14 +5,14 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>queryearth.objects &mdash; queryearth 0.1.1.dev3</title>
+  <title>queryearth.objects &mdash; queryearth 0.1.1.dev4</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
 
   
       <script src="../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../_static/documentation_options.js?v=3ee5b2c0"></script>
+      <script src="../../_static/documentation_options.js?v=f56c220d"></script>
       <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../_static/versions.js?v=58ec1786"></script>
@@ -101,27 +101,23 @@
 
 <span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span>
     <span class="s2">"Action"</span><span class="p">,</span>
+    <span class="s2">"Change"</span><span class="p">,</span>
     <span class="s2">"Confidence"</span><span class="p">,</span>
     <span class="s2">"DuplicateCodeError"</span><span class="p">,</span>
     <span class="s2">"Finding"</span><span class="p">,</span>
-    <span class="s2">"Kind"</span><span class="p">,</span>
     <span class="s2">"LoadError"</span><span class="p">,</span>
     <span class="s2">"Match"</span><span class="p">,</span>
     <span class="s2">"Outcome"</span><span class="p">,</span>
     <span class="s2">"Query"</span><span class="p">,</span>
     <span class="s2">"Scope"</span><span class="p">,</span>
     <span class="s2">"Status"</span><span class="p">,</span>
-    <span class="s2">"Suggestion"</span><span class="p">,</span>
     <span class="s2">"UnknownNameError"</span><span class="p">,</span>
 <span class="p">]</span>
 
-<span class="n">Kind</span> <span class="o">=</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">"warning"</span><span class="p">,</span> <span class="s2">"suggestion"</span><span class="p">]</span>
 <span class="n">Confidence</span> <span class="o">=</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">"observed"</span><span class="p">,</span> <span class="s2">"likely"</span><span class="p">,</span> <span class="s2">"possible"</span><span class="p">,</span> <span class="s2">"unknown"</span><span class="p">]</span>  <span class="c1"># CAP certainty</span>
 <span class="n">Action</span> <span class="o">=</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">"can_be_used"</span><span class="p">,</span> <span class="s2">"use_with_caution"</span><span class="p">,</span> <span class="s2">"do_not_use"</span><span class="p">,</span> <span class="s2">"replaced"</span><span class="p">]</span>
 <span class="n">Status</span> <span class="o">=</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">"draft"</span><span class="p">,</span> <span class="s2">"reviewed"</span><span class="p">,</span> <span class="s2">"deprecated"</span><span class="p">]</span>
 
-<span class="n">KINDS</span> <span class="o">=</span> <span class="p">(</span><span class="s2">"warning"</span><span class="p">,</span> <span class="s2">"suggestion"</span><span class="p">)</span>  <span class="c1"># in the order findings sort</span>
-<span class="n">LEVELS</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"warning"</span><span class="p">:</span> <span class="n">logging</span><span class="o">.</span><span class="n">WARNING</span><span class="p">,</span> <span class="s2">"suggestion"</span><span class="p">:</span> <span class="n">logging</span><span class="o">.</span><span class="n">INFO</span><span class="p">}</span>
 <span class="n">CONFIDENCES</span> <span class="o">=</span> <span class="p">(</span><span class="s2">"observed"</span><span class="p">,</span> <span class="s2">"likely"</span><span class="p">,</span> <span class="s2">"possible"</span><span class="p">,</span> <span class="s2">"unknown"</span><span class="p">)</span>
 <span class="n">ACTIONS</span> <span class="o">=</span> <span class="p">(</span><span class="s2">"can_be_used"</span><span class="p">,</span> <span class="s2">"use_with_caution"</span><span class="p">,</span> <span class="s2">"do_not_use"</span><span class="p">,</span> <span class="s2">"replaced"</span><span class="p">)</span>
 <span class="n">STATUSES</span> <span class="o">=</span> <span class="p">(</span><span class="s2">"draft"</span><span class="p">,</span> <span class="s2">"reviewed"</span><span class="p">,</span> <span class="s2">"deprecated"</span><span class="p">)</span>
@@ -218,11 +214,11 @@
 
 
 <span class="c1"># ---- outcomes, matches, findings -----------------------------------------------</span>
-<div class="viewcode-block" id="Suggestion">
-<a class="viewcode-back" href="../../api.html#queryearth.Suggestion">[docs]</a>
+<div class="viewcode-block" id="Change">
+<a class="viewcode-back" href="../../api.html#queryearth.Change">[docs]</a>
 <span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-<span class="k">class</span><span class="w"> </span><span class="nc">Suggestion</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">"""A structured action; the engine never interprets target or key."""</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">Change</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""A structured change for the caller to apply; never interpreted here."""</span>
 
     <span class="n">target</span><span class="p">:</span> <span class="nb">str</span>
     <span class="n">key</span><span class="p">:</span> <span class="nb">str</span>
@@ -232,36 +228,36 @@
     <span class="k">def</span><span class="w"> </span><span class="nf">__post_init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
         <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"target"</span><span class="p">,</span> <span class="s2">"key"</span><span class="p">):</span>
             <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">),</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">or</span> <span class="ow">not</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">):</span>
-                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"a suggestion's </span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2"> is a non-empty string"</span><span class="p">)</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"a change's </span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2"> is a non-empty string"</span><span class="p">)</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">rationale</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
-            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">"a suggestion's rationale is a string"</span><span class="p">)</span></div>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">"a change's rationale is a string"</span><span class="p">)</span></div>
 
 
 
-<span class="k">def</span><span class="w"> </span><span class="nf">suggestion_of</span><span class="p">(</span><span class="n">value</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Suggestion</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">"""A Suggestion from itself or a {target, key, value, rationale} mapping."""</span>
-    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">Suggestion</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">change_of</span><span class="p">(</span><span class="n">value</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Change</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""A Change from itself or a {target, key, value, rationale} mapping."""</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">Change</span><span class="p">):</span>
         <span class="k">return</span> <span class="n">value</span>
     <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">Mapping</span><span class="p">):</span>
-        <span class="k">return</span> <span class="n">Suggestion</span><span class="p">(</span><span class="o">**</span><span class="n">value</span><span class="p">)</span>
-    <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"a suggestion is a Suggestion or a mapping, not </span><span class="si">{</span><span class="n">value</span><span class="si">!r}</span><span class="s2">"</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">Change</span><span class="p">(</span><span class="o">**</span><span class="n">value</span><span class="p">)</span>
+    <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"a change is a Change or a mapping, not </span><span class="si">{</span><span class="n">value</span><span class="si">!r}</span><span class="s2">"</span><span class="p">)</span>
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">_outcome_post_init</span><span class="p">(</span><span class="n">o</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
     <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">o</span><span class="o">.</span><span class="n">code</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">o</span><span class="o">.</span><span class="n">code</span><span class="p">:</span>
         <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"a code is a non-empty string"</span><span class="p">)</span>
-    <span class="n">_choice</span><span class="p">(</span><span class="n">o</span><span class="o">.</span><span class="n">kind</span><span class="p">,</span> <span class="n">KINDS</span><span class="p">,</span> <span class="s2">"kind"</span><span class="p">)</span>
     <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"title"</span><span class="p">,</span> <span class="s2">"message"</span><span class="p">,</span> <span class="s2">"instruction"</span><span class="p">):</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="nb">getattr</span><span class="p">(</span><span class="n">o</span><span class="p">,</span> <span class="n">name</span><span class="p">),</span> <span class="nb">str</span><span class="p">):</span>
             <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2"> must be a string"</span><span class="p">)</span>
-    <span class="n">_set</span><span class="p">(</span><span class="n">o</span><span class="p">,</span> <span class="s2">"level"</span><span class="p">,</span> <span class="n">LEVELS</span><span class="p">[</span><span class="n">o</span><span class="o">.</span><span class="n">kind</span><span class="p">]</span> <span class="k">if</span> <span class="n">o</span><span class="o">.</span><span class="n">level</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">level_of</span><span class="p">(</span><span class="n">o</span><span class="o">.</span><span class="n">level</span><span class="p">))</span>
     <span class="n">_choice</span><span class="p">(</span><span class="n">o</span><span class="o">.</span><span class="n">confidence</span><span class="p">,</span> <span class="n">CONFIDENCES</span><span class="p">,</span> <span class="s2">"confidence"</span><span class="p">)</span>
     <span class="k">if</span> <span class="n">o</span><span class="o">.</span><span class="n">action</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
         <span class="n">_choice</span><span class="p">(</span><span class="n">o</span><span class="o">.</span><span class="n">action</span><span class="p">,</span> <span class="n">ACTIONS</span><span class="p">,</span> <span class="s2">"action"</span><span class="p">)</span>
     <span class="n">_choice</span><span class="p">(</span><span class="n">o</span><span class="o">.</span><span class="n">status</span><span class="p">,</span> <span class="n">STATUSES</span><span class="p">,</span> <span class="s2">"status"</span><span class="p">)</span>
-    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">o</span><span class="o">.</span><span class="n">suggestions</span><span class="p">,</span> <span class="p">(</span><span class="n">Suggestion</span><span class="p">,</span> <span class="n">Mapping</span><span class="p">)):</span>
-        <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">"suggestions is a sequence of suggestions"</span><span class="p">)</span>
-    <span class="n">_set</span><span class="p">(</span><span class="n">o</span><span class="p">,</span> <span class="s2">"suggestions"</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">suggestion_of</span><span class="p">(</span><span class="n">s</span><span class="p">)</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">o</span><span class="o">.</span><span class="n">suggestions</span><span class="p">))</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">o</span><span class="o">.</span><span class="n">changes</span><span class="p">,</span> <span class="p">(</span><span class="n">Change</span><span class="p">,</span> <span class="n">Mapping</span><span class="p">)):</span>
+        <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">"changes is a sequence of changes"</span><span class="p">)</span>
+    <span class="n">_set</span><span class="p">(</span><span class="n">o</span><span class="p">,</span> <span class="s2">"changes"</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">change_of</span><span class="p">(</span><span class="n">c</span><span class="p">)</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">o</span><span class="o">.</span><span class="n">changes</span><span class="p">))</span>
+    <span class="n">default</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">INFO</span> <span class="k">if</span> <span class="n">o</span><span class="o">.</span><span class="n">changes</span> <span class="k">else</span> <span class="n">logging</span><span class="o">.</span><span class="n">WARNING</span>
+    <span class="n">_set</span><span class="p">(</span><span class="n">o</span><span class="p">,</span> <span class="s2">"level"</span><span class="p">,</span> <span class="n">default</span> <span class="k">if</span> <span class="n">o</span><span class="o">.</span><span class="n">level</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">level_of</span><span class="p">(</span><span class="n">o</span><span class="o">.</span><span class="n">level</span><span class="p">))</span>
     <span class="n">minimum</span> <span class="o">=</span> <span class="n">_number</span><span class="p">(</span><span class="n">o</span><span class="o">.</span><span class="n">min_overlap</span><span class="p">,</span> <span class="s2">"min_overlap"</span><span class="p">)</span>
     <span class="k">if</span> <span class="ow">not</span> <span class="mf">0.0</span> <span class="o">&lt;=</span> <span class="n">minimum</span> <span class="o">&lt;=</span> <span class="mf">1.0</span><span class="p">:</span>
         <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"min_overlap must lie in [0, 1], not </span><span class="si">{</span><span class="n">minimum</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
@@ -280,14 +276,13 @@
 <span class="w">    </span><span class="sd">"""What a rule says; shared by Rule and Finding."""</span>
 
     <span class="n">code</span><span class="p">:</span> <span class="nb">str</span>
-    <span class="n">kind</span><span class="p">:</span> <span class="n">Kind</span>
     <span class="n">title</span><span class="p">:</span> <span class="nb">str</span>
     <span class="n">message</span><span class="p">:</span> <span class="nb">str</span>
-    <span class="n">level</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>  <span class="c1"># a logging level; None takes the kind's default</span>
+    <span class="n">level</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>  <span class="c1"># a logging level; None: WARNING, INFO with changes</span>
     <span class="n">confidence</span><span class="p">:</span> <span class="n">Confidence</span> <span class="o">=</span> <span class="s2">"unknown"</span>
     <span class="n">action</span><span class="p">:</span> <span class="n">Action</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
     <span class="n">instruction</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">""</span>
-    <span class="n">suggestions</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Suggestion</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span> <span class="o">=</span> <span class="p">()</span>
+    <span class="n">changes</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Change</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span> <span class="o">=</span> <span class="p">()</span>
     <span class="n">min_overlap</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.0</span>  <span class="c1"># a smaller area_fraction is too small to count</span>
     <span class="n">status</span><span class="p">:</span> <span class="n">Status</span> <span class="o">=</span> <span class="s2">"draft"</span>
     <span class="n">references</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Mapping</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">],</span> <span class="o">...</span><span class="p">]</span> <span class="o">=</span> <span class="p">()</span>

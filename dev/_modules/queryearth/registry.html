@@ -5,14 +5,14 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>queryearth.registry &mdash; queryearth 0.1.1.dev3</title>
+  <title>queryearth.registry &mdash; queryearth 0.1.1.dev4</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
 
   
       <script src="../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../_static/documentation_options.js?v=3ee5b2c0"></script>
+      <script src="../../_static/documentation_options.js?v=f56c220d"></script>
       <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../_static/versions.js?v=58ec1786"></script>
@@ -100,7 +100,6 @@
 <span class="kn">from</span><span class="w"> </span><span class="nn">queryearth</span><span class="w"> </span><span class="kn">import</span> <span class="n">space</span> <span class="k">as</span> <span class="n">sp</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">queryearth.dimensions</span><span class="w"> </span><span class="kn">import</span> <span class="n">Dimension</span><span class="p">,</span> <span class="n">SpaceDimension</span><span class="p">,</span> <span class="n">TimeDimension</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">queryearth.objects</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
-    <span class="n">KINDS</span><span class="p">,</span>
     <span class="n">DuplicateCodeError</span><span class="p">,</span>
     <span class="n">Finding</span><span class="p">,</span>
     <span class="n">LoadError</span><span class="p">,</span>
@@ -385,7 +384,7 @@
 <div class="viewcode-block" id="Registry.query">
 <a class="viewcode-back" href="../../api.html#queryearth.Registry.query">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">query</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">query</span><span class="p">:</span> <span class="n">Query</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="o">/</span><span class="p">,</span> <span class="o">**</span><span class="n">fields</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">Finding</span><span class="p">]:</span>
-<span class="w">        </span><span class="sd">"""Findings for one query, sorted by level, kind, then code.</span>
+<span class="w">        </span><span class="sd">"""Findings for one query, sorted by level, changes, then code.</span>
 
 <span class="sd">        fields are Query fields (they override those of query) and</span>
 <span class="sd">        include_conditional, which also returns findings for rules the query</span>
@@ -536,8 +535,8 @@
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">_sorted</span><span class="p">(</span><span class="n">findings</span><span class="p">:</span> <span class="n">Iterable</span><span class="p">[</span><span class="n">Finding</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">Finding</span><span class="p">]:</span>
-<span class="w">    </span><span class="sd">"""By level (highest first), kind, then code."""</span>
-    <span class="k">return</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">findings</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">f</span><span class="p">:</span> <span class="p">(</span><span class="o">-</span><span class="n">f</span><span class="o">.</span><span class="n">level</span><span class="p">,</span> <span class="n">KINDS</span><span class="o">.</span><span class="n">index</span><span class="p">(</span><span class="n">f</span><span class="o">.</span><span class="n">kind</span><span class="p">),</span> <span class="n">f</span><span class="o">.</span><span class="n">code</span><span class="p">))</span>
+<span class="w">    </span><span class="sd">"""By level (highest first), those without changes first, then code."""</span>
+    <span class="k">return</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">findings</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">f</span><span class="p">:</span> <span class="p">(</span><span class="o">-</span><span class="n">f</span><span class="o">.</span><span class="n">level</span><span class="p">,</span> <span class="nb">bool</span><span class="p">(</span><span class="n">f</span><span class="o">.</span><span class="n">changes</span><span class="p">),</span> <span class="n">f</span><span class="o">.</span><span class="n">code</span><span class="p">))</span>
 
 
 <span class="c1"># ---- the result of the bulk path ----------------------------------------------------</span>
