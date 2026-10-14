@@ -8,7 +8,14 @@ A rule without changes is a warning or a note, such as "these values are climato
 
 The **level** is a standard `logging` level, or its name: `"info"`, `"warning"` or `"error"`. It defaults to `logging.WARNING` (30) for a rule without changes and `logging.INFO` (20) for a rule with changes.
 
-A **code** is a prefix plus three or four digits, such as `CRU001`, or `ERA5-014` (a prefix that ends in a digit needs the hyphen).
+A **code** is a prefix plus three or four digits, such as `CRU001`, or `ERA5-014` (a prefix that ends in a digit needs the hyphen). The prefix is the rule's **group**. A Registry can declare its groups, each prefix with a title, and then every code must use one of them:
+
+```python
+registry = qe.Registry("mine", groups={"GRID": "Grid and numerics", "ITF": "Indonesian Throughflow"})
+registry.next_code("ITF")  # "ITF001", then one past the highest ITF number in use
+```
+
+{meth}`Registry.next_code() <queryearth.Registry.next_code>` gives a new rule its number. Numbers carry no meaning and are never given twice, withdrawn rules included, so a code always means the same rule.
 
 ## Dimensions
 
@@ -43,7 +50,7 @@ registry = qe.Registry(
 
 Scopes and queries give space and time as `space=` and `time=`, and the other dimensions in one mapping, such as `dimensions={"resolution": 8, "product": "era5"}`. A name the Registry has not declared raises `UnknownNameError`, so a misspelt name never looks like "no rule applies". [Extending queryearth](extending.md#dimension-plugins) shows how to write your own kind.
 
-A rule file can declare its dimensions itself, so that {meth}`Registry.from_file() <queryearth.Registry.from_file>` reads it with no Python declarations (see [Rule files](rules.md#rule-files)). {meth}`Registry.describe() <queryearth.Registry.describe>` tells a person or a program what a Registry can answer: its dimensions, the values its rules give on each ({meth}`Registry.values() <queryearth.Registry.values>`) and its rules, as JSON.
+A rule file can declare its dimensions itself, so that {meth}`Registry.from_file() <queryearth.Registry.from_file>` reads it with no Python declarations (see [Rule files](rules.md#rule-files)). {meth}`Registry.describe() <queryearth.Registry.describe>` tells a person or a program what a Registry can answer: its groups, its dimensions, the values its rules give on each ({meth}`Registry.values() <queryearth.Registry.values>`) and its rules, as JSON.
 
 ## Queries and findings
 
@@ -94,6 +101,8 @@ Coordinates are longitude and latitude in degrees, and edges are straight lines 
 - `polygon(shape)` for a GeoJSON mapping, a shapely geometry or a coordinate list.
 
 Shapes are normalised once: longitudes from 0 to 360 are wrapped, rings that cross ±180 are split there, and invalid rings are repaired. A ring that goes all the way around a pole raises an error: close it along latitude 90 or -90 first. Matching uses closed sets, so a point on an edge is inside. Area fractions use spherical areas.
+
+A rule with `edge=True` in its scope (`"edge": true` in a record) applies where the query's **edge** meets its space, rather than wherever they overlap. It is for advice about where a domain's boundary falls, such as an open boundary that cuts a strong current. A domain inside the space counts, since its edge is too; a domain that holds the whole space does not. The cuts at ±180 are not edges, nor is the pole of a polar cap, so the edge of a cap is its circle of latitude. A point has no edge, and a query without a space gets a conditional finding.
 
 ## Time
 

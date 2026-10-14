@@ -5,14 +5,14 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>queryearth.space &mdash; queryearth 0.2.1.dev1</title>
+  <title>queryearth.space &mdash; queryearth 0.3.1.dev1</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
 
   
       <script src="../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../_static/documentation_options.js?v=28304322"></script>
+      <script src="../../_static/documentation_options.js?v=54fce9ad"></script>
       <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../_static/versions.js?v=58ec1786"></script>
@@ -100,6 +100,8 @@
     <span class="s2">"Space"</span><span class="p">,</span>
     <span class="s2">"area_km2"</span><span class="p">,</span>
     <span class="s2">"box"</span><span class="p">,</span>
+    <span class="s2">"edge"</span><span class="p">,</span>
+    <span class="s2">"edge_meets"</span><span class="p">,</span>
     <span class="s2">"measure"</span><span class="p">,</span>
     <span class="s2">"meets"</span><span class="p">,</span>
     <span class="s2">"point"</span><span class="p">,</span>
@@ -110,6 +112,10 @@
 
 <span class="n">R_KM</span> <span class="o">=</span> <span class="mf">6371.0088</span>  <span class="c1"># mean Earth radius; area fractions do not depend on it</span>
 <span class="n">LAT_TOLERANCE</span> <span class="o">=</span> <span class="mf">1e-9</span>  <span class="c1"># degrees beyond +-90 that are clamped rather than refused</span>
+<span class="n">_EAST</span> <span class="o">=</span> <span class="n">shapely</span><span class="o">.</span><span class="n">LineString</span><span class="p">([(</span><span class="mf">180.0</span><span class="p">,</span> <span class="o">-</span><span class="mf">90.0</span><span class="p">),</span> <span class="p">(</span><span class="mf">180.0</span><span class="p">,</span> <span class="mf">90.0</span><span class="p">)])</span>
+<span class="n">_POLES</span> <span class="o">=</span> <span class="n">shapely</span><span class="o">.</span><span class="n">MultiLineString</span><span class="p">(</span>
+    <span class="p">[[(</span><span class="o">-</span><span class="mf">180.0</span><span class="p">,</span> <span class="mf">90.0</span><span class="p">),</span> <span class="p">(</span><span class="mf">180.0</span><span class="p">,</span> <span class="mf">90.0</span><span class="p">)],</span> <span class="p">[(</span><span class="o">-</span><span class="mf">180.0</span><span class="p">,</span> <span class="o">-</span><span class="mf">90.0</span><span class="p">),</span> <span class="p">(</span><span class="mf">180.0</span><span class="p">,</span> <span class="o">-</span><span class="mf">90.0</span><span class="p">)]]</span>
+<span class="p">)</span>
 
 
 <div class="viewcode-block" id="Space">
@@ -162,6 +168,12 @@
     <span class="c1"># make_valid can nest a MultiPolygon inside a GeometryCollection</span>
     <span class="n">parts</span> <span class="o">=</span> <span class="n">shapely</span><span class="o">.</span><span class="n">get_parts</span><span class="p">(</span><span class="n">shapely</span><span class="o">.</span><span class="n">get_parts</span><span class="p">(</span><span class="n">shape</span><span class="p">))</span>
     <span class="k">return</span> <span class="n">shapely</span><span class="o">.</span><span class="n">union_all</span><span class="p">(</span><span class="n">parts</span><span class="p">[</span><span class="n">shapely</span><span class="o">.</span><span class="n">get_type_id</span><span class="p">(</span><span class="n">parts</span><span class="p">)</span> <span class="o">==</span> <span class="mi">3</span><span class="p">])</span>  <span class="c1"># Polygon</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_lines</span><span class="p">(</span><span class="n">shape</span><span class="p">:</span> <span class="n">shapely</span><span class="o">.</span><span class="n">Geometry</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">shapely</span><span class="o">.</span><span class="n">Geometry</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""The line parts of a geometry, merged."""</span>
+    <span class="n">parts</span> <span class="o">=</span> <span class="n">shapely</span><span class="o">.</span><span class="n">get_parts</span><span class="p">(</span><span class="n">shapely</span><span class="o">.</span><span class="n">get_parts</span><span class="p">(</span><span class="n">shape</span><span class="p">))</span>
+    <span class="k">return</span> <span class="n">shapely</span><span class="o">.</span><span class="n">union_all</span><span class="p">(</span><span class="n">parts</span><span class="p">[</span><span class="n">shapely</span><span class="o">.</span><span class="n">get_type_id</span><span class="p">(</span><span class="n">parts</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span><span class="p">])</span>  <span class="c1"># LineString</span>
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">_split_at_seam</span><span class="p">(</span><span class="n">shape</span><span class="p">:</span> <span class="n">shapely</span><span class="o">.</span><span class="n">Geometry</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">shapely</span><span class="o">.</span><span class="n">Geometry</span><span class="p">:</span>
@@ -278,6 +290,26 @@
 
 
 
+<div class="viewcode-block" id="edge">
+<a class="viewcode-back" href="../../api.html#queryearth.edge">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">edge</span><span class="p">(</span><span class="n">space</span><span class="p">:</span> <span class="n">Space</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">shapely</span><span class="o">.</span><span class="n">Geometry</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""A polygon's edges on the globe, as lines.</span>
+
+<span class="sd">    That is its boundary without the cuts at +-180, which join two parts of one</span>
+<span class="sd">    shape, and without lines along latitude 90 or -90, which are a single point</span>
+<span class="sd">    on the globe: the edge of a polar cap is its one circle of latitude.</span>
+<span class="sd">    """</span>
+    <span class="k">if</span> <span class="n">space</span><span class="o">.</span><span class="n">kind</span> <span class="o">!=</span> <span class="s2">"polygon"</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"only a polygon has an edge, not a </span><span class="si">{</span><span class="n">space</span><span class="o">.</span><span class="n">kind</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+    <span class="n">lines</span> <span class="o">=</span> <span class="n">_lines</span><span class="p">(</span><span class="n">shapely</span><span class="o">.</span><span class="n">boundary</span><span class="p">(</span><span class="n">space</span><span class="o">.</span><span class="n">geometry</span><span class="p">))</span>
+    <span class="n">east</span> <span class="o">=</span> <span class="n">_lines</span><span class="p">(</span><span class="n">shapely</span><span class="o">.</span><span class="n">intersection</span><span class="p">(</span><span class="n">lines</span><span class="p">,</span> <span class="n">_EAST</span><span class="p">))</span>
+    <span class="n">west</span> <span class="o">=</span> <span class="n">_lines</span><span class="p">(</span><span class="n">shapely</span><span class="o">.</span><span class="n">intersection</span><span class="p">(</span><span class="n">lines</span><span class="p">,</span> <span class="n">_shift</span><span class="p">(</span><span class="n">_EAST</span><span class="p">,</span> <span class="o">-</span><span class="mf">360.0</span><span class="p">)))</span>
+    <span class="n">cut</span> <span class="o">=</span> <span class="n">_lines</span><span class="p">(</span><span class="n">shapely</span><span class="o">.</span><span class="n">intersection</span><span class="p">(</span><span class="n">east</span><span class="p">,</span> <span class="n">_shift</span><span class="p">(</span><span class="n">west</span><span class="p">,</span> <span class="mf">360.0</span><span class="p">)))</span>  <span class="c1"># on both sides</span>
+    <span class="n">seams</span> <span class="o">=</span> <span class="n">shapely</span><span class="o">.</span><span class="n">union_all</span><span class="p">([</span><span class="n">cut</span><span class="p">,</span> <span class="n">_shift</span><span class="p">(</span><span class="n">cut</span><span class="p">,</span> <span class="o">-</span><span class="mf">360.0</span><span class="p">),</span> <span class="n">_POLES</span><span class="p">])</span>
+    <span class="k">return</span> <span class="n">_lines</span><span class="p">(</span><span class="n">shapely</span><span class="o">.</span><span class="n">difference</span><span class="p">(</span><span class="n">lines</span><span class="p">,</span> <span class="n">seams</span><span class="p">))</span></div>
+
+
+
 <span class="c1"># ---- areas (design.md section 6.3) ---------------------------------------------</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">_ring_area</span><span class="p">(</span><span class="n">coords</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""Signed area of a closed ring with straight lon/lat edges; CCW is positive.</span>
@@ -371,6 +403,25 @@
     <span class="n">x0</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">x1</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">other</span><span class="o">.</span><span class="n">bounds</span>
     <span class="k">return</span> <span class="p">(</span><span class="n">x0</span> <span class="o">==</span> <span class="o">-</span><span class="mf">180.0</span> <span class="ow">and</span> <span class="n">shapely</span><span class="o">.</span><span class="n">intersects</span><span class="p">(</span><span class="n">shape</span><span class="p">,</span> <span class="n">_shift</span><span class="p">(</span><span class="n">other</span><span class="p">,</span> <span class="mf">360.0</span><span class="p">)))</span> <span class="ow">or</span> <span class="p">(</span>
         <span class="n">x1</span> <span class="o">==</span> <span class="mf">180.0</span> <span class="ow">and</span> <span class="n">shapely</span><span class="o">.</span><span class="n">intersects</span><span class="p">(</span><span class="n">shape</span><span class="p">,</span> <span class="n">_shift</span><span class="p">(</span><span class="n">other</span><span class="p">,</span> <span class="o">-</span><span class="mf">360.0</span><span class="p">))</span>
+    <span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="edge_meets">
+<a class="viewcode-back" href="../../api.html#queryearth.edge_meets">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">edge_meets</span><span class="p">(</span><span class="n">rule</span><span class="p">:</span> <span class="n">Space</span> <span class="o">|</span> <span class="n">shapely</span><span class="o">.</span><span class="n">Geometry</span><span class="p">,</span> <span class="n">query</span><span class="p">:</span> <span class="n">Space</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Whether the edge of a query polygon (edge()) meets a rule shape, as</span>
+<span class="sd">    closed sets. A point has no edge, so it meets no rule this way."""</span>
+    <span class="k">if</span> <span class="n">query</span><span class="o">.</span><span class="n">kind</span> <span class="o">!=</span> <span class="s2">"polygon"</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">False</span>
+    <span class="n">shape</span><span class="p">,</span> <span class="n">line</span> <span class="o">=</span> <span class="n">_shape</span><span class="p">(</span><span class="n">rule</span><span class="p">),</span> <span class="n">edge</span><span class="p">(</span><span class="n">query</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">line</span><span class="o">.</span><span class="n">is_empty</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">False</span>
+    <span class="k">if</span> <span class="n">shapely</span><span class="o">.</span><span class="n">intersects</span><span class="p">(</span><span class="n">shape</span><span class="p">,</span> <span class="n">line</span><span class="p">):</span>
+        <span class="k">return</span> <span class="kc">True</span>
+    <span class="n">x0</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">x1</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">line</span><span class="o">.</span><span class="n">bounds</span>
+    <span class="k">return</span> <span class="p">(</span><span class="n">x0</span> <span class="o">==</span> <span class="o">-</span><span class="mf">180.0</span> <span class="ow">and</span> <span class="n">shapely</span><span class="o">.</span><span class="n">intersects</span><span class="p">(</span><span class="n">shape</span><span class="p">,</span> <span class="n">_shift</span><span class="p">(</span><span class="n">line</span><span class="p">,</span> <span class="mf">360.0</span><span class="p">)))</span> <span class="ow">or</span> <span class="p">(</span>
+        <span class="n">x1</span> <span class="o">==</span> <span class="mf">180.0</span> <span class="ow">and</span> <span class="n">shapely</span><span class="o">.</span><span class="n">intersects</span><span class="p">(</span><span class="n">shape</span><span class="p">,</span> <span class="n">_shift</span><span class="p">(</span><span class="n">line</span><span class="p">,</span> <span class="o">-</span><span class="mf">360.0</span><span class="p">))</span>
     <span class="p">)</span></div>
 
 

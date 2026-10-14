@@ -5,14 +5,14 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>queryearth.dimensions &mdash; queryearth 0.2.1.dev1</title>
+  <title>queryearth.dimensions &mdash; queryearth 0.3.1.dev1</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
 
   
       <script src="../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../_static/documentation_options.js?v=28304322"></script>
+      <script src="../../_static/documentation_options.js?v=54fce9ad"></script>
       <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../_static/versions.js?v=58ec1786"></script>
@@ -233,11 +233,23 @@
 
     <span class="n">parse_query</span> <span class="o">=</span> <span class="n">parse_rule</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="nf">match</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">rule</span><span class="p">:</span> <span class="n">sp</span><span class="o">.</span><span class="n">Space</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span> <span class="n">query</span><span class="p">:</span> <span class="n">sp</span><span class="o">.</span><span class="n">Space</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">DimMatch</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
-        <span class="k">if</span> <span class="n">rule</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">sp</span><span class="o">.</span><span class="n">meets</span><span class="p">(</span><span class="n">rule</span><span class="p">,</span> <span class="n">query</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">match</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">rule</span><span class="p">:</span> <span class="n">sp</span><span class="o">.</span><span class="n">Space</span> <span class="o">|</span> <span class="n">Edge</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span> <span class="n">query</span><span class="p">:</span> <span class="n">sp</span><span class="o">.</span><span class="n">Space</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">DimMatch</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">rule</span><span class="p">,</span> <span class="n">Edge</span><span class="p">):</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">sp</span><span class="o">.</span><span class="n">edge_meets</span><span class="p">(</span><span class="n">rule</span><span class="o">.</span><span class="n">space</span><span class="p">,</span> <span class="n">query</span><span class="p">):</span>
+                <span class="k">return</span> <span class="kc">None</span>
+            <span class="n">rule</span> <span class="o">=</span> <span class="n">rule</span><span class="o">.</span><span class="n">space</span>
+        <span class="k">elif</span> <span class="n">rule</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">sp</span><span class="o">.</span><span class="n">meets</span><span class="p">(</span><span class="n">rule</span><span class="p">,</span> <span class="n">query</span><span class="p">):</span>
             <span class="k">return</span> <span class="kc">None</span>
         <span class="n">fraction</span><span class="p">,</span> <span class="n">km2</span> <span class="o">=</span> <span class="n">sp</span><span class="o">.</span><span class="n">measure</span><span class="p">(</span><span class="n">rule</span><span class="p">,</span> <span class="n">query</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">DimMatch</span><span class="p">(</span><span class="n">km2</span><span class="p">,</span> <span class="n">fraction</span><span class="p">)</span>
+
+
+<span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">eq</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">Edge</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""The space of an edge rule (Scope edge=True), as the Registry compiles it:</span>
+<span class="sd">    the rule meets a query whose edge meets this space."""</span>
+
+    <span class="n">space</span><span class="p">:</span> <span class="n">sp</span><span class="o">.</span><span class="n">Space</span>
 
 
 <span class="k">class</span><span class="w"> </span><span class="nc">TimeDimension</span><span class="p">(</span><span class="n">Dimension</span><span class="p">):</span>
