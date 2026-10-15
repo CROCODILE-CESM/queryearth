@@ -1,12 +1,11 @@
-"""queryearth: match rules scoped by area, time and other dimensions to a request.
+"""queryearth: match rules scoped by space, time and dimensions you define to a query.
 
-queryearth.time holds time keys, intervals and their measures,
-queryearth.space points, polygons and closed-set measures (imported as
-``from queryearth import space as sp``), and queryearth.converters turns other
-descriptions of a place, such as a model grid, into spaces. The rule engine is
-at the top level: a Registry of dimensions and rules answers queries with
-Finding objects, which callers log with the logging module or print with
-report(). See docs/design.md for the design.
+A Registry holds rules; Registry.query() returns the rules that apply to a
+query. Space, time and Axis are the base dimensions and Labels the extension
+that comes with them, all written on the public Dimension class, as your own
+dimensions are. queryearth.space makes points and polygons (import it as
+``from queryearth import space as sp``) and interval() makes times.
+docs/growth.md lists what queryearth 0.6.0 had beyond this core.
 """
 
 try:
@@ -14,70 +13,31 @@ try:
 except ImportError:  # running from a source tree that was never built or installed
     __version__ = "0.0.0"
 
-from queryearth import converters, space
+from queryearth import space
 from queryearth.dimensions import (
     Axis,
-    AxisOverlap,
-    DimMatch,
     Dimension,
     Labels,
-    Prefilter,
-    Versions,
+    SpaceDimension,
+    TimeDimension,
 )
-from queryearth.registry import FORMAT, Registry, PointResult
-from queryearth.objects import (
-    Action,
-    Change,
-    Confidence,
-    DuplicateCodeError,
-    Finding,
-    LoadError,
-    Match,
-    Outcome,
-    Query,
-    Scope,
-    Status,
-    UnknownNameError,
-    report,
-)
-from queryearth.rules import CheckResult, ComputedRule, Rule, RuleFunc, RuleKind
+from queryearth.registry import DuplicateCodeError, Registry
+from queryearth.rules import Rule
 from queryearth.space import Space
-from queryearth.time import Interval, TimeSpec, interval, parse_time
+from queryearth.time import Interval, interval
 
 __all__ = [
-    "FORMAT",
-    "Action",
     "Axis",
-    "AxisOverlap",
-    "Change",
-    "CheckResult",
-    "ComputedRule",
-    "Confidence",
-    "DimMatch",
     "Dimension",
     "DuplicateCodeError",
-    "Finding",
-    "Registry",
     "Interval",
     "Labels",
-    "LoadError",
-    "Match",
-    "Outcome",
-    "PointResult",
-    "Prefilter",
-    "Query",
+    "Registry",
     "Rule",
-    "RuleFunc",
-    "RuleKind",
-    "Scope",
     "Space",
-    "Status",
-    "TimeSpec",
-    "UnknownNameError",
-    "Versions",
+    "SpaceDimension",
+    "TimeDimension",
     "__version__",
     "interval",
-    "parse_time",
-    "report",
     "space",
 ]

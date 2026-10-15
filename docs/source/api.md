@@ -1,6 +1,6 @@
 # API reference
 
-Everything below is importable from `queryearth`, except the shape helpers, which live in `queryearth.space`, and the converters, which live in `queryearth.converters`.
+Everything below is importable from `queryearth`, except the shape helpers, which live in `queryearth.space`.
 
 ```{eval-rst}
 .. automodule:: queryearth
@@ -11,12 +11,5 @@ Everything below is importable from `queryearth`, except the shape helpers, whic
 
 ```{eval-rst}
 .. automodule:: queryearth.space
-   :members:
-```
-
-## queryearth.converters
-
-```{eval-rst}
-.. automodule:: queryearth.converters
    :members:
 ```

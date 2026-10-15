@@ -1,530 +1,244 @@
-"""Dimensions: every kind of scope, through one interface (section 4.13).
+"""Dimensions: what a rule's scope and a query give values on, and how they match.
 
-A dimension decides only whether one rule value meets one query value; the
-Registry does everything else (conditional findings, unknown names, sorting).
-Every dimension subclasses Dimension. Space and time are built in on every
-Registry and cannot be replaced; Axis (numeric ranges), Labels (names matched
-by glob patterns) and Versions (OSV-style version ranges) are declared, and a
-user's own dimension subclasses Dimension the same way.
+Every dimension subclasses Dimension and implements its four methods: the base
+dimensions space, time and Axis, the Labels extension that comes with them, and
+any dimension you write. Space and time are on every Registry; the others are
+declared on it. applies() is the matching rule, in one place.
 """
 
 from __future__ import annotations
 
 import abc
 import math
-import re
-from collections.abc import Callable, Iterable, Mapping, Sequence
-from dataclasses import dataclass, field
+import numbers
+from collections.abc import Mapping
+from dataclasses import dataclass
 from fnmatch import fnmatchcase
-from typing import Any, ClassVar, Protocol
+from typing import Any
 
-import numpy as np
+import shapely
 
 from queryearth import space as sp
-from queryearth.time import TimeSpec, overlap, time_fraction
+from queryearth.time import Interval, interval
 
-__all__ = [
-    "Axis",
-    "AxisOverlap",
-    "DimMatch",
-    "Dimension",
-    "Labels",
-    "Patterns",
-    "Prefilter",
-    "SpaceDimension",
-    "TimeDimension",
-    "VersionRange",
-    "Versions",
-    "describe_dimension",
-    "dimension_from",
-]
-
-
-@dataclass(frozen=True)
-class DimMatch:
-    """How one rule value met one query value on one dimension."""
-
-    overlap: Any = None  # dimension-specific; serialised with the plugin's to_json
-    fraction: float | None = None  # share of the query's value covered, if measurable
-    to_json: Callable[[Any], Any] | None = field(
-        default=None, compare=False, repr=False
-    )
-
-    def to_dict(self) -> dict[str, Any]:
-        """For Finding.to_dict(): the overlap through the plugin's to_json, if any."""
-        overlap = self.overlap if self.to_json is None else self.to_json(self.overlap)
-        return {"overlap": overlap, "fraction": self.fraction}
+__all__ = ["Axis", "Dimension", "Labels", "SpaceDimension", "TimeDimension", "applies"]
 
 
 class Dimension(abc.ABC):
-    """One kind of scope, declared on a Registry under a unique name.
+    """One kind of scope, such as space, time or grid resolution.
 
-    A subclass sets name and implements parse_rule, parse_query and match; it
-    cannot be created without them. The other members have defaults that leave
-    the Registry's behaviour unchanged, and a subclass overrides only those it
-    needs.
+    A subclass sets name, the key that scopes, queries and rule files use for
+    it, and implements the four methods below; Python refuses to create one
+    that leaves any out. The Registry calls them and does the rest: it refuses
+    undeclared names, and applies() decides whether a rule applies. A value
+    can be anything the dimension parses, such as a number, a range, a shape
+    or a mapping of several fields; a dimension sees only its own value.
     """
 
-    name: str  # key in scopes, queries, records and conditional_on
-    late: ClassVar[bool] = False  # run after the others; space, so it runs last
-    always: ClassVar[bool] = False  # match(None, query) when a rule leaves it out
+    name: str
 
     @abc.abstractmethod
     def parse_rule(self, value: Any) -> Any:
-        """A rule's value, parsed when the rule is added; ValueError if invalid."""
+        """A rule's value, given in Python or read from a rule file's JSON, in
+        the form matches() takes; ValueError if it is not valid."""
 
     @abc.abstractmethod
     def parse_query(self, value: Any) -> Any:
-        """A query's value, parsed when the query runs; ValueError if invalid."""
+        """A query's value, in the form matches() takes; ValueError if it is
+        not valid."""
 
     @abc.abstractmethod
-    def match(self, rule: Any, query: Any) -> DimMatch | None:
-        """How a rule's value meets a query's value; None when they do not."""
+    def matches(self, rule: Any, query: Any) -> bool:
+        """Whether a parsed rule value and a parsed query value share at least
+        one value, such as a point, an instant or a number."""
 
-    def comparable(self, rule: Any, query: Any) -> bool:
-        """False makes the finding conditional on this dimension, not a non-match."""
-        return True
-
-    def build(self, pairs: list[tuple[int, Any]]) -> Prefilter | None:
-        """An index over the (position, rule value) pairs of the rules that
-        constrain this dimension, to narrow them before match() runs; None for
-        no index. Not used by a dimension that overrides comparable()."""
-        return None
-
-    def extent(self, rule: Any) -> Any:
-        """What a finding reports when the query leaves this dimension out;
-        None for nothing."""
-        return None
-
-    def to_json(self, overlap: Any) -> Any:
-        """An overlap as JSON, for Finding.to_dict()."""
-        return overlap
+    @abc.abstractmethod
+    def to_json(self, rule: Any) -> Any:
+        """A parsed rule value as JSON for a rule file; parse_rule() reads it back."""
 
 
-class Prefilter(Protocol):
-    """Narrows the rules before match() runs; may return extra positions."""
+def applies(
+    dimensions: Mapping[str, Dimension],
+    scope: Mapping[str, Any],
+    query: Mapping[str, Any],
+) -> bool:
+    """Whether a rule applies to a query.
 
-    def candidates(self, query: Any) -> set[int]: ...
+    scope and query map dimension names to values parsed by those dimensions.
+    A rule applies when, on every dimension its scope constrains, the query
+    gives a value and the dimension's matches() says the two share at least
+    one value. A dimension the rule leaves out matches anything. A dimension
+    the rule constrains and the query leaves out does not match, since the
+    query gives no value to share.
+    """
+    return all(
+        name in query and dimensions[name].matches(value, query[name])
+        for name, value in scope.items()
+    )
 
 
-# ---- space and time: built in on every Registry --------------------------------------
 class SpaceDimension(Dimension):
-    """Space: closed-set meeting, then the area fraction and overlap in km².
+    """Space: a rule gives a polygon, a query a point or a polygon.
 
-    It runs late, after the cheaper dimensions, and also measures the query
-    against a rule that leaves space unconstrained.
+    In a rule file, a rule's space is the Feature's GeoJSON geometry.
     """
 
     name = "space"
-    late = True
-    always = True
 
-    def parse_rule(self, value: sp.Space) -> sp.Space:
+    def parse_rule(self, value: Any) -> sp.Space:
+        if isinstance(value, sp.Space) and value.kind != "polygon":
+            raise ValueError("a rule's space is a polygon, not a point")
+        return value if isinstance(value, sp.Space) else sp.polygon(value)
+
+    def parse_query(self, value: Any) -> sp.Space:
+        if not isinstance(value, sp.Space):
+            raise ValueError(
+                f"a query's space is a point or polygon from queryearth.space, "
+                f"such as sp.box(-60, 30, -50, 40), not {value!r}"
+            )
         return value
 
-    parse_query = parse_rule
+    def matches(self, rule: sp.Space, query: sp.Space) -> bool:
+        return sp.meets(rule, query)
 
-    def match(self, rule: sp.Space | Edge | None, query: sp.Space) -> DimMatch | None:
-        if isinstance(rule, Edge):
-            if not sp.edge_meets(rule.space, query):
-                return None
-            rule = rule.space
-        elif rule is not None and not sp.meets(rule, query):
-            return None
-        fraction, km2 = sp.measure(rule, query)
-        return DimMatch(km2, fraction)
-
-
-@dataclass(frozen=True, eq=False)
-class Edge:
-    """The space of an edge rule (Scope edge=True), as the Registry compiles it:
-    the rule meets a query whose edge meets this space."""
-
-    space: sp.Space
+    def to_json(self, rule: sp.Space) -> dict[str, Any]:
+        # Split edges longer than 180 degrees, which a reader would take the
+        # short way round; normalising makes the output the same every time.
+        shape = shapely.normalize(shapely.segmentize(rule.geometry, 180.0))
+        return shapely.geometry.mapping(shapely.orient_polygons(shape))
 
 
 class TimeDimension(Dimension):
-    """Time: the overlapping periods and the share of the query they cover.
+    """Time: a rule and a query each give an interval, made by interval().
 
-    It also measures the query against a rule that leaves time unconstrained,
-    and an undecided rule reports its own periods.
+    In a rule file, a rule's time is the Feature's JSON-FG time member,
+    {"interval": [start, end]}, with ".." for an open end.
     """
 
     name = "time"
-    always = True
 
-    def parse_rule(self, value: TimeSpec) -> TimeSpec:
-        return value
+    def parse_rule(self, value: Any) -> Interval:
+        if isinstance(value, Interval):
+            return value
+        pair = value.get("interval") if isinstance(value, Mapping) else None
+        if not isinstance(pair, list) or len(pair) != 2 or len(value) != 1:
+            raise ValueError(
+                f'a time is qe.interval(start, end), or {{"interval": [start, end]}} '
+                f"in a rule file, not {value!r}"
+            )
+        return interval(*pair)
 
     parse_query = parse_rule
 
-    def match(self, rule: TimeSpec | None, query: TimeSpec) -> DimMatch | None:
-        both = query if rule is None else overlap(rule, query)
-        if both is None:
-            return None
-        return DimMatch(both.to_wire(), time_fraction(both, query))
+    def matches(self, rule: Interval, query: Interval) -> bool:
+        return rule.meets(query)
 
-    def extent(self, rule: TimeSpec) -> tuple[tuple[str, str], ...]:
-        """The rule's own periods, reported when the query gives no time."""
-        return () if rule.extent == (None, None) else rule.to_wire()
+    def to_json(self, rule: Interval) -> dict[str, list[str]]:
+        return {"interval": list(rule.to_wire())}
 
 
-def _number(value: Any, what: str) -> float:
-    if isinstance(value, bool) or not isinstance(value, (int, float, np.number)):
+_BOUNDS = {"gt", "ge", "lt", "le"}
+
+
+def _number(value: Any, what: str) -> int | float:
+    if isinstance(value, bool) or not isinstance(value, numbers.Real):
         raise ValueError(f"{what} must be a number, not {value!r}")
-    number = float(value)
-    if math.isnan(number):
+    if math.isnan(value):
         raise ValueError(f"{what} is not a number")
-    return number
-
-
-def _string_list(value: Any, what: str) -> tuple[str, ...]:
-    if isinstance(value, str):
-        value = [value]  # in Python a bare string is a one-item list
-    if isinstance(value, Mapping) or not isinstance(value, Iterable):
-        raise ValueError(f"{what} must be a list of strings, not {value!r}")
-    items = tuple(value)
-    if not items or not all(isinstance(v, str) and v for v in items):
-        raise ValueError(f"{what} must be a non-empty list of non-empty strings")
-    return items
-
-
-# ---- Axis: a named ordered dimension in one unit ----------------------------------
-@dataclass(frozen=True)
-class AxisOverlap:
-    """An interval on one axis that keeps its open ends, such as [8, 10).
-
-    An open end at infinity has its closed flag False.
-    """
-
-    lo: float
-    hi: float
-    lo_closed: bool = True
-    hi_closed: bool = True
-
-    def __post_init__(self) -> None:
-        object.__setattr__(self, "lo", float(self.lo))
-        object.__setattr__(self, "hi", float(self.hi))
-        if math.isnan(self.lo) or math.isnan(self.hi) or self.lo > self.hi:
-            raise ValueError(
-                f"an axis interval needs lo <= hi, got {self.lo}, {self.hi}"
-            )
-
-
-def axis_intersection(rule: AxisOverlap, lo: float, hi: float) -> AxisOverlap | None:
-    """The intersection of a rule interval with the closed range [lo, hi]."""
-    start = max(rule.lo, lo)
-    end = min(rule.hi, hi)
-    start_closed = rule.lo_closed if rule.lo >= lo else True
-    end_closed = rule.hi_closed if rule.hi <= hi else True
-    if start < end or (start == end and start_closed and end_closed):
-        return AxisOverlap(start, end, start_closed, end_closed)
-    return None
+    return value if type(value) is int else float(value)
 
 
 @dataclass(frozen=True)
 class Axis(Dimension):
-    """A named, ordered, numeric dimension with exactly one unit.
+    """A named numeric dimension in one unit, such as grid resolution in km.
 
-    A rule gives a range {gt, ge, lt, le, unit}, or a list of ranges that do
-    not overlap; a query gives a number or a closed range (lo, hi). The overlap
-    is the intersections with the rule's ranges, lowest first, keeping open ends.
+    A rule gives a range with any of gt, ge, lt and le, and optionally the
+    unit, such as {"lt": 8} or {"gt": 2, "le": 10, "unit": "km"}; a query gives
+    a number or a closed range (lo, hi). They match when they share a number.
+    queryearth converts no units, so a rule that gives another unit is refused.
     """
 
     name: str
     unit: str
-    description: str = ""
 
     def __post_init__(self) -> None:
         if not isinstance(self.unit, str) or not self.unit:
-            raise ValueError(f"axis {self.name!r} needs a unit")
+            raise ValueError(f"axis {self.name!r} needs a unit, such as 'km'")
 
-    def parse_rule(self, value: Any) -> tuple[AxisOverlap, ...]:
-        if isinstance(value, Mapping):
-            value = [value]
-        if isinstance(value, (str, bytes)) or not isinstance(value, Iterable):
+    def parse_rule(self, value: Any) -> tuple[float, bool, float, bool]:
+        """The range as (lo, lo_closed, hi, hi_closed); a missing end is infinite."""
+        if not isinstance(value, Mapping) or set(value) - {*_BOUNDS, "unit"}:
             raise ValueError(
-                f"axis {self.name!r} takes a range of gt, ge, lt, le and unit, or "
-                f"a list of them, not {value!r}"
+                f"axis {self.name!r} takes a range of gt, ge, lt, le and unit, "
+                f"such as {{'lt': 8}}, not {value!r}"
             )
-        ranges = sorted((self._range(item) for item in value), key=lambda r: r.lo)
-        if not ranges:
-            raise ValueError(f"axis {self.name!r} needs at least one range")
-        for a, b in zip(ranges, ranges[1:]):
-            if a.hi > b.lo or (a.hi == b.lo and a.hi_closed and b.lo_closed):
-                raise ValueError(
-                    f"the ranges of axis {self.name!r} overlap; join them into one"
-                )
-        return tuple(ranges)
-
-    def _range(self, value: Any) -> AxisOverlap:
-        if not isinstance(value, Mapping):
-            raise ValueError(f"an axis range is a mapping of gt, ge, lt, le, unit")
-        unknown = set(value) - {"gt", "ge", "lt", "le", "unit"}
-        if unknown:
-            raise ValueError(f"unknown axis bound keys {sorted(unknown)}")
         if {"gt", "ge"} <= set(value) or {"lt", "le"} <= set(value):
             raise ValueError("give at most one of gt and ge, and one of lt and le")
-        if not set(value) & {"gt", "ge", "lt", "le"}:
-            raise ValueError("an axis range needs at least one of gt, ge, lt, le")
-        unit = value.get("unit")
-        if unit is not None and unit != self.unit:
+        if not set(value) & _BOUNDS:
+            raise ValueError("a range needs at least one of gt, ge, lt and le")
+        if value.get("unit", self.unit) != self.unit:
             raise ValueError(
-                f"unit {unit!r} does not match the unit {self.unit!r} of axis "
-                f"{self.name!r}; the core does no unit conversion"
+                f"unit {value['unit']!r} is not the unit {self.unit!r} of axis "
+                f"{self.name!r}; queryearth converts no units"
             )
-        lo, lo_closed, hi, hi_closed = -math.inf, False, math.inf, False
-        if "gt" in value:
-            lo = _number(value["gt"], "gt")
-        if "ge" in value:
-            lo, lo_closed = _number(value["ge"], "ge"), True
-        if "lt" in value:
-            hi = _number(value["lt"], "lt")
-        if "le" in value:
-            hi, hi_closed = _number(value["le"], "le"), True
+        lo = next((_number(value[k], k) for k in ("gt", "ge") if k in value), -math.inf)
+        hi = next((_number(value[k], k) for k in ("lt", "le") if k in value), math.inf)
+        lo_closed, hi_closed = "ge" in value, "le" in value
         if lo > hi or (lo == hi and not (lo_closed and hi_closed)):
-            raise ValueError(f"the axis range {dict(value)} leaves no value")
-        return AxisOverlap(lo, hi, lo_closed, hi_closed)
+            raise ValueError(f"the range {dict(value)} holds no number")
+        return lo, lo_closed, hi, hi_closed
 
     def parse_query(self, value: Any) -> tuple[float, float]:
-        if isinstance(value, (str, bytes)) or not isinstance(value, Sequence):
-            v = _number(value, f"axis {self.name!r}")
-            lo, hi = v, v
-        elif len(value) != 2:
-            raise ValueError(f"axis {self.name!r} takes a number or a range (lo, hi)")
-        else:
-            lo, hi = (_number(v, f"axis {self.name!r}") for v in value)
+        pair = isinstance(value, (list, tuple)) and len(value) == 2
+        lo, hi = (
+            _number(v, f"axis {self.name!r}") for v in (value if pair else [value] * 2)
+        )
         if not (math.isfinite(lo) and math.isfinite(hi)) or lo > hi:
-            raise ValueError(f"axis {self.name!r} needs a finite range lo <= hi")
+            raise ValueError(f"axis {self.name!r} takes a number or a range lo <= hi")
         return lo, hi
 
-    def match(
-        self, rule: tuple[AxisOverlap, ...], query: tuple[float, float]
-    ) -> DimMatch | None:
-        lo, hi = query
-        pieces = (axis_intersection(r, lo, hi) for r in rule)
-        found = tuple(piece for piece in pieces if piece is not None)
-        if not found:
-            return None
-        fraction = 1.0 if hi == lo else sum(f.hi - f.lo for f in found) / (hi - lo)
-        return DimMatch(found, fraction)
+    def matches(
+        self, rule: tuple[float, bool, float, bool], query: tuple[float, float]
+    ) -> bool:
+        lo, lo_closed, hi, hi_closed = rule
+        a, b = query
+        return (lo < b or (lo == b and lo_closed)) and (
+            a < hi or (a == hi and hi_closed)
+        )
 
-    def extent(self, rule: tuple[AxisOverlap, ...]) -> tuple[AxisOverlap, ...]:
-        """The rule's own ranges, reported when the query omits the axis."""
-        return rule
-
-
-# ---- Labels: names matched by case-sensitive fnmatch globs -------------------------
-@dataclass(frozen=True)
-class Patterns:
-    """A parsed label rule: values must match some any_of and no none_of."""
-
-    any_of: tuple[str, ...] | None  # None: any value not excluded
-    none_of: tuple[str, ...] = ()
-
-    def admits(self, value: str) -> bool:
-        if any(fnmatchcase(value, p) for p in self.none_of):
-            return False
-        return self.any_of is None or any(fnmatchcase(value, p) for p in self.any_of)
+    def to_json(self, rule: tuple[float, bool, float, bool]) -> dict[str, Any]:
+        lo, lo_closed, hi, hi_closed = rule
+        bounds = {}
+        if lo > -math.inf:
+            bounds["ge" if lo_closed else "gt"] = lo
+        if hi < math.inf:
+            bounds["le" if hi_closed else "lt"] = hi
+        return bounds | {"unit": self.unit}
 
 
 @dataclass(frozen=True)
 class Labels(Dimension):
-    """A label dimension: names, which rules match with glob patterns (section 4.7)."""
+    """Names, such as a forcing product or a model option.
+
+    A rule gives a name or a list of names, which may use the wildcards * and
+    ? (case-sensitive), such as ["jra", "era5*"]; a query gives a name or a
+    list of names. They match when a query name matches one of the rule's.
+    """
 
     name: str
-    description: str = ""
 
-    def parse_rule(self, value: Any) -> Patterns:
-        what = f"label dimension {self.name!r}"
-        if isinstance(value, Patterns):
-            return value
-        if not isinstance(value, Mapping):
-            return Patterns(_string_list(value, what))
-        unknown = set(value) - {"any_of", "none_of"}
-        if unknown or not value:
-            raise ValueError(
-                f"{what} takes a list of patterns or "
-                f"{{'any_of': [...], 'none_of': [...]}}, got {dict(value)!r}"
-            )
-        any_of = None
-        if "any_of" in value:
-            any_of = _string_list(value["any_of"], f"{what} any_of")
-        none_of = ()
-        if "none_of" in value:
-            none_of = _string_list(value["none_of"], f"{what} none_of")
-        return Patterns(any_of, none_of)
+    def parse_rule(self, value: Any) -> tuple[str, ...]:
+        names = [value] if isinstance(value, str) else value
+        if not isinstance(names, (list, tuple)) or not names:
+            raise ValueError(f"labels {self.name!r} takes a name or a list of names")
+        if not all(isinstance(n, str) and n for n in names):
+            raise ValueError(f"labels {self.name!r} takes names, not {value!r}")
+        return tuple(names)
 
-    def parse_query(self, value: Any) -> tuple[str, ...]:
-        what = f"label dimension {self.name!r}"
-        return tuple(dict.fromkeys(_string_list(value, what)))
+    parse_query = parse_rule
 
-    def match(self, rule: Patterns, query: tuple[str, ...]) -> DimMatch | None:
-        hits = tuple(v for v in query if rule.admits(v))
-        if not hits:
-            return None
-        return DimMatch(hits, len(hits) / len(query))
+    def matches(self, rule: tuple[str, ...], query: tuple[str, ...]) -> bool:
+        return any(fnmatchcase(name, pattern) for pattern in rule for name in query)
 
-
-# ---- Versions: OSV-style ranges ----------------------------------------------------
-_DOTTED = re.compile(r"[0-9]+(?:\.[0-9]+)*")
-
-
-def dotted(version: str) -> tuple[int, ...] | None:
-    """The integers of a dotted-integer version, or None for any other string."""
-    if not isinstance(version, str) or not _DOTTED.fullmatch(version):
-        return None
-    return tuple(int(part) for part in version.split("."))
-
-
-def compare_versions(a: tuple[int, ...], b: tuple[int, ...]) -> int:
-    """-1, 0 or 1, comparing dotted integers padded with zeros: 4.07 == 4.7.0."""
-    size = max(len(a), len(b))
-    a = a + (0,) * (size - len(a))
-    b = b + (0,) * (size - len(b))
-    return (a > b) - (a < b)
-
-
-@dataclass(frozen=True)
-class VersionRange:
-    """One OSV-style range: introduced (in), fixed (out) or last_affected (in),
-    plus exact versions. Bounds are dotted integers; anything else goes in
-    versions, where it matches literally."""
-
-    introduced: str | None = None
-    fixed: str | None = None
-    last_affected: str | None = None
-    versions: tuple[str, ...] = ()
-
-    def __post_init__(self) -> None:
-        if self.fixed is not None and self.last_affected is not None:
-            raise ValueError("a version range has fixed or last_affected, not both")
-        for name in ("introduced", "fixed", "last_affected"):
-            bound = getattr(self, name)
-            if bound is not None and dotted(bound) is None:
-                raise ValueError(
-                    f"version bound {name}={bound!r} is not a dotted integer; "
-                    "list other versions in 'versions'"
-                )
-        object.__setattr__(self, "versions", tuple(self.versions))
-        if not all(isinstance(v, str) and v for v in self.versions):
-            raise ValueError("versions must be non-empty strings")
-        if not self.bounded and not self.versions:
-            raise ValueError("a version range needs at least one field")
-
-    @property
-    def bounded(self) -> bool:
-        return (self.introduced, self.fixed, self.last_affected) != (None, None, None)
-
-    def contains(self, version: str) -> bool:
-        number = dotted(version)
-        for exact in self.versions:
-            other = dotted(exact)
-            if exact == version or (
-                number is not None
-                and other is not None
-                and compare_versions(number, other) == 0
-            ):
-                return True
-        if not self.bounded or number is None:
-            return False
-        if self.introduced is not None:
-            if compare_versions(number, dotted(self.introduced)) < 0:
-                return False
-        if self.fixed is not None:
-            if compare_versions(number, dotted(self.fixed)) >= 0:
-                return False
-        if self.last_affected is not None:
-            if compare_versions(number, dotted(self.last_affected)) > 0:
-                return False
-        return True
-
-
-@dataclass(frozen=True)
-class Versions(Dimension):
-    """A version dimension: rules give a union of OSV-style ranges (section 4.8)."""
-
-    name: str
-    description: str = ""
-
-    def parse_rule(self, value: Any) -> tuple[VersionRange, ...]:
-        if isinstance(value, Mapping):
-            value = [value]
-        if isinstance(value, str) or not isinstance(value, Iterable):
-            raise ValueError(
-                f"dimension {self.name!r} takes a version range or a list of "
-                f"them, not {value!r}"
-            )
-        ranges = []
-        for item in value:
-            if isinstance(item, VersionRange):
-                ranges.append(item)
-                continue
-            if not isinstance(item, Mapping):
-                raise ValueError(f"a version range is a mapping, not {item!r}")
-            unknown = set(item) - {"introduced", "fixed", "last_affected", "versions"}
-            if unknown:
-                raise ValueError(f"unknown version range keys {sorted(unknown)}")
-            fields = dict(item)
-            if "versions" in fields:
-                fields["versions"] = _string_list(fields["versions"], "versions")
-            ranges.append(VersionRange(**fields))
-        if not ranges:
-            raise ValueError(f"dimension {self.name!r} needs at least one range")
-        return tuple(ranges)
-
-    def parse_query(self, value: Any) -> tuple[str, ...]:
-        return tuple(dict.fromkeys(_string_list(value, f"dimension {self.name!r}")))
-
-    def match(
-        self, rule: tuple[VersionRange, ...], query: tuple[str, ...]
-    ) -> DimMatch | None:
-        hits = tuple(v for v in query if any(r.contains(v) for r in rule))
-        if not hits:
-            return None
-        return DimMatch(hits, len(hits) / len(query))
-
-
-# ---- plain descriptions: a rule file's "dimensions" member -------------------------
-_KINDS = {"axis": Axis, "labels": Labels, "versions": Versions}
-
-
-def describe_dimension(dimension: Dimension) -> dict[str, str]:
-    """A dimension in the plain form a rule file's "dimensions" member uses, such
-    as {"name": "resolution", "kind": "axis", "unit": "km"}. A plugin's kind is
-    its class name; only axis, labels and versions can be made back from it."""
-    kind = next((k for k, cls in _KINDS.items() if type(dimension) is cls), None)
-    if kind is None:
-        return {"name": dimension.name, "kind": type(dimension).__name__}
-    described = {"name": dimension.name, "kind": kind}
-    if kind == "axis":
-        described["unit"] = dimension.unit
-    if dimension.description:
-        described["description"] = dimension.description
-    return described
-
-
-def dimension_from(described: Any) -> Dimension:
-    """The dimension a plain description declares: the inverse of describe_dimension."""
-    if not isinstance(described, Mapping):
-        raise ValueError(
-            f"a dimension is a mapping of name, kind and unit, not {described!r}"
-        )
-    unknown = set(described) - {"name", "kind", "unit", "description"}
-    if unknown:
-        raise ValueError(f"unknown dimension keys {sorted(unknown)}")
-    kind = described.get("kind")
-    if kind not in _KINDS:
-        raise ValueError(
-            f"a dimension's kind is axis, labels or versions, not {kind!r}; "
-            "declare a plugin dimension in Python"
-        )
-    fields = {
-        "name": described.get("name"),
-        "description": described.get("description", ""),
-    }
-    if kind == "axis":
-        fields["unit"] = described.get("unit")
-    elif "unit" in described:
-        raise ValueError(f"only an axis has a unit, not {kind} {fields['name']!r}")
-    return _KINDS[kind](**fields)
+    def to_json(self, rule: tuple[str, ...]) -> list[str]:
+        return list(rule)

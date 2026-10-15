@@ -1,7 +1,6 @@
 """Sphinx configuration for the queryearth user docs.
 
-Only docs/source is built. The frozen design documents in docs/ (design.md and
-docs/reference/) are not part of the site.
+Only docs/source is built; docs/growth.md is not part of the site.
 """
 
 import os

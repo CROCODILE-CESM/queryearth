@@ -22,7 +22,7 @@ classifiers = [
 ]
 
 [project.optional-dependencies]
-test = ["pytest", "cftime", "pandas", "pyproj"]
+test = ["pytest"]
 docs = ["sphinx", "sphinx-rtd-theme", "myst-parser"]
 
 [project.urls]

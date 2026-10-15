@@ -1,1004 +1,205 @@
-"""The Registry: declared dimensions and rules, loading rule files, and the query.
+"""The Registry: the dimensions, the rules, the query, and rule files.
 
-Registry.query follows design.md section 9.1: it calls evaluate() on every
-active rule (after any plugin prefilters) and sorts the findings.
+A rule file is a GeoJSON FeatureCollection with one Feature per rule. A rule's
+space is the Feature's geometry and its time the JSON-FG time member, so other
+GeoJSON tools can read them; every other dimension's value is in the
+properties' "dimensions" member, in the form that dimension's to_json() gives.
 """
 
 from __future__ import annotations
 
-import copy
-import dataclasses
-import functools
 import json
-import logging
 import os
 import re
-import threading
-import urllib.request
-from collections.abc import Callable, Iterable, Mapping
-from dataclasses import dataclass
+from collections.abc import Iterable, Mapping
 from pathlib import Path
 from typing import Any
 
-import numpy as np
+from queryearth.dimensions import Dimension, SpaceDimension, TimeDimension, applies
+from queryearth.rules import LEVELS, Rule
 
-from queryearth import space as sp
-from queryearth.dimensions import (
-    Dimension,
-    Edge,
-    SpaceDimension,
-    TimeDimension,
-    describe_dimension,
-    dimension_from,
-)
-from queryearth.objects import (
-    DuplicateCodeError,
-    Finding,
-    LoadError,
-    Outcome,
-    Query,
-    Scope,
-    UnknownNameError,
-    _jsonable,
-    level_of,
-    time_of,
-)
-from queryearth.rules import (
-    Binding,
-    CompiledScope,
-    ComputedRule,
-    FunctionRule,
-    Rule,
-    RuleFunc,
-    binding_of,
-    check_prefix,
-    computed_findings,
-    make_code,
-    make_findings,
-    match_scope,
-    split_code,
-)
-
-__all__ = ["FORMAT", "Registry", "PointResult"]
+__all__ = ["DuplicateCodeError", "Registry"]
 
 # The release that last changed the rule file format. to_file() writes it in the
-# "queryearth" member, and a file that needs a later release is refused.
-FORMAT = "0.6"
-
-_SLUG = re.compile(r"[a-z][a-z0-9_]*")
-_RELEASE = re.compile(r"([0-9]+)\.([0-9]+)(?:\.[0-9]+)?")
-_URL = re.compile(r"https?://", re.IGNORECASE)
-# A list of numbers, such as a point, as json.dumps(indent=2) spreads it over lines.
-# A JSON string never holds a newline, so only real lists match.
+# "queryearth" member, and from_file() refuses a file that needs a later release.
+FORMAT = "0.7"
+MEMBERS = {"space": "geometry", "time": "time"}  # the Feature members they use
+FEATURE_KEYS = frozenset({"type", "id", "geometry", "time", "properties", "bbox"})
+# A list of numbers, such as a point, as json.dumps(indent=2) spreads it over
+# lines. A JSON string never holds a newline, so only real lists match.
 _NUMBERS = re.compile(
     r"\[\n\s*(-?[0-9][0-9.eE+-]*(?:,\n\s*-?[0-9][0-9.eE+-]*)*)\n\s*\]"
 )
 
-_default: Registry | None = None
-_default_lock = threading.Lock()
 
-
-@dataclass(eq=False)
-class _Entry:
-    rule: Any
-    form: str  # "record", "computed", "hooked" (has outcomes()) or "foreign"
-    scope: CompiledScope
-    qualname: str | None  # a redefinition with the same name replaces it (Q10)
-    withdrawn: bool
-    supersedes: tuple[str, ...]
-
-
-def _split(code: Any) -> tuple[str | None, int]:
-    """A code's prefix and number, or (None, 0) for a string that is not one."""
-    try:
-        return split_code(code)
-    except ValueError:
-        return None, 0
-
-
-def _strings(value: Any) -> tuple[str, ...]:
-    return (value,) if isinstance(value, str) else tuple(value or ())
-
-
-Source = str | os.PathLike[str]  # a pack's folder, or a rule file's path or URL
-PACK, CATEGORY = "pack.json", "category.json"  # the files that describe a pack
-
-
-def _open(source: Source) -> tuple[str, str, Any]:
-    """A pack's or rule file's name for messages and findings (its folder or file
-    name, or its URL), its stem, and its rules as a FeatureCollection; LoadError
-    naming it when it cannot be read."""
-    if isinstance(source, str) and _URL.match(source):
-        name, stem = source, Path(source.split("?")[0].rstrip("/")).stem
-        request = urllib.request.Request(source, headers={"User-Agent": "queryearth"})
-        try:
-            with urllib.request.urlopen(request, timeout=30) as response:
-                return name, stem, json.loads(response.read().decode("utf-8"))
-        except (OSError, ValueError) as err:  # URLError and HTTPError are OSErrors
-            raise LoadError([f"{name}: {err}"]) from err
-    path = Path(source)
-    if path.is_dir():
-        return f"{path.name}/", path.name, _read_pack(path)
-    try:
-        return path.name, path.stem, json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, ValueError) as err:
-        raise LoadError([f"{path.name}: {err}"]) from err
-
-
-def _read_pack(folder: Path) -> dict[str, Any]:
-    """A pack read as the rule file it stands for, or LoadError listing every
-    problem with its layout. pack.json gives the file format and dimensions;
-    each folder below is a category named by its prefix, with category.json for
-    its title, its subcategories as folders inside it, and a file per rule named
-    by the rule's code. Other files, such as a README, are left alone."""
-    where, problems = f"{folder.name}/", []
-
-    def read(path: Path, keys: set[str]) -> dict[str, Any]:
-        name = path.relative_to(folder.parent).as_posix()
-        try:
-            data = json.loads(path.read_text(encoding="utf-8"))
-        except (OSError, ValueError) as err:
-            problems.append(f"{name}: {err}")
-            return {}
-        if not isinstance(data, dict) or not set(data) <= keys:
-            problems.append(f"{name}: has only {sorted(keys)}, not {data!r}"[:300])
-            return {}
-        return data
-
-    if not (folder / PACK).is_file():
-        raise LoadError([f"{where}: a pack has a {PACK}; this folder has none"])
-    head = read(folder / PACK, {"queryearth", "dimensions"})
-    categories: dict[str, Any] = {}
-    features: list[Any] = []
-
-    def walk(directory: Path, parent: str | None) -> None:
-        for rule in sorted(directory.glob("*.geojson")):
-            name = rule.relative_to(folder.parent).as_posix()
-            try:
-                feature = json.loads(rule.read_text(encoding="utf-8"))
-            except (OSError, ValueError) as err:
-                problems.append(f"{name}: {err}")
-                continue
-            props = feature.get("properties") if isinstance(feature, dict) else None
-            code = props.get("code") if isinstance(props, dict) else None
-            if feature.get("type") != "Feature" or code != rule.stem:
-                problems.append(
-                    f"{name}: a rule file holds one rule, named by its code"
-                )
-                continue
-            if _split(code)[0] != parent:
-                place = f"the {parent} folder" if parent else "the pack's top folder"
-                problems.append(
-                    f"{name}: {code} is in {place}; its code puts it in {_split(code)[0]}"
-                )
-                continue
-            features.append(feature)
-        for sub in sorted(d for d in directory.iterdir() if d.is_dir()):
-            name = sub.relative_to(folder.parent).as_posix()
-            if not (sub / CATEGORY).is_file():
-                if any(sub.rglob("*.geojson")):
-                    problems.append(f"{name}/: a category folder has a {CATEGORY}")
-                continue  # not part of the pack
-            try:
-                check_prefix(sub.name)
-            except ValueError as err:
-                problems.append(f"{name}/: {err}")
-                continue
-            title = read(sub / CATEGORY, {"title"}).get("title")
-            categories[sub.name] = (
-                title if parent is None else {"title": title, "parent": parent}
-            )
-            walk(sub, sub.name)
-
-    walk(folder, None)
-    if problems:
-        raise LoadError(problems)
-    pack = {"type": "FeatureCollection", **head}
-    if categories:
-        pack["categories"] = categories
-    return pack | {"features": features}
-
-
-def _category_entry(prefix: str, value: Any) -> tuple[str, str | None]:
-    """A category's title and parent, from its title or {"title", "parent"}."""
-    if isinstance(value, str):
-        title, parent = value, None
-    elif (
-        isinstance(value, Mapping)
-        and "title" in value
-        and set(value)
-        <= {
-            "title",
-            "parent",
-        }
-    ):
-        title, parent = value["title"], value.get("parent")
-    else:
-        raise ValueError(
-            f'category {prefix!r} is its title, or {{"title": ..., "parent": ...}}, '
-            f"not {value!r}"
-        )
-    if not isinstance(title, str) or not title.strip():
-        raise ValueError(f"category {prefix!r} needs a title")
-    if parent is not None:
-        check_prefix(parent)
-    return title, parent
-
-
-def _collection(data: Any) -> Any:
-    """A rule file's JSON as a FeatureCollection; a lone Feature is wrapped."""
-    if isinstance(data, Mapping) and data.get("type") == "Feature":
-        return {"type": "FeatureCollection", "features": [data]}
-    return data
-
-
-def _json(data: Any) -> str:
-    """The text of a rule file or a pack's file: indented JSON, with each list of
-    numbers, such as a point, on one line."""
-    text = json.dumps(data, indent=2, ensure_ascii=False)
-    text = _NUMBERS.sub(lambda m: "[" + re.sub(r",\n\s*", ", ", m[1]) + "]", text)
-    return text + "\n"
-
-
-def _plain(dimension: Any) -> dict[str, Any]:
-    """A dimension's file form without its description, to compare two."""
-    return {
-        k: v for k, v in describe_dimension(dimension).items() if k != "description"
-    }
-
-
-def _categories_member(data: Any) -> Any:
-    """A file's "categories" member. Files from before 0.6 call it "groups"."""
-    if not isinstance(data, Mapping) or "groups" not in data:
-        return data.get("categories") if isinstance(data, Mapping) else None
-    given = data.get("queryearth")
-    found = _RELEASE.fullmatch(given) if isinstance(given, str) else None
-    old = found is None or tuple(int(n) for n in found.groups()[:2]) < (0, 6)
-    if "categories" in data or not old:
-        raise ValueError('"groups" is called "categories" since queryearth 0.6')
-    return data["groups"]
-
-
-def _format_problems(collection: Any, where: str) -> list[str]:
-    """Why this queryearth cannot read a collection, from its "queryearth" member."""
-    given = collection.get("queryearth") if isinstance(collection, Mapping) else None
-    if given is None:
-        return []
-    found = _RELEASE.fullmatch(given) if isinstance(given, str) else None
-    if found is None:
-        return [
-            f'{where}: "queryearth" is the release whose file format the file '
-            f'uses, such as "{FORMAT}", not {given!r}'
-        ]
-    newest = tuple(int(n) for n in _RELEASE.fullmatch(FORMAT).groups()[:2])
-    if tuple(int(n) for n in found.groups()[:2]) > newest:
-        from queryearth import __version__
-
-        return [
-            f"{where}: this file needs queryearth {given} or later; this is "
-            f"queryearth {__version__}, which reads files up to {FORMAT}"
-        ]
-    return []
+class DuplicateCodeError(ValueError):
+    """A code the Registry already holds was added again."""
 
 
 class Registry:
-    """Declared dimensions and rules; answers queries.
+    """The rules, and the dimensions their scopes use; answers queries.
 
-    Space and time are built in; dimensions lists every other dimension, such
-    as Axis, Labels and Versions objects and plugins, in the order that
-    conditional_on names them. There is no hidden global registry: a library
-    keeps its own Registry, and Registry.default() is the application default
-    for scripts and notebooks.
+    Every Registry has space and time. dimensions declares the others, such as
+    Axis("resolution", "km"), Labels("product") or one of your own; a
+    dimension's name is its key in scopes, queries and rule files.
     """
 
-    def __init__(
-        self,
-        name: str = "",
-        *,
-        dimensions: Iterable[Any] = (),
-        categories: Mapping[str, Any] | None = None,
-    ) -> None:
-        self.name = name
-        self._dimensions: dict[str, Any] = {
-            "space": SpaceDimension(),
-            "time": TimeDimension(),
-        }
-        self._categories: dict[str, tuple[str, str | None]] = {}  # title, parent
-        self._entries: list[_Entry] = []
-        self._codes: dict[str, int] = {}
-        self._prefilters_cache: dict[str, Any] | None = None
-        self._last: tuple[Any, Any] = (None, None)  # the last query parsed
-        for dimension in dimensions:
-            self.add_dimension(dimension)
-        for prefix, value in (categories or {}).items():
-            self.add_category(prefix, *_category_entry(prefix, value))
-
-    def __repr__(self) -> str:
-        return f"Registry({self.name!r}, rules={len(self._entries)})"
-
-    @classmethod
-    def default(cls) -> Registry:
-        """The application default Registry, made on first use."""
-        global _default
-        with _default_lock:
-            if _default is None:
-                _default = Registry("default")
-            return _default
-
-    # ---- declarations -------------------------------------------------------------
-    def add_dimension(self, dimension: Any) -> None:
-        """Declare a dimension (section 4.13), before any rule is added."""
-        if self._entries:
-            raise ValueError("declare dimensions before adding rules")
-        if isinstance(dimension, str):
-            raise TypeError(
-                f"declare a dimension with an object such as qe.Labels({dimension!r}),"
-                f" not the bare name {dimension!r}"
-            )
-        if not isinstance(dimension, Dimension):
-            raise TypeError(
-                f"a dimension subclasses qe.Dimension, as qe.Axis, qe.Labels and "
-                f"qe.Versions do; {type(dimension).__name__} does not"
-            )
-        name = getattr(dimension, "name", None)
-        if not isinstance(name, str) or not _SLUG.fullmatch(name):
-            raise ValueError(f"a dimension name is a lowercase slug, not {name!r}")
-        if name in self._dimensions:
-            raise ValueError(f"dimension name {name!r} is reserved or already declared")
-        self._dimensions[name] = dimension
-
-    def add_category(self, prefix: str, title: str, parent: str | None = None) -> None:
-        """Declare a category of rules, before any rule is added: the rules whose
-        codes have this prefix, such as ITF for ITF001. Once a Registry declares
-        categories, every rule's prefix must be one of them. A category can sit in a
-        parent category, declared before it, to any depth."""
-        if self._entries:
-            raise ValueError("declare categories before adding rules")
-        check_prefix(prefix)
-        title, parent = _category_entry(
-            prefix, title if parent is None else {"title": title, "parent": parent}
-        )
-        if prefix in self._categories:
-            raise ValueError(f"category {prefix!r} is already declared")
-        if parent is not None and parent not in self._categories:
-            raise ValueError(
-                f"category {prefix!r}: declare its parent {parent!r} first"
-            )
-        self._categories[prefix] = (title, parent)
+    def __init__(self, dimensions: Iterable[Dimension] = ()) -> None:
+        self.dimensions: dict[str, Dimension] = {}
+        for dimension in (SpaceDimension(), TimeDimension(), *dimensions):
+            if not isinstance(dimension, Dimension):
+                raise TypeError(f"{dimension!r} does not subclass qe.Dimension")
+            if dimension.name in self.dimensions:
+                raise ValueError(f"dimension {dimension.name!r} is declared twice")
+            self.dimensions[dimension.name] = dimension
+        self._rules: dict[str, tuple[Rule, dict[str, Any]]] = {}  # parsed scopes
 
     @property
-    def categories(self) -> dict[str, Any]:
-        """The declared categories as a rule file gives them, in the order declared:
-        prefix to title, or to {"title", "parent"} for a subcategory."""
-        return {
-            prefix: title if parent is None else {"title": title, "parent": parent}
-            for prefix, (title, parent) in self._categories.items()
-        }
+    def rules(self) -> list[Rule]:
+        """Every rule, in the order added."""
+        return [rule for rule, _ in self._rules.values()]
 
-    def category_path(self, prefix: str) -> list[str]:
-        """A category and the categories it sits in, outermost first: ["DOMAIN", "OBC"]."""
-        if prefix not in self._categories:
-            raise UnknownNameError(
-                f"undeclared category {prefix!r}; declared: {list(self._categories)}"
+    def _dimension(self, name: str) -> Dimension:
+        if name not in self.dimensions:
+            raise ValueError(
+                f"undeclared dimension {name!r}; this Registry has {list(self.dimensions)}"
             )
-        path = [prefix]
-        while (parent := self._categories[path[0]][1]) is not None:
-            path.insert(0, parent)
-        return path
+        return self.dimensions[name]
 
-    def next_code(self, prefix: str) -> str:
-        """The code for a new rule in a category: one more than the highest number
-        with that prefix among the rules here, withdrawn ones too, and the codes
-        they keep as aliases or supersede, so no number is given twice. ITF001
-        when the category has none yet."""
-        check_prefix(prefix)
-        if self._categories and prefix not in self._categories:
-            raise UnknownNameError(
-                f"undeclared category {prefix!r}; declared: {list(self._categories)}"
-            )
-        used = set(self._codes)
-        for entry in self._entries:
-            used.update(entry.supersedes, _strings(getattr(entry.rule, "aliases", ())))
-        numbers = [n for p, n in map(_split, used) if p == prefix]
-        return make_code(prefix, max(numbers, default=0) + 1)
+    def add(self, rule: Rule | Mapping[str, Any]) -> None:
+        """Add a Rule, or a GeoJSON Feature as a rule file holds it.
 
-    def add(self, rule: Any) -> None:
-        """Add a Rule, a ComputedRule instance, any RuleKind or a record mapping.
-
-        A mapping is a GeoJSON Feature or a FeatureCollection, added whole or not
-        at all (LoadError). A reused code raises DuplicateCodeError, except that
-        redefining a computed rule with the same qualified name replaces it (Q10).
+        Each scope value is parsed by its dimension. A name the Registry does
+        not have is refused, so a misspelt one never matches by accident, and
+        a code already here raises DuplicateCodeError.
         """
-        if isinstance(rule, Mapping) and rule.get("type") == "FeatureCollection":
-            self._add_all(rule, "collection", "python")
-        elif isinstance(rule, Mapping):
-            self._add(Rule.from_feature(rule), "python")
-        else:
-            self._add(rule, "python")
-
-    @classmethod
-    def from_file(cls, *sources: Source) -> Registry:
-        """A Registry made for one or more packs and rule files, with their rules
-        loaded.
-
-        Each source is a pack's folder (see to_pack()), or a rule file's path or
-        http(s) URL, such as a raw link to a file in a GitHub repository or gist. A file declares the dimensions its rules use
-        in its "dimensions" member, in the form describe() gives:
-        [{"name": "resolution", "kind": "axis", "unit": "km"}]; space and time
-        need no declaring. Its "categories" member gives its categories, and "queryearth"
-        the release whose format it uses. The Registry declares every file's
-        dimensions and categories, which must agree where files share a name, and a
-        code must be unique across the files. Raises LoadError listing every
-        problem, as load() does.
-        """
-        if not sources:
-            raise TypeError("from_file needs at least one rule file")
-        opened = [_open(source) for source in sources]
-        problems = [
-            p for where, _, data in opened for p in _format_problems(data, where)
-        ]
-        if problems:
-            raise LoadError(problems)
-        dimensions: dict[str, Any] = {}
-        categories: dict[str, Any] = {}
-        for where, _, data in opened:
-            data = data if isinstance(data, Mapping) else {}
-            try:
-                declared = data.get("dimensions", [])
-                if not isinstance(declared, list):
-                    raise ValueError("it is a list of dimensions")
-                for dimension in map(dimension_from, declared):
-                    known = dimensions.setdefault(dimension.name, dimension)
-                    if _plain(known) != _plain(dimension):
-                        raise ValueError(
-                            f"{dimension.name!r} is {_plain(dimension)} here, but "
-                            f"{_plain(known)} in an earlier file"
-                        )
-            except (ValueError, TypeError) as err:
-                problems.append(f"{where}: dimensions: {err}")
-            try:
-                given = _categories_member(data) or {}
-                if not isinstance(given, Mapping):
-                    raise ValueError("it maps each prefix to a title")
-                for prefix, value in given.items():
-                    parent = _category_entry(prefix, value)[1]
-                    known = categories.setdefault(prefix, value)
-                    if _category_entry(prefix, known)[1] != parent:
-                        raise ValueError(
-                            f"category {prefix!r} sits in {parent!r} here, but in "
-                            f"{_category_entry(prefix, known)[1]!r} in an earlier file"
-                        )
-            except (ValueError, TypeError) as err:
-                problems.append(f"{where}: categories: {err}")
-        if problems:
-            raise LoadError(problems)
-        name = "+".join(stem for _, stem, _ in opened)
-        try:
-            registry = cls(name, dimensions=dimensions.values(), categories=categories)
-        except (ValueError, TypeError) as err:
-            raise LoadError([f"{opened[0][0]}: categories: {err}"]) from err
-        for where, _, data in opened:
-            try:
-                registry._add_all(_collection(data), where, where)
-            except LoadError as err:
-                problems += err.problems
-        if problems and not dimensions:
-            if any("undeclared dimension" in p for p in problems):
-                problems.append(
-                    f"{opened[0][0]}: declare the dimensions the rules use in the "
-                    'file\'s "dimensions" member'
-                )
-        if problems:
-            raise LoadError(problems)
-        return registry
-
-    def load(self, source: Source) -> list[str]:
-        """Add the rules of one pack, or of one rule file, a FeatureCollection or
-        a single Feature, at a path or an http(s) URL.
-
-        Returns the codes loaded; their findings have the file's name (or URL)
-        as source. Loading never runs code. Raises LoadError listing every
-        problem with the file, the feature's position and its code, and then
-        leaves the Registry as it was. A file that declares its dimensions or
-        categories must declare them as this Registry does.
-        """
-        where, _, data = _open(source)
-        return self._add_all(_collection(data), where, where)
-
-    def _add_all(self, collection: Any, where: str, source: str) -> list[str]:
-        """Add every record of a FeatureCollection, or none of them (LoadError)."""
-        features = (
-            collection.get("features") if isinstance(collection, Mapping) else None
-        )
-        if (
-            not isinstance(features, list)
-            or collection.get("type") != "FeatureCollection"
-        ):
-            raise LoadError([f"{where}: not a GeoJSON FeatureCollection or Feature"])
-        problems = _format_problems(collection, where)
-        problems += self._declared_problems(collection.get("dimensions"), where)
-        try:
-            declared = _categories_member(collection)
-        except ValueError as err:
-            declared, problems = None, [*problems, f"{where}: categories: {err}"]
-        problems += self._category_problems(declared, where)
-        if problems:
-            raise LoadError(problems)
-        saved = {k: copy.copy(v) for k, v in vars(self).items()}
-        codes = []
-        try:
-            for i, feature in enumerate(features):
-                props = (
-                    feature.get("properties") if isinstance(feature, Mapping) else None
-                )
-                code = props.get("code") if isinstance(props, Mapping) else None
+        if isinstance(rule, Mapping):
+            rule = _from_feature(rule)
+        if not isinstance(rule, Rule):
+            raise TypeError(f"cannot add {rule!r}: not a Rule or a GeoJSON Feature")
+        if rule.code in self._rules:
+            raise DuplicateCodeError(f"{rule.code}: this code is already a rule here")
+        values = {}
+        for name, value in rule.scope.items():
+            if value is not None:
                 try:
-                    rule = Rule.from_feature(feature)
-                    self._add(rule, source)
-                    codes.append(rule.code)
-                except (ValueError, TypeError, KeyError) as err:
-                    text = str(err).removeprefix(f"{code}: ")
-                    problems.append(f"{where}: feature {i} ({code}): {text}")
-            if problems:
-                raise LoadError(problems)
-        except BaseException:
-            vars(self).clear()
-            vars(self).update(saved)
-            raise
-        return codes
+                    values[name] = self._dimension(name).parse_rule(value)
+                except (ValueError, TypeError) as err:
+                    err.args = (f"{rule.code}: {name}: {err}",)
+                    raise
+        self._rules[rule.code] = (rule, values)
 
-    def _declared_problems(self, declared: Any, where: str) -> list[str]:
-        """How a collection's "dimensions" member disagrees with this Registry."""
-        if declared is None:
-            return []
-        if not isinstance(declared, list):
-            return [f"{where}: dimensions: it is a list of dimensions"]
-        mine = {
-            name: describe_dimension(d)
-            for name, d in list(self._dimensions.items())[2:]
-        }
-        problems = []
-        for item in declared:
-            try:
-                theirs = describe_dimension(dimension_from(item))
-            except (ValueError, TypeError) as err:
-                problems.append(f"{where}: dimensions: {err}")
-                continue
-            ours = mine.get(theirs["name"])
-            plain = {k: v for k, v in theirs.items() if k != "description"}
-            if ours is None:
-                problems.append(
-                    f"{where}: dimension {theirs['name']!r} is not declared on registry {self.name!r}"
-                )
-            elif plain != {k: v for k, v in ours.items() if k != "description"}:
-                problems.append(
-                    f"{where}: the file declares {plain}, registry {self.name!r} has {ours}"
-                )
-        return problems
+    def query(self, **values: Any) -> list[Rule]:
+        """The rules that apply to a query, highest level first, then by code.
 
-    def _category_problems(self, declared: Any, where: str) -> list[str]:
-        """How a collection's "categories" member disagrees with this Registry; the
-        titles are for people, so they may differ."""
-        if declared is None:
-            return []
-        if not isinstance(declared, Mapping):
-            return [f"{where}: categories: it maps each prefix to a title"]
-        problems = []
-        for prefix, value in declared.items():
-            try:
-                parent = _category_entry(prefix, value)[1]
-            except ValueError as err:
-                problems.append(f"{where}: categories: {err}")
-                continue
-            if prefix not in self._categories:
-                problems.append(
-                    f"{where}: category {prefix!r} is not declared on registry {self.name!r}"
-                )
-            elif self._categories[prefix][1] != parent:
-                problems.append(
-                    f"{where}: category {prefix!r} sits in {parent!r} in the file, but in "
-                    f"{self._categories[prefix][1]!r} on registry {self.name!r}"
-                )
-        return problems
-
-    def _add(self, rule: Any, source: str) -> None:
-        """Registry.add; source names a record's file ("python" from Python)."""
-        if isinstance(rule, ComputedRule):
-            form, get = "computed", rule.meta.get
-            scope = Scope(
-                get("space"),
-                time_of(get("time")),
-                get("dimensions", {}),
-                get("edge", False),
-            )
-        elif isinstance(getattr(rule, "scope", None), Scope) and hasattr(
-            rule, "evaluate"
-        ):
-            form = "hooked" if hasattr(rule, "outcomes") else "foreign"
-            form = "record" if isinstance(rule, Rule) else form
-            scope, get = rule.scope, functools.partial(getattr, rule)
-        else:
-            raise TypeError(f"cannot add {rule!r}: not a Rule or a RuleKind")
-        code = rule.code
-        category = split_code(code)[0]
-        if self._categories and category not in self._categories:
-            raise UnknownNameError(
-                f"{code}: undeclared category {category!r}; declared: {list(self._categories)}"
-            )
-        compiled = self._compile(scope, _strings(get("requires", ())), code)
-        qualname = rule._qualname() if form == "computed" else None
-        at = self._codes.get(code)
-        if at is not None and (
-            qualname is None or self._entries[at].qualname != qualname
-        ):
-            raise DuplicateCodeError(
-                f"code {code!r} is already on registry {self.name!r}"
-            )
-        bound = getattr(rule, "_qe_binding", None)
-        if bound is not None and bound.registry is not self:
-            if form != "record":
-                raise ValueError(
-                    f"{code}: this rule object is already on another Registry"
-                )
-            rule = copy.copy(rule)
-        if form == "computed":
-            rule.scope = scope
-        if form in ("record", "computed"):
-            source = source if form == "record" else "computed"
-            object.__setattr__(rule, "_qe_binding", Binding(self, compiled, source))
-        lifecycle = bool(get("withdrawn", None)), _strings(get("supersedes", ()))
-        entry = _Entry(rule, form, compiled, qualname, *lifecycle)
-        if at is None:
-            self._codes[code] = len(self._entries)
-            self._entries.append(entry)
-        else:
-            self._entries[at] = entry
-        self._prefilters_cache = None
-
-    def rule(self, code: str, **meta: Any) -> Callable[[RuleFunc], RuleFunc]:
-        """Register a function (query, match) -> CheckResult as a computed rule.
-
-        Takes the keywords of ComputedRule; the title comes from the docstring.
+        values gives the query's value on any of the dimensions, by name, such
+        as space=sp.box(-60, 30, -50, 40), time=qe.interval("2020-01-01",
+        "2020-12-31") or resolution=8; None leaves a dimension out. applies()
+        says what "apply" means.
         """
-
-        def register(func: RuleFunc) -> RuleFunc:
-            self.add(FunctionRule(func, code, meta))
-            return func
-
-        return register
-
-    # ---- describing --------------------------------------------------------------
-    def values(self, name: str) -> list[Any]:
-        """Every distinct value the rules give on one declared dimension, as they
-        give it and in the order the rules were added. A list means any of its
-        items, so a list is split into its items: ["glorys", "era5*"] gives
-        "glorys" and "era5*"."""
-        self._dimension(name)  # an undeclared name raises UnknownNameError
-        found: list[Any] = []
-        for entry in self._active():
-            given = entry.rule.scope.dimensions.get(name)
-            if given is None:
-                continue
-            items = given if isinstance(given, (list, tuple)) else [given]
-            found += [item for item in items if item not in found]
-        return found
-
-    def describe(self) -> dict[str, Any]:
-        """What this Registry can answer, as a JSON-ready dict: its categories and
-        its declared dimensions as a rule file gives them, the values its rules
-        give on each dimension (values()), and each rule's code, title, level and
-        category (None when no category is declared for it).
-        Space and time are always there and are not listed."""
-        declared = list(self._dimensions.items())[2:]
-        rules = []
-        for entry in self._active():
-            rule = entry.rule
-            outcome = rule if isinstance(rule, Outcome) else rule.outcome
-            prefix = _split(rule.code)[0]
-            rules.append(
-                {
-                    "code": rule.code,
-                    "title": outcome.title,
-                    "level": logging.getLevelName(outcome.level).lower(),
-                    "category": prefix if prefix in self._categories else None,
-                    "computed": entry.form != "record",
-                }
-            )
-        return {
-            "name": self.name,
-            "categories": self.categories,
-            "dimensions": [describe_dimension(d) for _, d in declared],
-            "values": {name: _jsonable(self.values(name)) for name, _ in declared},
-            "rules": rules,
+        query = {
+            name: self._dimension(name).parse_query(value)
+            for name, value in values.items()
+            if value is not None
         }
-
-    # ---- writing ------------------------------------------------------------------
-    def to_collection(self) -> dict[str, Any]:
-        """This Registry as a rule file, a JSON-ready FeatureCollection: the
-        file format it needs, its categories, its declared dimensions and a record
-        for each static rule. Computed rules are code, so they are left out;
-        describe() lists them."""
-        collection: dict[str, Any] = {"type": "FeatureCollection", "queryearth": FORMAT}
-        if self._categories:
-            collection["categories"] = self.categories
-        declared = list(self._dimensions.values())[2:]
-        collection["dimensions"] = [describe_dimension(d) for d in declared]
-        collection["features"] = [
-            e.rule.to_feature() for e in self._entries if e.form == "record"
+        found = [
+            r
+            for r, scope in self._rules.values()
+            if applies(self.dimensions, scope, query)
         ]
-        return collection
+        return sorted(found, key=lambda rule: (LEVELS.index(rule.level), rule.code))
+
+    # ---- rule files ---------------------------------------------------------------
+    def to_feature(self, rule: Rule) -> dict[str, Any]:
+        """A rule on this Registry as the GeoJSON Feature a rule file holds."""
+        rule, values = self._rules[rule.code]
+        feature = {"type": "Feature", "id": rule.code, "geometry": None, "time": None}
+        props: dict[str, Any] = {"code": rule.code, "title": rule.title}
+        props |= {"message": rule.message, "level": rule.level}
+        for name, value in values.items():
+            value = self.dimensions[name].to_json(value)
+            if name in MEMBERS:
+                feature[MEMBERS[name]] = value
+            else:
+                props.setdefault("dimensions", {})[name] = value
+        return feature | {"properties": props | rule.properties}
 
     def to_file(self, path: str | os.PathLike[str]) -> None:
-        """Write to_collection() to a rule file that from_file() reads back."""
-        Path(path).write_text(_json(self.to_collection()), encoding="utf-8")
+        """Write every rule to a rule file that from_file() reads back, as
+        indented GeoJSON with each point on one line."""
+        features = [self.to_feature(rule) for rule in self.rules]
+        data = {"type": "FeatureCollection", "queryearth": FORMAT, "features": features}
+        text = json.dumps(data, indent=2, ensure_ascii=False)
+        text = _NUMBERS.sub(lambda m: "[" + re.sub(r",\n\s*", ", ", m[1]) + "]", text)
+        Path(path).write_text(text + "\n", encoding="utf-8")
 
-    def to_pack(self, path: str | os.PathLike[str]) -> None:
-        """Write this Registry as a pack that from_file() reads back: pack.json
-        with the file format and the declared dimensions, a folder per category
-        inside its parent's, named by its prefix, with category.json for its
-        title, and a file per rule, named by its code, in its category's folder.
-        Without declared categories, each prefix gets a folder titled by the
-        prefix. Computed rules are left out, as in to_file().
+    @classmethod
+    def from_file(
+        cls, *paths: str | os.PathLike[str], dimensions: Iterable[Dimension] = ()
+    ) -> Registry:
+        """A Registry with the rules of one or more rule files.
 
-        The folder may be new, empty or a pack already: then the rule files,
-        category.json files and empty folders it no longer needs are removed,
-        and other files, such as a README, are kept.
+        dimensions declares the dimensions other than space and time, as
+        Registry() does; a rule that uses any other is refused. Codes must be
+        unique across the files. Raises ValueError naming the file, the
+        feature's position and its code; nothing is returned unless every
+        rule was read.
         """
-        folder = Path(path)
-        if folder.exists() and any(folder.iterdir()) and not (folder / PACK).exists():
-            raise ValueError(
-                f"{folder} is not empty and not a pack; write to a new folder"
-            )
-        collection = self.to_collection()
-        categories = dict(self._categories) or {
-            _split(f["id"])[0]: (_split(f["id"])[0], None)
-            for f in collection["features"]
-        }
-
-        def place(prefix: str) -> Path:
-            title, parent = categories[prefix]
-            return (folder if parent is None else place(parent)) / prefix
-
-        written = {
-            folder / PACK: {k: collection[k] for k in ("queryearth", "dimensions")}
-        }
-        for prefix, (title, _) in categories.items():
-            written[place(prefix) / CATEGORY] = {"title": title}
-        for feature in collection["features"]:
-            written[place(_split(feature["id"])[0]) / f"{feature['id']}.geojson"] = (
-                feature
-            )
-        for old in sorted(folder.rglob("*"), reverse=True) if folder.exists() else []:
-            stale = old.name == CATEGORY or old.suffix == ".geojson"
-            if old.is_file() and stale and old not in written:
-                old.unlink()
-        for target, data in written.items():
-            target.parent.mkdir(parents=True, exist_ok=True)
-            target.write_text(_json(data), encoding="utf-8")
-        for old in sorted(folder.rglob("*"), reverse=True):
-            if old.is_dir() and not any(old.iterdir()):
-                old.rmdir()
-
-    # ---- names --------------------------------------------------------------------
-    def _dimension(self, name: str) -> Any:
-        """A declared dimension; space and time have their own fields instead."""
-        if name in ("space", "time") or name not in self._dimensions:
-            declared = list(self._dimensions)[2:]
-            raise UnknownNameError(
-                f"undeclared dimension {name!r}; declared: {declared}"
-            )
-        return self._dimensions[name]
-
-    def _compile(
-        self, scope: Scope, requires: tuple[str, ...], code: str
-    ) -> CompiledScope:
-        space = scope.space
-        if space is not None and space.kind != "polygon":
-            raise ValueError(f"{code}: a rule space is a polygon, not a point")
-        values = {
-            k: v for k, v in (("space", space), ("time", scope.time)) if v is not None
-        }
-        if scope.edge:
-            values["space"] = Edge(space)
-        for name, value in scope.dimensions.items():
+        registry = cls(dimensions)
+        for path in paths:
+            where = f"{Path(path).name}: "
             try:
-                values[name] = self._dimension(name).parse_rule(value)
-            except ValueError as err:
-                raise ValueError(f"{code}: {name}: {err}") from err
-        return CompiledScope(values, requires)
+                data = json.loads(Path(path).read_text(encoding="utf-8"))
+                if (
+                    not isinstance(data, Mapping)
+                    or data.get("type") != "FeatureCollection"
+                ):
+                    raise ValueError("not a GeoJSON FeatureCollection")
+                _check_format(data.get("queryearth", FORMAT))
+                for i, feature in enumerate(data.get("features", [])):
+                    where = f"{Path(path).name}: feature {i}: "
+                    registry.add(feature)
+            except (ValueError, TypeError) as err:
+                err.args = (where + str(err),)
+                raise
+        return registry
 
-    def _parse_query(self, query: Query) -> dict[str, Any]:
-        """The query's values, parsed by their dimensions."""
-        if self._last[0] is query:
-            return self._last[1]
-        parsed = {
-            k: v
-            for k, v in (("space", query.space), ("time", query.time))
-            if v is not None
-        }
-        for name, value in query.dimensions.items():
-            parsed[name] = self._dimension(name).parse_query(value)
-        self._last = (query, parsed)
-        return parsed
 
-    # ---- queries ------------------------------------------------------------------
-    def query(self, query: Query | None = None, /, **fields: Any) -> list[Finding]:
-        """Findings for one query, sorted by level, changes, then code.
-
-        fields are Query fields (they override those of query) and
-        include_conditional, which also returns findings for rules the query
-        leaves undecided.
-        """
-        conditional = fields.pop("include_conditional", False)
-        query = (
-            Query(**fields) if query is None else dataclasses.replace(query, **fields)
-        )
-        found: list[Finding] = []
-        for entry in self._candidates(query):
-            if entry.form in ("record", "computed"):
-                found += entry.rule.evaluate(query)
-                continue
-            matched = match_scope(self, entry.scope, query)  # third-party kinds
-            if matched is None:  # a definite scope failure drops the rule
-                continue
-            if entry.form == "foreign":  # its own evaluate() decides the rest
-                found += entry.rule.evaluate(query)
-            else:
-                match, details = matched
-                found += computed_findings(
-                    entry.rule.outcome, match, query, details, entry.rule.outcomes
-                )
-        self._last = (None, None)  # holds the caller's context until cleared
-        return _sorted(f for f in found if conditional or not f.conditional_on)
-
-    def _active(self) -> list[_Entry]:
-        """The rules that are neither withdrawn nor superseded."""
-        superseded = {code for e in self._entries for code in e.supersedes}
-        return [
-            e
-            for e in self._entries
-            if not e.withdrawn and e.rule.code not in superseded
-        ]
-
-    def _prefilters(self) -> dict[str, Any]:
-        """Plugin prefilters (a Dimension's optional build()), rebuilt after a change."""
-        if self._prefilters_cache is None:
-            entries = list(enumerate(self._entries))
-            self._prefilters_cache = {
-                name: dimension.build(
-                    [
-                        (i, e.scope.values[name])
-                        for i, e in entries
-                        if name in e.scope.values
-                    ]
-                )
-                for name, dimension in self._dimensions.items()
-                if _overrides(dimension, "build")
-                and not _overrides(dimension, "comparable")
-            }
-        return self._prefilters_cache
-
-    def _candidates(self, query: Query) -> list[_Entry]:
-        """The active rules a query evaluates, narrowed by any plugin prefilters."""
-        parsed = self._parse_query(query)
-        allowed = {
-            name: prefilter.candidates(parsed[name])
-            for name, prefilter in self._prefilters().items()
-            if name in parsed
-        }
-        position = {id(e): i for i, e in enumerate(self._entries)}
-        return [
-            e
-            for e in self._active()
-            if all(
-                name not in e.scope.values or position[id(e)] in keep
-                for name, keep in allowed.items()
-            )
-        ]
-
-    # ---- the bulk path (section 9.3) ------------------------------------------------
-    def query_points(
-        self, lon: Any, lat: Any, weights: Any = None, **fields: Any
-    ) -> PointResult:
-        """Masks and weighted fractions over many points (section 9.3).
-
-        fields are those of query() but space and context: the points are the
-        support. Weights default to equal, and zero weights leave points out of
-        every fraction. NaN points are inside no rule. A computed rule takes part
-        through its mask(lon, lat, query) hook, called with the flat arrays, and
-        is otherwise listed in skipped.
-        """
-        conditional = fields.pop("include_conditional", False)
-        if "space" in fields or "context" in fields:
-            raise TypeError("the points are the space, and there is no context")
-        shape = np.shape(lon)
-        x = sp.wrap_lon(np.asarray(lon, dtype=float).ravel())
-        y = np.asarray(lat, dtype=float).ravel()
-        valid = sp.points_mask(None, x, y)  # finite; raises for latitudes past 90
-        w = np.ones_like(x) if weights is None else np.array(weights, dtype=float)
-        w = w.ravel()
-        if w.shape != x.shape:
-            raise ValueError(f"{w.size} weights for {x.size} points")
-        if not (np.all(np.isfinite(w)) and np.all(w >= 0.0) and w.sum() > 0.0):
-            raise ValueError("weights must be finite, non-negative and not all zero")
-        query = Query(**fields)
-        total = w[valid].sum()
-        found: list[Finding] = []
-        masks: dict[str, np.ndarray] = {}
-        fractions: dict[str, float] = {}
-        skipped = []
-        for entry in self._candidates(query):
-            rule, code = entry.rule, entry.rule.code
-            values = {k: v for k, v in entry.scope.values.items() if k != "space"}
-            scope = CompiledScope(values)  # the points stand in for space
-            matched = match_scope(self, scope, query)
-            if matched is None:
-                continue
-            match, details = matched
-            if match.conditional_on and not conditional:
-                continue
-            space = entry.scope.values.get("space")
-            if isinstance(space, Edge):
-                continue  # a point has no edge
-            mask = valid.copy() if space is None else sp.points_mask(space, x, y)
-            if not mask.any():
-                continue
-            if entry.form in ("hooked", "foreign"):  # no outcome to mask
-                skipped.append(code)
-                continue
-            computed = entry.form == "computed"
-            if not match.conditional_on:  # conditional findings get no mask
-                if computed:
-                    hooked = rule.mask(x, y, query)
-                    if hooked is None:
-                        skipped.append(code)
-                        continue
-                    mask &= np.asarray(hooked, bool).reshape(-1)
-                    if not mask.any():
-                        continue
-                masks[code] = mask.reshape(shape)
-                fractions[code] = float(w[mask].sum() / total)
-                match = dataclasses.replace(match, area_fraction=fractions[code])
-            outcome = rule.outcome if computed else rule
-            source = binding_of(rule).source
-            found += make_findings(
-                outcome, match, query, source=source, details=details
-            )
-        self._last = (None, None)
-        return PointResult(
-            tuple(_sorted(found)), masks, fractions, tuple(skipped), shape
+def _check_format(given: Any) -> None:
+    """Refuse a file whose "queryearth" member names a later format than FORMAT."""
+    found = re.fullmatch(r"([0-9]+)\.([0-9]+)(\.[0-9]+)?", str(given))
+    if found is None:
+        raise ValueError(f'"queryearth" is a release such as "{FORMAT}", not {given!r}')
+    if (int(found[1]), int(found[2])) > tuple(map(int, FORMAT.split("."))):
+        raise ValueError(
+            f"this file needs queryearth {given} or later, and this queryearth "
+            f"reads rule files up to {FORMAT}; upgrade queryearth to read it"
         )
 
 
-def _sorted(findings: Iterable[Finding]) -> list[Finding]:
-    """By level (highest first), those without changes first, then code."""
-    return sorted(findings, key=lambda f: (-f.level, bool(f.changes), f.code))
-
-
-# ---- the result of the bulk path ----------------------------------------------------
-@dataclass(frozen=True, eq=False)
-class PointResult:
-    """What Registry.query_points found, keyed by rule code.
-
-    Masks are shaped like lon; conditional findings have none.
-    """
-
-    findings: tuple[Finding, ...]
-    masks: Mapping[str, np.ndarray]
-    fractions: Mapping[str, float]
-    skipped: tuple[str, ...] = ()  # codes of matching rules with no mask
-    shape: tuple[int, ...] = ()  # the shape of lon
-
-    def any(self, min_level: int | str = logging.WARNING) -> np.ndarray:
-        """Points inside some definite finding at or above min_level."""
-        floor = level_of(min_level)
-        out = np.zeros(self.shape, bool)
-        for f in self.findings:
-            if f.level >= floor and f.code in self.masks:
-                out |= self.masks[f.code]
-        return out
-
-
-def _overrides(dimension: Dimension, member: str) -> bool:
-    """Whether a dimension's class replaces one of Dimension's default members."""
-    return getattr(type(dimension), member) is not getattr(Dimension, member)
+def _from_feature(feature: Mapping[str, Any]) -> Rule:
+    """A rule from a GeoJSON Feature: its geometry is the rule's space (null for
+    none) and its JSON-FG time member the rule's time; its properties hold the
+    code, title, message, an optional level, "dimensions", the value on each
+    other dimension by name, and anything else, which is kept as given."""
+    props = feature.get("properties")
+    if feature.get("type") != "Feature" or not isinstance(props, Mapping):
+        raise ValueError("a rule is a GeoJSON Feature with properties")
+    code = props.get("code", "a rule")
+    if unknown := sorted(set(feature) - FEATURE_KEYS):
+        raise ValueError(f"{code}: unknown Feature members {unknown}")
+    if not {"code", "title", "message"} <= set(props) or "geometry" not in feature:
+        raise ValueError(
+            f"{code}: a rule needs a code, a title, a message and a "
+            "geometry (null for none)"
+        )
+    scope = props.get("dimensions", {})
+    if not isinstance(scope, Mapping) or set(scope) & set(MEMBERS):
+        raise ValueError(
+            f"{code}: dimensions maps names to values; space and time go in the "
+            "geometry and time members"
+        )
+    scope = {**scope, **{name: feature.get(key) for name, key in MEMBERS.items()}}
+    fields = {k: props[k] for k in ("code", "title", "message", "level") if k in props}
+    others = {k: v for k, v in props.items() if k not in fields and k != "dimensions"}
+    return Rule(**fields, scope=scope, properties=others)

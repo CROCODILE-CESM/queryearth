@@ -1,0 +1,93 @@
+# The growth path
+
+This core is queryearth cut back to what is realistic to review: rules scoped by space, time, axes and labels, one matching rule, and GeoJSON rule files. Everything else queryearth 0.6.0 had is kept at the tag [v0.6.0](https://github.com/CROCODILE-CESM/queryearth/tree/v0.6.0) and listed here, in three parts: planned, parked and dropped. Paths are at v0.6.0 unless they say "core". The full 0.6.0 design, its decisions and its correctness fixtures are `docs/design.md` and `docs/reference/` at the tag, and `examples/toy/` there exercises most of the features.
+
+The core grows in three places: a new `Dimension` subclass (its four methods), the `Registry` (adding, querying, reading and writing), and `Rule.properties`, which already carries anything else a rule says, unread. Rules stay data; code lives in dimensions.
+
+## Planned
+
+### Categories
+
+**What.** In 0.6.0 a rule's category was the prefix of its code: ITF001 is in category ITF. A Registry declared its categories, each prefix with a title, and then every code had to use one. A category could sit in a parent, declared before it, to any depth (`{"OBC": {"title": "Open boundaries", "parent": "DOMAIN"}}`), and `category_path("OBC")` gave `["DOMAIN", "OBC"]`. A rule file carried them in a top-level `categories` member. `next_code("ITF")` handed out the next number, one past the highest in use, withdrawn rules and aliases included, so a number was never reused. That needed a code grammar: capitals and digits plus three or four digits, with a hyphen after a prefix that ends in a digit (`ERA5-014`).
+
+**At v0.6.0.** `queryearth/registry.py`: `Registry.__init__(categories=...)`, `add_category`, `categories`, `category_path`, `next_code`, `_category_entry`, `_category_problems`, the category checks in `Registry._add` and `Registry.from_file`, and `to_collection`, which writes the member. `queryearth/rules.py`: `CODE`, `check_code`, `split_code`, `make_code`, `check_prefix`. Tests: `tests/test_categories.py`.
+
+**Today.** A rule can carry a plain `category` property with no code: unknown properties pass through a read and a write unchanged, and a caller can group findings by it.
+
+**Plugs in.** The smallest addition, about 25 lines outside the matching:
+
+1. `Registry(dimensions, categories={"REGION": "Regions", "ITF": {"title": "Indonesian Throughflow", "parent": "REGION"}})` declares them, parents first.
+2. A rule names its category in its `category` property; `Registry.add` refuses one the Registry has not declared, once it declares any. No code grammar is needed.
+3. `to_file` writes the declarations in a top-level `categories` member, and `from_file` reads and merges them across files, refusing a category that two files give different parents.
+4. `next_code(category)` only if codes keep a prefix per category, which brings back the code grammar. Using the code's prefix as the category, as 0.6.0 did, saves the property but needs the grammar from the start.
+
+### Recurring time
+
+**What.** A rule's time as several intervals (`periods`) and as some months of every year (`recurrence`, such as `{"months": [12, 1, 2]}`, wrapping the year end). The core's time is one interval.
+
+**At v0.6.0.** `queryearth/time.py`: `TimeSpec`, `parse_time`, and `overlap`, which cuts an overlap into calendar months.
+
+**Plugs in.** `TimeDimension.parse_rule` and `to_json` take and write a list of intervals and a set of months, and `matches` checks whether the query's interval meets any interval in one of the months (the month cutting in `overlap`). The file form is the 0.6.0 one: `periods` and `recurrence` beside the `time` member, which the core refuses today so that an old record is never read as applying all year. Alternatively, months alone can be a dimension of its own, such as `Months("season")`, with no core change.
+
+### report()
+
+**What.** `report(findings)` printed each finding as text: its level, `[CODE] title`, then its message, instruction and changes, indented. The core prints findings as their GeoJSON Features.
+
+**At v0.6.0.** `queryearth/objects.py`: `report`, `Finding.__str__`.
+
+**Plugs in.** A function over the rules a query returns, in `queryearth/rules.py`, reading `rule.properties` for an instruction. About ten lines.
+
+*Optional: why a rule did not apply.* For one rule and one query, name the dimension that failed or that the query left out. Not in 0.6.0; it came out of the z3 study. A sibling of `applies()` in the core's `queryearth/dimensions.py`, about eight lines.
+
+### Sharing: rule files at URLs
+
+**What.** `from_file` read a rule file at an http(s) URL, such as a raw link to a file in a GitHub repository or gist, with urllib and no new dependency.
+
+**At v0.6.0.** `queryearth/registry.py`: `_open`, `Registry.from_file`, `Registry.load`.
+
+**Plugs in.** A branch in `Registry.from_file` that reads a path that starts with `http://` or `https://` through `urllib.request`. About eight lines.
+
+### Packs
+
+**What.** A ruleset as a folder: `pack.json`, a folder per category with `category.json`, and a file per rule named by its code, so a rule set in git shows each change as a change to one file. `to_pack` wrote or updated one.
+
+**At v0.6.0.** `queryearth/registry.py`: `_read_pack`, `Registry.to_pack`, `PACK`, `CATEGORY`. Tests: `tests/test_packs.py`.
+
+**Plugs in.** After categories: a reader that turns the folder into the FeatureCollection `from_file` reads, and a writer from `to_feature`. Until then, a folder of Feature files converts to a rule file by gathering its Features, which is how CrocoDash's two packs were converted for the core.
+
+### Features for AI agents
+
+**What.** `describe()` told a person or a language model what a Registry can answer: its dimensions, its rules, and through `values(name)`, every value the rules give on a dimension. 0.6.0 rule files also declared their own dimensions, so `from_file` needed no Python.
+
+**At v0.6.0.** `queryearth/registry.py`: `Registry.describe`, `Registry.values`, `Registry.from_file`; `queryearth/dimensions.py`: `describe_dimension`, `dimension_from`.
+
+**Plugs in.** A `describe()` method on `Dimension` (its name, kind and, for an axis, unit), and `Registry.describe()` and `values()` over the rules' scopes. `docs/source/llms.txt`, the one-page guide for language models, is in the core already, and its test runs it as written.
+
+### Version enforcement
+
+**In the core now.** `to_file` writes the format's release in the `queryearth` member, and `from_file` refuses a file that needs a later queryearth, saying to upgrade.
+
+**Left at v0.6.0.** Reading pre-0.6 files' `groups` member as `categories`: `queryearth/registry.py`, `_categories_member`.
+
+## Parked
+
+Kept at the tag, not planned.
+
+- **Overlap amounts.** Area fraction and km², time overlap and fraction, the part of an axis range met, and `min_overlap`; a finding in the core just says the rule applied. `space.py`: `measure`, `area_km2`; `time.py`: `time_fraction`; `dimensions.py`: `DimMatch`, `AxisOverlap`; `objects.py`: `Match`.
+- **Polar caps.** A grid that contains a pole became the polar cap beyond its outline. `converters.py`: `grid_outline`. The core keeps a box to ±90 working and refuses a ring around a pole with a hint (about seven lines in the core's `space._ring`).
+- **A rule-set lint with z3.** Rules that can never apply, identical or nested scopes, conflicting pairs. Not in 0.6.0; from the z3 study, which found z3 too slow for matching, it belongs in CrocoDash's tests.
+- **Rule-history fields.** `status`, `confidence`, `action`, `created`, `updated`, `withdrawn`, `supersedes` and `aliases`. `objects.py`: `Outcome`; `rules.py`: `Rule`; `registry.py`: `_active`. The core passes them through unread, except `withdrawn` and `supersedes`, which it refuses because they changed which rules apply.
+- **Versions.** OSV-style version ranges as a dimension. `dimensions.py`: `Versions`, `VersionRange`.
+- **query_points.** Masks and weighted shares over many points. `registry.py`: `Registry.query_points`, `PointResult`; `space.py`: `points_mask`.
+- **Conditional findings.** A rule whose dimension the query left out was returned as conditional, hidden by default; the core treats it as not applying, as 0.6.0 did by default. `rules.py`: `match_scope`; `objects.py`: `Match.conditional_on`.
+- **Alternatives within a dimension.** A list of axis ranges, and labels with `any_of` and `none_of`. `dimensions.py`: `Axis.parse_rule`, `Patterns`.
+- **More dimension hooks.** `comparable`, `build` and `Prefilter`, `late`, `always`, `extent`. `dimensions.py`: `Dimension`, `Prefilter`; `registry.py`: `_prefilters`.
+- **Record shorthands.** A `box` property, `time_start` and `time_end`, JSON-FG `date` and `timestamp` members, `x_*` extensions, levels as logging numbers. `rules.py`: `box_of`, `Rule._read`; `time.py`: `parse_time`; `objects.py`: `level_of`. The core refuses `box`, `time_start` and `time_end`.
+- **The query object.** `Query` with a label and a context, and `Registry.default()`. `objects.py`: `Query`; `registry.py`: `Registry.default`.
+
+## Dropped
+
+- **Edge rules**, a rule that applies where a domain's edge meets its space: too confusing to read. CrocoDash writes its nine (OBC001 to OBC005, CLAUDE002 to CLAUDE005) as plain area rules now. The core refuses `"edge": true` so an old record is not read as an area rule.
+- **changes**, structured edits for the caller to apply: folded into the message or instruction, as CrocoDash did for GRID001, POLAR001 and ITF001.
+- **grid_outline**: lives in CrocoDash, as six lines for regional grids.
+- **Computed rules and third-party rule kinds** (`ComputedRule`, `@registry.rule`, `RuleKind`): covered by defining a dimension; rules are always data.
