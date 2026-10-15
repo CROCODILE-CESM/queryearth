@@ -171,6 +171,7 @@ def test_describe_is_json_ready_and_lists_dimensions_values_and_rules():
         "code": "TST001",
         "title": "TST001 title",
         "level": "warning",
+        "category": None,
         "computed": False,
     }
     assert described["rules"][-1]["code"] == "TST004"

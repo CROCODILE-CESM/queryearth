@@ -1,6 +1,6 @@
 # Writing rules
 
-There are three ways to write a rule: a {class}`~queryearth.Rule` built in Python, a computed rule whose outcome depends on the query, or a record in a GeoJSON **rule file**. All three end up on a {class}`~queryearth.Registry`, the object you query.
+There are three ways to write a rule: a {class}`~queryearth.Rule` built in Python, a computed rule whose outcome depends on the query, or a record in a GeoJSON **rule file** or a **pack**, a folder with a file per rule. All three end up on a {class}`~queryearth.Registry`, the rules in memory that you query, loaded from any number of rule files and packs.
 
 ## Rules in Python
 
@@ -129,3 +129,34 @@ The values in `dimensions` take the forms in the [table of dimensions](concepts.
 registry.to_file("mine.geojson")
 again = qe.Registry.from_file("mine.geojson")
 ```
+
+## Packs
+
+A large ruleset is easier to keep as a **pack**: a folder that holds the same rules as a rule file, laid out by category, with one file per rule.
+
+```
+crocodash_rules/
+  pack.json            {"queryearth": "0.6", "dimensions": [...]}
+  DOMAIN/
+    category.json      {"title": "Domain design"}
+    OBC/
+      category.json    {"title": "Open boundaries"}
+      OBC001.geojson   one rule: a GeoJSON Feature
+      OBC002.geojson
+  REGION/
+    ITF/ …
+```
+
+- `pack.json` holds the pack's `queryearth` release and its `dimensions`, as a rule file's top-level members do.
+- Each category is a folder named by its prefix, with a `category.json` holding its title; a subcategory's folder sits inside its parent's. The folders are the category tree, so a pack needs no `parent` fields.
+- Each rule is a file named by its code, holding one Feature, in its category's folder.
+- Other files, such as a README or images, are left alone.
+
+{meth}`Registry.from_file() <queryearth.Registry.from_file>` and {meth}`Registry.load() <queryearth.Registry.load>` read a pack from its folder, alongside rule files; a finding's `source` is the folder's name. {meth}`Registry.to_pack() <queryearth.Registry.to_pack>` writes one, and updates a pack that is already there: it removes the rule files and categories that are gone and keeps everything else, so a pack in git shows each change as a change to one rule's file. A rule file and a pack hold the same rules, so either converts to the other:
+
+```python
+qe.Registry.from_file("crocodash_rules/").to_file("crocodash_rules.geojson")  # to share or link
+qe.Registry.from_file("crocodash_rules.geojson").to_pack("crocodash_rules/")  # to organize
+```
+
+A web link points at one file, so share a ruleset as a rule file; a pack is read from disk. Loading a pack checks its layout: a rule file whose name is not its code, a rule in another category's folder, or a folder of rules without a `category.json` is reported with the rest of the load's problems.

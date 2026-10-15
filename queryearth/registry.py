@@ -95,12 +95,14 @@ def _strings(value: Any) -> tuple[str, ...]:
     return (value,) if isinstance(value, str) else tuple(value or ())
 
 
-Source = str | os.PathLike[str]  # a rule file's path, or its http(s) URL
+Source = str | os.PathLike[str]  # a pack's folder, or a rule file's path or URL
+PACK, CATEGORY = "pack.json", "category.json"  # the files that describe a pack
 
 
 def _open(source: Source) -> tuple[str, str, Any]:
-    """A rule file's name for messages and findings (its file name, or its URL),
-    its stem, and its JSON; LoadError naming it when it cannot be read."""
+    """A pack's or rule file's name for messages and findings (its folder or file
+    name, or its URL), its stem, and its rules as a FeatureCollection; LoadError
+    naming it when it cannot be read."""
     if isinstance(source, str) and _URL.match(source):
         name, stem = source, Path(source.split("?")[0].rstrip("/")).stem
         request = urllib.request.Request(source, headers={"User-Agent": "queryearth"})
@@ -110,10 +112,86 @@ def _open(source: Source) -> tuple[str, str, Any]:
         except (OSError, ValueError) as err:  # URLError and HTTPError are OSErrors
             raise LoadError([f"{name}: {err}"]) from err
     path = Path(source)
+    if path.is_dir():
+        return f"{path.name}/", path.name, _read_pack(path)
     try:
         return path.name, path.stem, json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError) as err:
         raise LoadError([f"{path.name}: {err}"]) from err
+
+
+def _read_pack(folder: Path) -> dict[str, Any]:
+    """A pack read as the rule file it stands for, or LoadError listing every
+    problem with its layout. pack.json gives the file format and dimensions;
+    each folder below is a category named by its prefix, with category.json for
+    its title, its subcategories as folders inside it, and a file per rule named
+    by the rule's code. Other files, such as a README, are left alone."""
+    where, problems = f"{folder.name}/", []
+
+    def read(path: Path, keys: set[str]) -> dict[str, Any]:
+        name = path.relative_to(folder.parent).as_posix()
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError) as err:
+            problems.append(f"{name}: {err}")
+            return {}
+        if not isinstance(data, dict) or not set(data) <= keys:
+            problems.append(f"{name}: has only {sorted(keys)}, not {data!r}"[:300])
+            return {}
+        return data
+
+    if not (folder / PACK).is_file():
+        raise LoadError([f"{where}: a pack has a {PACK}; this folder has none"])
+    head = read(folder / PACK, {"queryearth", "dimensions"})
+    categories: dict[str, Any] = {}
+    features: list[Any] = []
+
+    def walk(directory: Path, parent: str | None) -> None:
+        for rule in sorted(directory.glob("*.geojson")):
+            name = rule.relative_to(folder.parent).as_posix()
+            try:
+                feature = json.loads(rule.read_text(encoding="utf-8"))
+            except (OSError, ValueError) as err:
+                problems.append(f"{name}: {err}")
+                continue
+            props = feature.get("properties") if isinstance(feature, dict) else None
+            code = props.get("code") if isinstance(props, dict) else None
+            if feature.get("type") != "Feature" or code != rule.stem:
+                problems.append(
+                    f"{name}: a rule file holds one rule, named by its code"
+                )
+                continue
+            if _split(code)[0] != parent:
+                place = f"the {parent} folder" if parent else "the pack's top folder"
+                problems.append(
+                    f"{name}: {code} is in {place}; its code puts it in {_split(code)[0]}"
+                )
+                continue
+            features.append(feature)
+        for sub in sorted(d for d in directory.iterdir() if d.is_dir()):
+            name = sub.relative_to(folder.parent).as_posix()
+            if not (sub / CATEGORY).is_file():
+                if any(sub.rglob("*.geojson")):
+                    problems.append(f"{name}/: a category folder has a {CATEGORY}")
+                continue  # not part of the pack
+            try:
+                check_prefix(sub.name)
+            except ValueError as err:
+                problems.append(f"{name}/: {err}")
+                continue
+            title = read(sub / CATEGORY, {"title"}).get("title")
+            categories[sub.name] = (
+                title if parent is None else {"title": title, "parent": parent}
+            )
+            walk(sub, sub.name)
+
+    walk(folder, None)
+    if problems:
+        raise LoadError(problems)
+    pack = {"type": "FeatureCollection", **head}
+    if categories:
+        pack["categories"] = categories
+    return pack | {"features": features}
 
 
 def _category_entry(prefix: str, value: Any) -> tuple[str, str | None]:
@@ -327,10 +405,11 @@ class Registry:
 
     @classmethod
     def from_file(cls, *sources: Source) -> Registry:
-        """A Registry made for one or more rule files, with their rules loaded.
+        """A Registry made for one or more packs and rule files, with their rules
+        loaded.
 
-        Each source is a path or an http(s) URL, such as a raw link to a file in
-        a GitHub repository or gist. A file declares the dimensions its rules use
+        Each source is a pack's folder (see to_pack()), or a rule file's path or
+        http(s) URL, such as a raw link to a file in a GitHub repository or gist. A file declares the dimensions its rules use
         in its "dimensions" member, in the form describe() gives:
         [{"name": "resolution", "kind": "axis", "unit": "km"}]; space and time
         need no declaring. Its "categories" member gives its categories, and "queryearth"
@@ -401,8 +480,8 @@ class Registry:
         return registry
 
     def load(self, source: Source) -> list[str]:
-        """Add the rules of one rule file, a FeatureCollection or a single
-        Feature, at a path or an http(s) URL.
+        """Add the rules of one pack, or of one rule file, a FeatureCollection or
+        a single Feature, at a path or an http(s) URL.
 
         Returns the codes loaded; their findings have the file's name (or URL)
         as source. Loading never runs code. Raises LoadError listing every
@@ -594,18 +673,21 @@ class Registry:
     def describe(self) -> dict[str, Any]:
         """What this Registry can answer, as a JSON-ready dict: its categories and
         its declared dimensions as a rule file gives them, the values its rules
-        give on each dimension (values()), and each rule's code, title and level.
+        give on each dimension (values()), and each rule's code, title, level and
+        category (None when no category is declared for it).
         Space and time are always there and are not listed."""
         declared = list(self._dimensions.items())[2:]
         rules = []
         for entry in self._active():
             rule = entry.rule
             outcome = rule if isinstance(rule, Outcome) else rule.outcome
+            prefix = _split(rule.code)[0]
             rules.append(
                 {
                     "code": rule.code,
                     "title": outcome.title,
                     "level": logging.getLevelName(outcome.level).lower(),
+                    "category": prefix if prefix in self._categories else None,
                     "computed": entry.form != "record",
                 }
             )
@@ -637,6 +719,54 @@ class Registry:
         """Write to_collection() to a rule file that from_file() reads back."""
         text = json.dumps(self.to_collection(), indent=2, ensure_ascii=False)
         Path(path).write_text(text + "\n", encoding="utf-8")
+
+    def to_pack(self, path: str | os.PathLike[str]) -> None:
+        """Write this Registry as a pack that from_file() reads back: pack.json
+        with the file format and the declared dimensions, a folder per category
+        inside its parent's, named by its prefix, with category.json for its
+        title, and a file per rule, named by its code, in its category's folder.
+        Without declared categories, each prefix gets a folder titled by the
+        prefix. Computed rules are left out, as in to_file().
+
+        The folder may be new, empty or a pack already: then the rule files,
+        category.json files and empty folders it no longer needs are removed,
+        and other files, such as a README, are kept.
+        """
+        folder = Path(path)
+        if folder.exists() and any(folder.iterdir()) and not (folder / PACK).exists():
+            raise ValueError(
+                f"{folder} is not empty and not a pack; write to a new folder"
+            )
+        collection = self.to_collection()
+        categories = dict(self._categories) or {
+            _split(f["id"])[0]: (_split(f["id"])[0], None)
+            for f in collection["features"]
+        }
+
+        def place(prefix: str) -> Path:
+            title, parent = categories[prefix]
+            return (folder if parent is None else place(parent)) / prefix
+
+        written = {
+            folder / PACK: {k: collection[k] for k in ("queryearth", "dimensions")}
+        }
+        for prefix, (title, _) in categories.items():
+            written[place(prefix) / CATEGORY] = {"title": title}
+        for feature in collection["features"]:
+            written[place(_split(feature["id"])[0]) / f"{feature['id']}.geojson"] = (
+                feature
+            )
+        for old in sorted(folder.rglob("*"), reverse=True) if folder.exists() else []:
+            stale = old.name == CATEGORY or old.suffix == ".geojson"
+            if old.is_file() and stale and old not in written:
+                old.unlink()
+        for target, data in written.items():
+            target.parent.mkdir(parents=True, exist_ok=True)
+            text = json.dumps(data, indent=2, ensure_ascii=False) + "\n"
+            target.write_text(text, encoding="utf-8")
+        for old in sorted(folder.rglob("*"), reverse=True):
+            if old.is_dir() and not any(old.iterdir()):
+                old.rmdir()
 
     # ---- names --------------------------------------------------------------------
     def _dimension(self, name: str) -> Any:

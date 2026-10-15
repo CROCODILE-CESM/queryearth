@@ -2,7 +2,7 @@
 
 ## Rules and their scope
 
-A **rule** has a code, a title, a message and a level, and may list changes. Its scope says where, when and for what it applies. Rules are written in Python or as records in GeoJSON rule files, and both are added to a {class}`~queryearth.Registry`, the object you query (see [Writing rules](rules.md)). A scope is given on [dimensions](#dimensions), such as space, time and grid resolution.
+A **rule** has a code, a title, a message and a level, and may list changes. Its scope says where, when and for what it applies. Rules are written in Python or as records in GeoJSON rule files and packs (a folder with a file per rule), and all are added to a {class}`~queryearth.Registry`, the rules in memory that you query (see [Writing rules](rules.md)). A scope is given on [dimensions](#dimensions), such as space, time and grid resolution.
 
 A rule without changes is a warning or a note, such as "these values are climatology, not observations". A rule with changes suggests what to do: each change is a {class}`~queryearth.Change` with a `target`, a `key`, a `value` and an optional `rationale`, such as `qe.Change("MOM_input", "DT", 900.0)`. queryearth never interprets changes; your code applies them, for example to a model's settings.
 

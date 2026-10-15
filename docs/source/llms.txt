@@ -146,6 +146,10 @@ mine.to_file("mine.geojson")  # computed rules are code, so they are left out
 
 Findings come sorted: highest level first, then those without changes, then by code. Each has the rule's `code`, `title`, `message`, `level` (a `logging` level number), `changes`, `instruction`, `confidence`, `action`, `status`, `references` and `evidence`, and how it matched: `area_fraction` and `overlap_km2` (how much of the query's area the rule covers), `time_overlap` and `time_fraction`, `dimensions` (for each other dimension, an object with `overlap` and `fraction`), and `conditional_on`. `str(finding)` is a one-line summary to log, such as `[MINE002] glorys is too fresh off the Mississippi (area 7%; 2020-01-01..2020-12-31; draft)`.
 
+## Packs
+
+A pack is a folder holding the same rules as a rule file, one file per rule, for large rulesets kept in git: `pack.json` (`{"queryearth": "0.6", "dimensions": [...]}`), a folder per category named by its prefix with `category.json` (`{"title": "..."}`), subcategory folders inside their parent's, and each rule in `CODE.geojson` (one Feature) in its category's folder. `qe.Registry.from_file(folder)` and `registry.load(folder)` read it; `registry.to_pack(folder)` writes or updates it, and `to_file()` writes the same rules as one file for sharing and web links. To add a rule to a pack, write `registry.next_code(prefix)`'s code as a new file in that category's folder.
+
 ## Spaces from model grids
 
 `queryearth.converters.grid_outline(lon, lat)` turns the corners of a curvilinear grid's cells (2-D arrays shaped `(ny + 1, nx + 1)`) into the polygon of its outline, split at ±180; a grid around a pole becomes the polar cap beyond its outline.

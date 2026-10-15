@@ -275,3 +275,12 @@ def test_groups_and_categories_together_is_refused(tmp_path):
     collection["queryearth"] = "0.5"
     with pytest.raises(qe.LoadError, match='"groups" is called "categories"'):
         full_registry().load(write(tmp_path / "both.geojson", collection))
+
+
+def test_describe_gives_each_rule_its_category():
+    registry = qe.Registry("mine", categories=CATEGORIES)
+    registry.add(rule("ITF001"))
+    assert registry.describe()["rules"][0]["category"] == "ITF"
+    plain = qe.Registry("plain")
+    plain.add(rule("ITF001"))
+    assert plain.describe()["rules"][0]["category"] is None
