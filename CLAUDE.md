@@ -4,11 +4,11 @@ Guidance for Claude Code (and anyone else) working in this repository.
 
 ## What queryearth is
 
-A small engine that matches rules to a query. A rule has a code, a title, a message, a level (`info`, `warning` or `error`, default `warning`) and a scope: a value on each dimension it constrains. Space and time are on every Registry; `Axis` (numbers in a unit) and `Labels` (names with wildcards) are declared on it, and so is any dimension a user writes. A query gives values on any of the dimensions and gets back the rules that apply. Rules are data, kept in GeoJSON rule files; code lives in dimensions. It is general-purpose, not tied to earth system modelling. Its first consumer is CrocoDash, which queries once in `Case()` and once in `configure_forcings()`.
+A small engine that matches rules to a query. A rule has a code, a title, a message, a level (`info`, `warning` or `error`, default `warning`) and a scope. A code may be a path, such as `REGION/ITF/ITF001`, whose part before the last slash is the rule's category. The scope is a value on each dimension it constrains. Space and time are on every Registry; `Axis` (numbers in a unit) and `Labels` (names with wildcards) are declared on it, and so is any dimension a user writes. A query gives values on any of the dimensions and gets back the rules that apply. Rules are data, kept in GeoJSON rule files; code lives in dimensions. It is general-purpose, not tied to earth system modelling. Its first consumer is CrocoDash, which queries once in `Case()` and once in `configure_forcings()`.
 
 It is an engine only: the package ships no curated rules. Rule files belong to their users.
 
-This is the core, cut back from 0.6.0 to what is realistic to review. `docs/growth.md` lists what 0.6.0 had beyond it, kept at the tag v0.6.0: planned (categories first), parked and dropped. Re-add a feature only when the author asks for it, and move its entry.
+This is the core, cut back from 0.6.0 to what is realistic to review. `docs/growth.md` lists what 0.6.0 had beyond it, kept at the tag v0.6.0: what has come back into the core since, then planned, parked and dropped. Re-add a feature only when the author asks for it, and move its entry.
 
 ## Rules
 
@@ -28,7 +28,7 @@ This is the core, cut back from 0.6.0 to what is realistic to review. `docs/grow
 | `queryearth/space.py` | `Space` (point or polygon) and `point`, `box`, `polygon`: longitudes wrapped, rings cut at ±180, invalid rings repaired, a ring around a pole refused; `meets`, closed-set and across the seam |
 | `queryearth/time.py` | `Interval` (half-open integer-second keys, day or second precision) and `interval()`; one calendar, proleptic Gregorian |
 | `queryearth/dimensions.py` | `Dimension` (the four-method contract), `applies()` (the matching rule, in one place), `SpaceDimension`, `TimeDimension`, `Axis`, `Labels` |
-| `queryearth/rules.py` | `Rule`, a frozen dataclass: code, title, message, level, scope, properties |
+| `queryearth/rules.py` | `Rule`, a frozen dataclass: code, title, message, level, scope, properties; `category`, derived from a path code |
 | `queryearth/registry.py` | `Registry`: `add`, `query`, `rules`, `to_feature`, `to_file`, `from_file`; the rule file format (`FORMAT`, the Feature reader); `DuplicateCodeError` |
 | `tests/` | `test_space.py`, `test_dimensions.py`, `test_queries.py`, `test_files.py`, and `test_docs.py`, which runs `docs/source/llms.txt` and checks the README's copy of `Labels` |
 | `docs/source/` | The public user docs (Sphinx with MyST Markdown): index, dimensions, concepts, rule files, API, and `llms.txt`. Built and deployed to GitHub Pages by `.github/workflows/docs.yml`, one folder per release (`vX.Y.Z/`) plus `dev/` for `main`; `.github/docs_versions.py` keeps the version list |
@@ -37,6 +37,7 @@ This is the core, cut back from 0.6.0 to what is realistic to review. `docs/grow
 ## Concepts worth knowing before changing the engine
 
 - A rule applies when, on every dimension its scope constrains, the query gives a value and the dimension's `matches()` is true: they share at least one value. A dimension the rule leaves out matches anything. A dimension the rule constrains and the query leaves out does not match. There are no conditional findings.
+- A code may be a slash path; `rule.category` is the part before the last slash, codes are unique as whole paths, and a `category` property is refused. A query is about dimensions only: filtering by category is one line on the results.
 - `Registry.add` parses each scope value with its dimension and refuses an undeclared name, as `Registry.query` does for the query's values. Findings are the `Rule` objects that apply, sorted by level (error first), then code. They print as GeoJSON with `Registry.to_feature`.
 - A rule file is one FeatureCollection. A rule's space is the Feature's `geometry`, its time the JSON-FG `time` member (`{"interval": [start, end]}`), and every other dimension's value is in `properties.dimensions`, as that dimension's `to_json()` writes it (an axis range carries its unit). Every other property passes through unread and is written back unchanged, except `box`, `edge`, `periods`, `recurrence`, `time_start`, `time_end`, `withdrawn` and `supersedes`, which changed which rules apply in 0.6 and are refused.
 - Files never declare dimensions: the caller passes them to `Registry.from_file(*paths, dimensions=[...])`, and a rule that names an undeclared one is refused. A file is read whole or not at all.

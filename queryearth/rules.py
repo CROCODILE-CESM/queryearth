@@ -22,13 +22,15 @@ RETIRED = frozenset(
 class Rule:
     """A rule: a code, a title, a message, a level and a scope.
 
-    level is "info", "warning" (the default) or "error". scope maps each
-    dimension the rule constrains to its value, such as {"space": sp.box(-98,
-    18, -80, 31), "time": qe.interval("2000-01-01", ".."), "resolution": {"lt":
-    8}}; a dimension it leaves out matches anything, and the Registry checks
-    each value with its dimension when the rule is added. properties holds
-    whatever else the rule carries, such as an instruction or references;
-    queryearth keeps it as given and writes it back to a rule file unchanged.
+    code is unique, and may be a slash path such as "REGION/ITF/ITF001": its
+    category is the path before the last slash. level is "info", "warning"
+    (the default) or "error". scope maps each dimension the rule constrains to
+    its value, such as {"space": sp.box(-98, 18, -80, 31), "time":
+    qe.interval("2000-01-01", ".."), "resolution": {"lt": 8}}; a dimension it
+    leaves out matches anything, and the Registry checks each value with its
+    dimension when the rule is added. properties holds whatever else the rule
+    carries, such as an instruction or references; queryearth keeps it as given
+    and writes it back to a rule file unchanged.
     """
 
     code: str
@@ -39,8 +41,11 @@ class Rule:
     properties: Mapping[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
-        if not isinstance(self.code, str) or not self.code:
-            raise ValueError(f"a code is a non-empty string, not {self.code!r}")
+        if not isinstance(self.code, str) or "" in self.code.split("/"):
+            raise ValueError(
+                f"a code is a name, or a path such as 'REGION/ITF/ITF001', not "
+                f"{self.code!r}"
+            )
         for name in ("title", "message"):
             if not isinstance(getattr(self, name), str):
                 raise TypeError(f"{self.code}: {name} is a string")
@@ -59,8 +64,19 @@ class Rule:
             raise ValueError(
                 f"{self.code}: {own} are fields of the rule, not properties"
             )
+        if "category" in self.properties:
+            raise ValueError(
+                f"{self.code}: a rule's category is the path of its code, such as "
+                "REGION/ITF in REGION/ITF/ITF001, not a property"
+            )
         if retired := sorted(set(self.properties) & RETIRED):
             raise ValueError(
                 f"{self.code}: {retired} changed which rules apply in queryearth "
                 "0.6, and this version leaves them out (docs/growth.md)"
             )
+
+    @property
+    def category(self) -> str | None:
+        """The path before the code's last slash, such as "REGION/ITF" for
+        "REGION/ITF/ITF001"; None for a code without one."""
+        return self.code.rpartition("/")[0] or None

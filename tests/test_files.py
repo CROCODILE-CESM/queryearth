@@ -116,10 +116,12 @@ def test_record_mistakes_are_refused_with_the_code(tmp_path):
     no_title = dict(ARCTIC, properties={"code": "X1", "message": "..."})
     typo = dict(ARCTIC, tme={"interval": ["2000-01-01", ".."]})
     edge = dict(ARCTIC, properties=dict(ARCTIC["properties"], edge=True))
+    category = dict(ARCTIC, properties=dict(ARCTIC["properties"], category="POLAR"))
     for feature, problem in [
         (no_title, "needs a code, a title"),
         (typo, "unknown Feature members \\['tme'\\]"),
         (edge, "\\['edge'\\] changed which rules apply in queryearth 0.6"),
+        (category, "category is the path of its code"),
     ]:
         with pytest.raises(ValueError, match=problem):
             qe.Registry.from_file(

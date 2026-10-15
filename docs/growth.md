@@ -1,25 +1,24 @@
 # The growth path
 
-This core is queryearth cut back to what is realistic to review: rules scoped by space, time, axes and labels, one matching rule, and GeoJSON rule files. Everything else queryearth 0.6.0 had is kept at the tag [v0.6.0](https://github.com/CROCODILE-CESM/queryearth/tree/v0.6.0) and listed here, in three parts: planned, parked and dropped. Paths are at v0.6.0 unless they say "core". The full 0.6.0 design, its decisions and its correctness fixtures are `docs/design.md` and `docs/reference/` at the tag, and `examples/toy/` there exercises most of the features.
+This core is queryearth cut back to what is realistic to review: rules scoped by space, time, axes and labels, one matching rule, and GeoJSON rule files. Everything else queryearth 0.6.0 had is kept at the tag [v0.6.0](https://github.com/CROCODILE-CESM/queryearth/tree/v0.6.0) and listed here: what has come back into the core since, then what is planned, parked and dropped. Paths are at v0.6.0 unless they say "core". The full 0.6.0 design, its decisions and its correctness fixtures are `docs/design.md` and `docs/reference/` at the tag, and `examples/toy/` there exercises most of the features.
 
 The core grows in three places: a new `Dimension` subclass (its four methods), the `Registry` (adding, querying, reading and writing), and `Rule.properties`, which already carries anything else a rule says, unread. Rules stay data; code lives in dimensions.
 
-## Planned
+## Now in the core
 
 ### Categories
 
-**What.** In 0.6.0 a rule's category was the prefix of its code: ITF001 is in category ITF. A Registry declared its categories, each prefix with a title, and then every code had to use one. A category could sit in a parent, declared before it, to any depth (`{"OBC": {"title": "Open boundaries", "parent": "DOMAIN"}}`), and `category_path("OBC")` gave `["DOMAIN", "OBC"]`. A rule file carried them in a top-level `categories` member. `next_code("ITF")` handed out the next number, one past the highest in use, withdrawn rules and aliases included, so a number was never reused. That needed a code grammar: capitals and digits plus three or four digits, with a hyphen after a prefix that ends in a digit (`ERA5-014`).
+A code may be a path, such as `REGION/ITF/ITF001`; its category, `rule.category`, is the path before the last slash. Categories need no declaring: the path is the hierarchy. Codes are unique as whole paths, so two categories can each have a rule named `001`. A `category` property is refused, so it can never disagree with the code. A query is about dimensions only; keeping the findings in one category is one line on the results, `[r for r in found if r.code.startswith("REGION/")]`. A `category` filter on `query()` and a `categories` listing are easy to add if a user interface needs them.
 
-**At v0.6.0.** `queryearth/registry.py`: `Registry.__init__(categories=...)`, `add_category`, `categories`, `category_path`, `next_code`, `_category_entry`, `_category_problems`, the category checks in `Registry._add` and `Registry.from_file`, and `to_collection`, which writes the member. `queryearth/rules.py`: `CODE`, `check_code`, `split_code`, `make_code`, `check_prefix`. Tests: `tests/test_categories.py`.
+The trade-off: moving a rule to another category changes its code, and aliases, which kept a rule's old codes in 0.6.0, are parked.
 
-**Today.** A rule can carry a plain `category` property with no code: unknown properties pass through a read and a write unchanged, and a caller can group findings by it.
+At v0.6.0 a category was the code's prefix (ITF001 in ITF), declared on the Registry with a title and a parent, and `next_code()` numbered rules within it: `queryearth/registry.py`: `add_category`, `categories`, `category_path`, `next_code`; `queryearth/rules.py`: `check_code`, `split_code`, `make_code`. Titles and `next_code()` stay at the tag.
 
-**Plugs in.** The smallest addition, about 25 lines outside the matching:
+### Version enforcement
 
-1. `Registry(dimensions, categories={"REGION": "Regions", "ITF": {"title": "Indonesian Throughflow", "parent": "REGION"}})` declares them, parents first.
-2. A rule names its category in its `category` property; `Registry.add` refuses one the Registry has not declared, once it declares any. No code grammar is needed.
-3. `to_file` writes the declarations in a top-level `categories` member, and `from_file` reads and merges them across files, refusing a category that two files give different parents.
-4. `next_code(category)` only if codes keep a prefix per category, which brings back the code grammar. Using the code's prefix as the category, as 0.6.0 did, saves the property but needs the grammar from the start.
+`to_file` writes the format's release in the `queryearth` member, and `from_file` refuses a file that needs a later queryearth, saying to upgrade. Reading pre-0.6 files' `groups` member as `categories` stays at the tag: `queryearth/registry.py`, `_categories_member`.
+
+## Planned
 
 ### Recurring time
 
@@ -53,7 +52,7 @@ The core grows in three places: a new `Dimension` subclass (its four methods), t
 
 **At v0.6.0.** `queryearth/registry.py`: `_read_pack`, `Registry.to_pack`, `PACK`, `CATEGORY`. Tests: `tests/test_packs.py`.
 
-**Plugs in.** After categories: a reader that turns the folder into the FeatureCollection `from_file` reads, and a writer from `to_feature`. Until then, a folder of Feature files converts to a rule file by gathering its Features, which is how CrocoDash's two packs were converted for the core.
+**Plugs in.** A reader that maps each category path to a folder and each code's last part to a file name, turning the folder into the FeatureCollection `from_file` reads, and a writer from `to_feature`. Until then, a folder of Feature files converts to a rule file by gathering its Features, which is how CrocoDash's two packs were converted for the core.
 
 ### Features for AI agents
 
@@ -62,12 +61,6 @@ The core grows in three places: a new `Dimension` subclass (its four methods), t
 **At v0.6.0.** `queryearth/registry.py`: `Registry.describe`, `Registry.values`, `Registry.from_file`; `queryearth/dimensions.py`: `describe_dimension`, `dimension_from`.
 
 **Plugs in.** A `describe()` method on `Dimension` (its name, kind and, for an axis, unit), and `Registry.describe()` and `values()` over the rules' scopes. `docs/source/llms.txt`, the one-page guide for language models, is in the core already, and its test runs it as written.
-
-### Version enforcement
-
-**In the core now.** `to_file` writes the format's release in the `queryearth` member, and `from_file` refuses a file that needs a later queryearth, saying to upgrade.
-
-**Left at v0.6.0.** Reading pre-0.6 files' `groups` member as `categories`: `queryearth/registry.py`, `_categories_member`.
 
 ## Parked
 

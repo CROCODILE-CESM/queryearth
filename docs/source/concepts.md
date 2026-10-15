@@ -4,7 +4,7 @@
 
 A {class}`~queryearth.Rule` has:
 
-- a `code`, any non-empty string, unique on its Registry;
+- a `code`, unique on its Registry, which may be a path such as `REGION/ITF/ITF004`: its [category](#categories) is the path before the last slash;
 - a `title` and a `message`;
 - a `level`: `"info"`, `"warning"` (the default) or `"error"`;
 - a `scope`, mapping each [dimension](dimensions.md) the rule constrains to its value;
@@ -13,7 +13,7 @@ A {class}`~queryearth.Rule` has:
 ```python
 registry = qe.Registry([qe.Axis("resolution", "km")])
 rule = qe.Rule(
-    code="ITF004",
+    code="REGION/ITF/ITF004",
     title="Lombok Strait spans only a few cells",
     message="Lombok Strait spans only a few cells even at 5 km.",
     scope={"space": sp.box(115.4, -9, 116.1, -8), "resolution": {"gt": 2}},
@@ -23,6 +23,17 @@ registry.add(rule)
 ```
 
 {meth}`Registry.add() <queryearth.Registry.add>` checks each scope value with its dimension. A code already on the Registry raises `DuplicateCodeError`. `Registry.rules` lists every rule, in the order added.
+
+## Categories
+
+A code may be a path; its category is the path before the last slash. `REGION/ITF/ITF004` is in category `REGION/ITF`, which sits in `REGION`, so categories need no declaring. `rule.category` gives a rule's category, or None for a code without a slash. Codes are unique as whole paths, so `REGION/ITF/001` and `DOMAIN/OBC/001` can both exist. Moving a rule to another category changes its code.
+
+A query is about dimensions only. To keep the findings in one category and those below it, filter on the code:
+
+```python
+findings = registry.query(resolution=(9.1, 9.3))
+in_region = [rule for rule in findings if rule.code.startswith("REGION/")]
+```
 
 ## Queries
 

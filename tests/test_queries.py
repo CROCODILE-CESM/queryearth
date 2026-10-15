@@ -79,3 +79,20 @@ def test_the_level_is_warning_unless_given_as_a_name():
     assert qe.Rule("X", "x", "...").level == "warning"
     with pytest.raises(ValueError):
         qe.Rule("X", "x", "...", level="WARNING")
+
+
+# ---- categories: a code may be a path ---------------------------------------------
+def test_a_rules_category_is_the_path_before_the_last_slash_of_its_code():
+    assert qe.Rule("REGION/ITF/ITF001", "i", "...").category == "REGION/ITF"
+    assert qe.Rule("ITF001", "i", "...").category is None
+    for bad in ("", "/REGION/X1", "REGION/", "REGION//X1", 5):
+        with pytest.raises(ValueError):
+            qe.Rule(bad, "x", "...")
+
+
+def test_rules_in_different_categories_may_share_a_name():
+    registry = registry_with(qe.Rule("REGION/ITF/001", "i", "..."))
+    registry.add(qe.Rule("DOMAIN/OBC/001", "o", "..."))
+    assert codes(registry.query()) == ["DOMAIN/OBC/001", "REGION/ITF/001"]
+    with pytest.raises(qe.DuplicateCodeError):
+        registry.add(qe.Rule("DOMAIN/OBC/001", "again", "..."))

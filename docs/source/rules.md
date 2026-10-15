@@ -9,14 +9,14 @@ A rule file is one GeoJSON FeatureCollection with one Feature per rule:
   "features": [
     {
       "type": "Feature",
-      "id": "POLAR001",
+      "id": "REGION/POLAR/POLAR001",
       "geometry": {
         "type": "Polygon",
         "coordinates": [[[-180, 60], [180, 60], [180, 90], [-180, 90], [-180, 60]]]
       },
       "time": {"interval": ["1993-01-01", ".."]},
       "properties": {
-        "code": "POLAR001",
+        "code": "REGION/POLAR/POLAR001",
         "title": "Consider active sea ice",
         "message": "Part of this domain is poleward of 60 degrees, where sea ice forms in winter.",
         "level": "warning",
@@ -31,8 +31,8 @@ A rule file is one GeoJSON FeatureCollection with one Feature per rule:
 
 - `geometry` is the rule's space: a Polygon, a MultiPolygon, or null for none. A ring that crosses ±180 is split there, so write a shape across the date line as it runs, such as from 170 to -170.
 - `time` is the rule's time, as a JSON-FG time member: `{"interval": [start, end]}` with ISO 8601 dates or timestamps and `".."` for an open end, or null for none. An end date covers its whole day.
-- `properties` holds `code`, `title` and `message`, all required; `level`, `"info"`, `"warning"` (the default) or `"error"`; and `dimensions`, the value on each other [dimension](dimensions.md), in the form that dimension's `to_json` writes.
-- Every other property, here `instruction` and `references`, is kept as given and written back unchanged.
+- `properties` holds `code`, `title` and `message`, all required, where the code may be a path whose part before the last slash is the rule's [category](concepts.md#categories); `level`, `"info"`, `"warning"` (the default) or `"error"`; and `dimensions`, the value on each other [dimension](dimensions.md), in the form that dimension's `to_json` writes.
+- Every other property, here `instruction` and `references`, is kept as given and written back unchanged. A `category` property is refused, since the category is the code's path.
 - `queryearth` names the release that last changed the file format. `to_file` writes it, and `from_file` refuses a file that needs a later queryearth than the one installed, saying to upgrade; a file without it is read as it is.
 
 ## Reading and writing

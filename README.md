@@ -99,6 +99,8 @@ Declare a dimension when you make the Registry, `qe.Registry([qe.Labels("product
 
 A rule file is a GeoJSON FeatureCollection with one Feature per rule. Its geometry is the rule's space, its JSON-FG `time` member the rule's time, and its properties hold the code, title, message, level, the value on each other dimension under `"dimensions"`, and anything else, such as an instruction or references, which queryearth keeps unchanged.
 
+A code may be a path, such as `REGION/ITF/ITF001`: its category, `rule.category`, is the path before the last slash. To keep the findings in one category, filter on the code: `[r for r in findings if r.code.startswith("REGION/")]`.
+
 ```python
 registry.to_file("rules.geojson")
 dimensions = [qe.Axis("resolution", "km"), qe.Labels("product")]
@@ -115,7 +117,7 @@ queryearth needs Python 3.11 or later, numpy and shapely 2.1 or later.
 
 ## The growth path
 
-This is the core of queryearth, cut back from 0.6.0 to what is realistic to review. [docs/growth.md](docs/growth.md) lists what 0.6.0 had beyond it, kept at the tag v0.6.0: categories are planned next, and the rest is parked.
+This is the core of queryearth, cut back from 0.6.0 to what is realistic to review. [docs/growth.md](docs/growth.md) lists what 0.6.0 had beyond it, kept at the tag v0.6.0: what has come back into the core since (categories, version enforcement), then what is planned, parked and dropped.
 
 ## Development
 
