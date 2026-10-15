@@ -59,10 +59,16 @@ def test_groups_are_declared_before_rules():
         registry.add_group("ITF", "Indonesian Throughflow")
 
 
-@pytest.mark.parametrize("title", ["", "  ", None])
+@pytest.mark.parametrize("title", ["", "  ", {"title": ""}])
 def test_a_group_needs_a_title(title):
     with pytest.raises(ValueError, match="needs a title"):
         qe.Registry("mine", groups={"ITF": title})
+
+
+@pytest.mark.parametrize("value", [None, 7, {"name": "x"}, {"title": "x", "kids": []}])
+def test_a_group_is_a_title_or_a_title_and_parent(value):
+    with pytest.raises(ValueError, match="is its title, or"):
+        qe.Registry("mine", groups={"ITF": value})
 
 
 def test_describe_gives_the_groups():

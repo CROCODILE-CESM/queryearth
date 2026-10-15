@@ -14,6 +14,7 @@ import logging
 import os
 import re
 import threading
+import urllib.request
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
@@ -62,10 +63,11 @@ __all__ = ["FORMAT", "Registry", "PointResult"]
 
 # The release that last changed the rule file format. to_file() writes it in the
 # "queryearth" member, and a file that needs a later release is refused.
-FORMAT = "0.4"
+FORMAT = "0.5"
 
 _SLUG = re.compile(r"[a-z][a-z0-9_]*")
 _RELEASE = re.compile(r"([0-9]+)\.([0-9]+)(?:\.[0-9]+)?")
+_URL = re.compile(r"https?://", re.IGNORECASE)
 
 _default: Registry | None = None
 _default_lock = threading.Lock()
@@ -85,12 +87,65 @@ def _strings(value: Any) -> tuple[str, ...]:
     return (value,) if isinstance(value, str) else tuple(value or ())
 
 
-def _read(path: Path) -> Any:
-    """A rule file's JSON, or LoadError naming the file."""
+Source = str | os.PathLike[str]  # a rule file's path, or its http(s) URL
+
+
+def _open(source: Source) -> tuple[str, str, Any]:
+    """A rule file's name for messages and findings (its file name, or its URL),
+    its stem, and its JSON; LoadError naming it when it cannot be read."""
+    if isinstance(source, str) and _URL.match(source):
+        name, stem = source, Path(source.split("?")[0].rstrip("/")).stem
+        request = urllib.request.Request(source, headers={"User-Agent": "queryearth"})
+        try:
+            with urllib.request.urlopen(request, timeout=30) as response:
+                return name, stem, json.loads(response.read().decode("utf-8"))
+        except (OSError, ValueError) as err:  # URLError and HTTPError are OSErrors
+            raise LoadError([f"{name}: {err}"]) from err
+    path = Path(source)
     try:
-        return json.loads(path.read_text(encoding="utf-8"))
+        return path.name, path.stem, json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError) as err:
         raise LoadError([f"{path.name}: {err}"]) from err
+
+
+def _group_entry(prefix: str, value: Any) -> tuple[str, str | None]:
+    """A group's title and parent, from its title or {"title", "parent"}."""
+    if isinstance(value, str):
+        title, parent = value, None
+    elif (
+        isinstance(value, Mapping)
+        and "title" in value
+        and set(value)
+        <= {
+            "title",
+            "parent",
+        }
+    ):
+        title, parent = value["title"], value.get("parent")
+    else:
+        raise ValueError(
+            f'group {prefix!r} is its title, or {{"title": ..., "parent": ...}}, '
+            f"not {value!r}"
+        )
+    if not isinstance(title, str) or not title.strip():
+        raise ValueError(f"group {prefix!r} needs a title")
+    if parent is not None:
+        check_prefix(parent)
+    return title, parent
+
+
+def _collection(data: Any) -> Any:
+    """A rule file's JSON as a FeatureCollection; a lone Feature is wrapped."""
+    if isinstance(data, Mapping) and data.get("type") == "Feature":
+        return {"type": "FeatureCollection", "features": [data]}
+    return data
+
+
+def _plain(dimension: Any) -> dict[str, Any]:
+    """A dimension's file form without its description, to compare two."""
+    return {
+        k: v for k, v in describe_dimension(dimension).items() if k != "description"
+    }
 
 
 def _format_problems(collection: Any, where: str) -> list[str]:
@@ -130,22 +185,22 @@ class Registry:
         name: str = "",
         *,
         dimensions: Iterable[Any] = (),
-        groups: Mapping[str, str] | None = None,
+        groups: Mapping[str, Any] | None = None,
     ) -> None:
         self.name = name
         self._dimensions: dict[str, Any] = {
             "space": SpaceDimension(),
             "time": TimeDimension(),
         }
-        self._groups: dict[str, str] = {}
+        self._groups: dict[str, tuple[str, str | None]] = {}  # title, parent
         self._entries: list[_Entry] = []
         self._codes: dict[str, int] = {}
         self._prefilters_cache: dict[str, Any] | None = None
         self._last: tuple[Any, Any] = (None, None)  # the last query parsed
         for dimension in dimensions:
             self.add_dimension(dimension)
-        for prefix, title in (groups or {}).items():
-            self.add_group(prefix, title)
+        for prefix, value in (groups or {}).items():
+            self.add_group(prefix, *_group_entry(prefix, value))
 
     def __repr__(self) -> str:
         return f"Registry({self.name!r}, rules={len(self._entries)})"
@@ -181,23 +236,42 @@ class Registry:
             raise ValueError(f"dimension name {name!r} is reserved or already declared")
         self._dimensions[name] = dimension
 
-    def add_group(self, prefix: str, title: str) -> None:
+    def add_group(self, prefix: str, title: str, parent: str | None = None) -> None:
         """Declare a group of rules, before any rule is added: the rules whose
         codes have this prefix, such as ITF for ITF001. Once a Registry declares
-        groups, every rule's prefix must be one of them."""
+        groups, every rule's prefix must be one of them. A group can sit in a
+        parent group, declared before it, to any depth."""
         if self._entries:
             raise ValueError("declare groups before adding rules")
         check_prefix(prefix)
-        if not isinstance(title, str) or not title.strip():
-            raise ValueError(f"group {prefix!r} needs a title")
+        title, parent = _group_entry(
+            prefix, title if parent is None else {"title": title, "parent": parent}
+        )
         if prefix in self._groups:
             raise ValueError(f"group {prefix!r} is already declared")
-        self._groups[prefix] = title
+        if parent is not None and parent not in self._groups:
+            raise ValueError(f"group {prefix!r}: declare its parent {parent!r} first")
+        self._groups[prefix] = (title, parent)
 
     @property
-    def groups(self) -> dict[str, str]:
-        """The declared groups, prefix to title, in the order declared."""
-        return dict(self._groups)
+    def groups(self) -> dict[str, Any]:
+        """The declared groups as a rule file gives them, in the order declared:
+        prefix to title, or to {"title", "parent"} for a group in a group."""
+        return {
+            prefix: title if parent is None else {"title": title, "parent": parent}
+            for prefix, (title, parent) in self._groups.items()
+        }
+
+    def group_path(self, prefix: str) -> list[str]:
+        """A group and the groups it sits in, outermost first: ["DOMAIN", "OBC"]."""
+        if prefix not in self._groups:
+            raise UnknownNameError(
+                f"undeclared group {prefix!r}; declared: {list(self._groups)}"
+            )
+        path = [prefix]
+        while (parent := self._groups[path[0]][1]) is not None:
+            path.insert(0, parent)
+        return path
 
     def next_code(self, prefix: str) -> str:
         """The code for a new rule in a group: one more than the highest number
@@ -226,59 +300,92 @@ class Registry:
             self._add(rule, "python")
 
     @classmethod
-    def from_file(cls, path: str | os.PathLike[str]) -> Registry:
-        """A Registry made for one rule file, with its rules loaded.
+    def from_file(cls, *sources: Source) -> Registry:
+        """A Registry made for one or more rule files, with their rules loaded.
 
-        The file declares the dimensions its rules use in its "dimensions"
-        member, in the form describe() gives: [{"name": "resolution", "kind":
-        "axis", "unit": "km"}, {"name": "product", "kind": "labels"}]. Space and
-        time need no declaring. Its optional "groups" member maps code prefixes
-        to titles, and "queryearth" names the release whose format it uses.
-        Raises LoadError as load() does.
+        Each source is a path or an http(s) URL, such as a raw link to a file in
+        a GitHub repository or gist. A file declares the dimensions its rules use
+        in its "dimensions" member, in the form describe() gives:
+        [{"name": "resolution", "kind": "axis", "unit": "km"}]; space and time
+        need no declaring. Its "groups" member gives its groups, and "queryearth"
+        the release whose format it uses. The Registry declares every file's
+        dimensions and groups, which must agree where files share a name, and a
+        code must be unique across the files. Raises LoadError listing every
+        problem, as load() does.
         """
-        path = Path(path)
-        data = _read(path)
-        problems = _format_problems(data, path.name)
+        if not sources:
+            raise TypeError("from_file needs at least one rule file")
+        opened = [_open(source) for source in sources]
+        problems = [
+            p for where, _, data in opened for p in _format_problems(data, where)
+        ]
         if problems:
             raise LoadError(problems)
-        declared = data.get("dimensions", []) if isinstance(data, Mapping) else []
+        dimensions: dict[str, Any] = {}
+        groups: dict[str, Any] = {}
+        for where, _, data in opened:
+            data = data if isinstance(data, Mapping) else {}
+            try:
+                declared = data.get("dimensions", [])
+                if not isinstance(declared, list):
+                    raise ValueError("it is a list of dimensions")
+                for dimension in map(dimension_from, declared):
+                    known = dimensions.setdefault(dimension.name, dimension)
+                    if _plain(known) != _plain(dimension):
+                        raise ValueError(
+                            f"{dimension.name!r} is {_plain(dimension)} here, but "
+                            f"{_plain(known)} in an earlier file"
+                        )
+            except (ValueError, TypeError) as err:
+                problems.append(f"{where}: dimensions: {err}")
+            try:
+                given = data.get("groups") or {}
+                if not isinstance(given, Mapping):
+                    raise ValueError("it maps each prefix to a title")
+                for prefix, value in given.items():
+                    parent = _group_entry(prefix, value)[1]
+                    known = groups.setdefault(prefix, value)
+                    if _group_entry(prefix, known)[1] != parent:
+                        raise ValueError(
+                            f"group {prefix!r} sits in {parent!r} here, but in "
+                            f"{_group_entry(prefix, known)[1]!r} in an earlier file"
+                        )
+            except (ValueError, TypeError) as err:
+                problems.append(f"{where}: groups: {err}")
+        if problems:
+            raise LoadError(problems)
+        name = "+".join(stem for _, stem, _ in opened)
         try:
-            if not isinstance(declared, list):
-                raise ValueError("it is a list of dimensions")
-            registry = cls(path.stem, dimensions=map(dimension_from, declared))
+            registry = cls(name, dimensions=dimensions.values(), groups=groups)
         except (ValueError, TypeError) as err:
-            raise LoadError([f"{path.name}: dimensions: {err}"]) from err
-        groups = data.get("groups") if isinstance(data, Mapping) else None
-        try:
-            if groups is not None and not isinstance(groups, Mapping):
-                raise ValueError("it maps each prefix to a title")
-            for prefix, title in (groups or {}).items():
-                registry.add_group(prefix, title)
-        except (ValueError, TypeError) as err:
-            raise LoadError([f"{path.name}: groups: {err}"]) from err
-        try:
-            registry.load(path)
-        except LoadError as err:
-            if declared or not any("undeclared dimension" in p for p in err.problems):
-                raise
-            hint = f'{path.name}: declare the dimensions the rules use in the file\'s "dimensions" member'
-            raise LoadError([*err.problems, hint]) from None
+            raise LoadError([f"{opened[0][0]}: groups: {err}"]) from err
+        for where, _, data in opened:
+            try:
+                registry._add_all(_collection(data), where, where)
+            except LoadError as err:
+                problems += err.problems
+        if problems and not dimensions:
+            if any("undeclared dimension" in p for p in problems):
+                problems.append(
+                    f"{opened[0][0]}: declare the dimensions the rules use in the "
+                    'file\'s "dimensions" member'
+                )
+        if problems:
+            raise LoadError(problems)
         return registry
 
-    def load(self, path: str | os.PathLike[str]) -> list[str]:
-        """Add the rules of one GeoJSON file, a FeatureCollection or a single Feature.
+    def load(self, source: Source) -> list[str]:
+        """Add the rules of one rule file, a FeatureCollection or a single
+        Feature, at a path or an http(s) URL.
 
-        Returns the codes loaded; their findings have the file name as source.
-        Loading never runs code. Raises LoadError listing every problem with the
-        file, the feature's position and its code, and then leaves the Registry
-        as it was. A file that declares its dimensions or groups must declare
-        them as this Registry does.
+        Returns the codes loaded; their findings have the file's name (or URL)
+        as source. Loading never runs code. Raises LoadError listing every
+        problem with the file, the feature's position and its code, and then
+        leaves the Registry as it was. A file that declares its dimensions or
+        groups must declare them as this Registry does.
         """
-        path = Path(path)
-        data = _read(path)
-        if isinstance(data, Mapping) and data.get("type") == "Feature":
-            data = {"type": "FeatureCollection", "features": [data]}
-        return self._add_all(data, path.name, path.name)
+        where, _, data = _open(source)
+        return self._add_all(_collection(data), where, where)
 
     def _add_all(self, collection: Any, where: str, source: str) -> list[str]:
         """Add every record of a FeatureCollection, or none of them (LoadError)."""
@@ -355,10 +462,20 @@ class Registry:
         if not isinstance(declared, Mapping):
             return [f"{where}: groups: it maps each prefix to a title"]
         problems = []
-        for prefix in declared:
+        for prefix, value in declared.items():
+            try:
+                parent = _group_entry(prefix, value)[1]
+            except ValueError as err:
+                problems.append(f"{where}: groups: {err}")
+                continue
             if prefix not in self._groups:
                 problems.append(
                     f"{where}: group {prefix!r} is not declared on registry {self.name!r}"
+                )
+            elif self._groups[prefix][1] != parent:
+                problems.append(
+                    f"{where}: group {prefix!r} sits in {parent!r} in the file, but in "
+                    f"{self._groups[prefix][1]!r} on registry {self.name!r}"
                 )
         return problems
 
@@ -464,7 +581,7 @@ class Registry:
             )
         return {
             "name": self.name,
-            "groups": dict(self._groups),
+            "groups": self.groups,
             "dimensions": [describe_dimension(d) for _, d in declared],
             "values": {name: _jsonable(self.values(name)) for name, _ in declared},
             "rules": rules,
@@ -478,7 +595,7 @@ class Registry:
         describe() lists them."""
         collection: dict[str, Any] = {"type": "FeatureCollection", "queryearth": FORMAT}
         if self._groups:
-            collection["groups"] = dict(self._groups)
+            collection["groups"] = self.groups
         declared = list(self._dimensions.values())[2:]
         collection["dimensions"] = [describe_dimension(d) for d in declared]
         collection["features"] = [

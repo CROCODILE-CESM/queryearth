@@ -1,6 +1,6 @@
 {
   "type": "FeatureCollection",
-  "queryearth": "0.4",
+  "queryearth": "0.5",
   "groups": {"TOY": "Toy rules"},
   "conformsTo": [
     "http://www.opengis.net/spec/json-fg-1/1.0/conf/core"
