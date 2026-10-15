@@ -17,6 +17,17 @@ registry.next_code("ITF")  # "ITF001", then one past the highest ITF number in u
 
 {meth}`Registry.next_code() <queryearth.Registry.next_code>` gives a new rule its number. Numbers carry no meaning and are never given twice, withdrawn rules included, so a code always means the same rule.
 
+A group can sit in another group, to any depth, for categories of categories: give it a parent, declared before it.
+
+```python
+registry = qe.Registry("mine", groups={
+    "DOMAIN": "Domain design",
+    "OBC": {"title": "Open boundaries", "parent": "DOMAIN"},
+    "GRID": {"title": "Grid and numerics", "parent": "DOMAIN"},
+})
+registry.group_path("OBC")  # ["DOMAIN", "OBC"]
+```
+
 ## Dimensions
 
 Everything a rule can be scoped by is a dimension. Each dimension has a set of values: a rule's scope picks some of them, a query picks some of them, and the two meet where they overlap. There are six kinds:

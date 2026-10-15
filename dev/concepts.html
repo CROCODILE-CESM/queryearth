@@ -6,14 +6,14 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Concepts &mdash; queryearth 0.3.1.dev1</title>
+  <title>Concepts &mdash; queryearth 0.5.0</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
 
   
       <script src="_static/jquery.js?v=5d32c60e"></script>
       <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="_static/documentation_options.js?v=54fce9ad"></script>
+      <script src="_static/documentation_options.js?v=1dd76d02"></script>
       <script src="_static/doctools.js?v=fd6eb6e6"></script>
       <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="_static/versions.js?v=58ec1786"></script>
@@ -99,6 +99,15 @@
 </pre></div>
 </div>
 <p><a class="reference internal" href="api.html#queryearth.Registry.next_code" title="queryearth.Registry.next_code"><code class="xref py py-meth docutils literal notranslate"><span class="pre">Registry.next_code()</span></code></a> gives a new rule its number. Numbers carry no meaning and are never given twice, withdrawn rules included, so a code always means the same rule.</p>
+<p>A group can sit in another group, to any depth, for categories of categories: give it a parent, declared before it.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">registry</span> <span class="o">=</span> <span class="n">qe</span><span class="o">.</span><span class="n">Registry</span><span class="p">(</span><span class="s2">"mine"</span><span class="p">,</span> <span class="n">groups</span><span class="o">=</span><span class="p">{</span>
+    <span class="s2">"DOMAIN"</span><span class="p">:</span> <span class="s2">"Domain design"</span><span class="p">,</span>
+    <span class="s2">"OBC"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"title"</span><span class="p">:</span> <span class="s2">"Open boundaries"</span><span class="p">,</span> <span class="s2">"parent"</span><span class="p">:</span> <span class="s2">"DOMAIN"</span><span class="p">},</span>
+    <span class="s2">"GRID"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"title"</span><span class="p">:</span> <span class="s2">"Grid and numerics"</span><span class="p">,</span> <span class="s2">"parent"</span><span class="p">:</span> <span class="s2">"DOMAIN"</span><span class="p">},</span>
+<span class="p">})</span>
+<span class="n">registry</span><span class="o">.</span><span class="n">group_path</span><span class="p">(</span><span class="s2">"OBC"</span><span class="p">)</span>  <span class="c1"># ["DOMAIN", "OBC"]</span>
+</pre></div>
+</div>
 </section>
 <section id="dimensions">
 <h2>Dimensions<a class="headerlink" href="#dimensions" title="Link to this heading"></a></h2>

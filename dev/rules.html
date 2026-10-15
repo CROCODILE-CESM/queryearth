@@ -6,14 +6,14 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Writing rules &mdash; queryearth 0.3.1.dev1</title>
+  <title>Writing rules &mdash; queryearth 0.5.0</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
 
   
       <script src="_static/jquery.js?v=5d32c60e"></script>
       <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="_static/documentation_options.js?v=54fce9ad"></script>
+      <script src="_static/documentation_options.js?v=1dd76d02"></script>
       <script src="_static/doctools.js?v=fd6eb6e6"></script>
       <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="_static/versions.js?v=58ec1786"></script>
@@ -133,15 +133,23 @@
 <h2>Rule files<a class="headerlink" href="#rule-files" title="Link to this heading"></a></h2>
 <p>A rule file is a GeoJSON file holding a FeatureCollection of records, or a single record. Besides <code class="docutils literal notranslate"><span class="pre">features</span></code>, a FeatureCollection can have three top-level members:</p>
 <ul class="simple">
-<li><p><code class="docutils literal notranslate"><span class="pre">queryearth</span></code>: the release whose file format the file uses, such as <code class="docutils literal notranslate"><span class="pre">&quot;0.4&quot;</span></code>. A file that needs a later release than the one installed is refused, with a message that says so; a file without it is read as it is.</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">groups</span></code>: the <a class="reference internal" href="concepts.html#rules-and-their-scope"><span class="std std-ref">groups</span></a> of its rules, each code prefix with its title, such as <code class="docutils literal notranslate"><span class="pre">{&quot;GRID&quot;:</span> <span class="pre">&quot;Grid</span> <span class="pre">and</span> <span class="pre">numerics&quot;,</span> <span class="pre">&quot;ITF&quot;:</span> <span class="pre">&quot;Indonesian</span> <span class="pre">Throughflow&quot;}</span></code>.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">queryearth</span></code>: the release whose file format the file uses, such as <code class="docutils literal notranslate"><span class="pre">&quot;0.5&quot;</span></code>. A file that needs a later release than the one installed is refused, with a message that says so; a file without it is read as it is.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">groups</span></code>: the <a class="reference internal" href="concepts.html#rules-and-their-scope"><span class="std std-ref">groups</span></a> of its rules, each code prefix with its title, or with its title and parent for a group in a group: <code class="docutils literal notranslate"><span class="pre">{&quot;DOMAIN&quot;:</span> <span class="pre">&quot;Domain</span> <span class="pre">design&quot;,</span> <span class="pre">&quot;OBC&quot;:</span> <span class="pre">{&quot;title&quot;:</span> <span class="pre">&quot;Open</span> <span class="pre">boundaries&quot;,</span> <span class="pre">&quot;parent&quot;:</span> <span class="pre">&quot;DOMAIN&quot;}}</span></code>.</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">dimensions</span></code>: the <a class="reference internal" href="concepts.html#dimensions"><span class="std std-ref">dimensions</span></a> its rules use, such as <code class="docutils literal notranslate"><span class="pre">[{&quot;name&quot;:</span> <span class="pre">&quot;resolution&quot;,</span> <span class="pre">&quot;kind&quot;:</span> <span class="pre">&quot;axis&quot;,</span> <span class="pre">&quot;unit&quot;:</span> <span class="pre">&quot;km&quot;},</span> <span class="pre">{&quot;name&quot;:</span> <span class="pre">&quot;product&quot;,</span> <span class="pre">&quot;kind&quot;:</span> <span class="pre">&quot;labels&quot;}]</span></code>. Each has a <code class="docutils literal notranslate"><span class="pre">name</span></code>, a <code class="docutils literal notranslate"><span class="pre">kind</span></code> (<code class="docutils literal notranslate"><span class="pre">axis</span></code>, <code class="docutils literal notranslate"><span class="pre">labels</span></code> or <code class="docutils literal notranslate"><span class="pre">versions</span></code>), a <code class="docutils literal notranslate"><span class="pre">unit</span></code> for an axis, and optionally a <code class="docutils literal notranslate"><span class="pre">description</span></code>.</p></li>
 </ul>
 <p><a class="reference internal" href="api.html#queryearth.Registry.from_file" title="queryearth.Registry.from_file"><code class="xref py py-meth docutils literal notranslate"><span class="pre">Registry.from_file()</span></code></a> makes a Registry with those groups and dimensions and loads the rules:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">registry</span> <span class="o">=</span> <span class="n">qe</span><span class="o">.</span><span class="n">Registry</span><span class="o">.</span><span class="n">from_file</span><span class="p">(</span><span class="s2">"examples/toy/rules.geojson"</span><span class="p">)</span>
 </pre></div>
 </div>
-<p><a class="reference internal" href="api.html#queryearth.Registry.load" title="queryearth.Registry.load"><code class="xref py py-meth docutils literal notranslate"><span class="pre">Registry.load()</span></code></a> adds a file’s rules to a Registry you already have, and returns their codes. That Registry must declare every dimension the records use; a file that declares its dimensions must declare them as the Registry does, and its groups must be declared on the Registry:</p>
+<p>It takes several files too, and a file can be an http(s) URL, such as a raw link to a file in a GitHub repository or gist. The Registry then holds every file’s groups and dimensions, which must agree where two files share a name, and a code must be unique across the files. Each finding’s <code class="docutils literal notranslate"><span class="pre">source</span></code> names the file its rule came from, so rules kept in separate files, such as one file per author, stay told apart:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">registry</span> <span class="o">=</span> <span class="n">qe</span><span class="o">.</span><span class="n">Registry</span><span class="o">.</span><span class="n">from_file</span><span class="p">(</span>
+    <span class="s2">"my_rules.geojson"</span><span class="p">,</span>
+    <span class="s2">"https://raw.githubusercontent.com/me/rules/main/more_rules.geojson"</span><span class="p">,</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<p>Loading a URL needs the network when it runs, so pin the link to a commit when results must be reproducible.</p>
+<p><a class="reference internal" href="api.html#queryearth.Registry.load" title="queryearth.Registry.load"><code class="xref py py-meth docutils literal notranslate"><span class="pre">Registry.load()</span></code></a> adds a file’s rules, from a path or a URL, to a Registry you already have, and returns their codes. That Registry must declare every dimension the records use; a file that declares its dimensions must declare them as the Registry does, and its groups must be declared on the Registry:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">codes</span> <span class="o">=</span> <span class="n">registry</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s2">"mine.geojson"</span><span class="p">)</span>
 </pre></div>
 </div>
