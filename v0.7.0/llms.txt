@@ -1,0 +1,114 @@
+# queryearth
+
+> queryearth matches rules, scoped by space, time and other dimensions, to queries, and returns the rules that apply. Python 3.11 or later, numpy and shapely. Install with `pip install queryearth`. Source: https://github.com/CROCODILE-CESM/queryearth. Docs: https://crocodile-cesm.github.io/queryearth/
+
+This page is for language models and other programs that write rules, check them and query them. Its rule file and its Python run as written: the package's tests run them.
+
+## The model
+
+- A rule has a `code` (unique; it may be a path such as `REGION/ITF/ITF001`, whose category is the path before the last slash), a `title`, a `message`, a `level` (`info`, `warning` or `error`; the default is `warning`) and a scope. Rules are data: they never run code.
+- A scope gives values on dimensions. Every Registry has space and time; the others are declared on it: `qe.Axis(name, unit)` for numbers, `qe.Labels(name)` for names, or a dimension written in Python.
+- A query gives values on any of the dimensions. A rule applies when, on every dimension it constrains, the query gives a value and the two share at least one value. A dimension the rule leaves out matches anything. A dimension the rule constrains and the query leaves out does not match.
+- Categories need no declaring: `rule.category` is the code's path before the last slash. A query is about dimensions only; to keep the rules in one category, filter the findings: `[r for r in findings if r.code.startswith("REGION/")]`.
+- Within a rule, all its dimensions must hold. "Or" across dimensions, such as "the Arctic in northern winter, or the Antarctic in southern winter", is two rules.
+
+## A rule file
+
+A rule file is a GeoJSON FeatureCollection; each Feature is one rule.
+
+```json
+{
+  "type": "FeatureCollection",
+  "queryearth": "0.7",
+  "features": [
+    {
+      "type": "Feature",
+      "id": "MINE001",
+      "geometry": null,
+      "time": null,
+      "properties": {
+        "code": "MINE001",
+        "title": "Fine grid: turn off the eddy parametrization",
+        "message": "Below 10 km the model starts to resolve eddies: set THICKNESSDIFFUSE = False.",
+        "level": "info",
+        "dimensions": {"resolution": {"lt": 10, "unit": "km"}}
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "MINE002",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[-92, 27], [-87, 27], [-87, 30.5], [-92, 30.5], [-92, 27]]]
+      },
+      "time": {"interval": ["1993-01-01", ".."]},
+      "properties": {
+        "code": "MINE002",
+        "title": "glorys is too fresh off the Mississippi",
+        "message": "Near the Mississippi delta, glorys surface salinity runs low.",
+        "dimensions": {"product": ["glorys"]},
+        "references": [{"title": "Where this comes from", "url": "https://example.org/source"}]
+      }
+    }
+  ]
+}
+```
+
+- `geometry` is the rule's space: a Polygon or MultiPolygon in longitude and latitude degrees, or null for none. Edges are straight lines in longitude and latitude. A ring that crosses ±180 is split there, so write a shape across the date line as it runs, for example from 170 to -170. A ring that goes around a pole is refused: write a polar region as a box to latitude 90 or -90, such as `[[-180, 66.5], [180, 66.5], [180, 90], [-180, 90], [-180, 66.5]]`.
+- `time` is the rule's time: `{"interval": [start, end]}` with ISO 8601 dates or timestamps and `".."` for an open end, or null for none. Both ends are inclusive, and an end date covers its whole day.
+- `properties` holds `code`, `title`, `message`, `level`, and `dimensions`, the value on each other dimension by name. Any other property, such as `instruction` or `references`, is kept and written back unchanged, except `box`, `edge`, `periods`, `recurrence`, `time_start`, `time_end`, `withdrawn` and `supersedes`, which queryearth 0.6 used and this version refuses, and `category`, which is the code's path instead.
+- `queryearth` names the release that last changed the file format; a file that needs a later queryearth is refused.
+
+## Dimension values
+
+| Kind | A rule gives | A query gives |
+|---|---|---|
+| space | the Feature's geometry, or in Python `sp.box(west, south, east, north)` or `sp.polygon(geojson)` | `sp.point(lon, lat)`, `sp.box(...)` or `sp.polygon(...)` |
+| time | the Feature's `time`, or in Python `qe.interval(start, end)` | `qe.interval(start, end)` |
+| axis | one range with any of `gt`, `ge`, `lt`, `le`, and optionally its `unit`: `{"lt": 10, "unit": "km"}` | a number, or `(lo, hi)` |
+| labels | a name or a list of names, with `*` and `?` wildcards: `["glorys", "era5*"]` | a name or a list of names |
+
+Names are case-sensitive. An axis's unit, when a rule gives one, must equal the declared unit: queryearth converts nothing.
+
+## Read and query a rule file
+
+```python
+import json
+
+import queryearth as qe
+from queryearth import space as sp
+
+dimensions = [qe.Axis("resolution", "km"), qe.Labels("product")]
+registry = qe.Registry.from_file("rules.geojson", dimensions=dimensions)
+# from_file takes several files; a ValueError names the file, the feature and its code
+
+findings = registry.query(
+    space=sp.box(-98, 18, -80, 31),  # west, south, east, north
+    time=qe.interval("2020-01-01", "2020-12-31"),
+    resolution=8,
+    product="glorys",
+)
+text = json.dumps([rule.to_feature() for rule in findings])  # as GeoJSON
+```
+
+`findings` lists the rules that apply, highest level first, then by code: here MINE002, then MINE001. A query or a rule that names a dimension the Registry has not declared raises `ValueError`, and adding a code twice raises `qe.DuplicateCodeError`.
+
+## Write rules in Python
+
+```python
+mine = qe.Registry([qe.Axis("resolution", "km")])
+mine.add(
+    qe.Rule(
+        code="ARCTIC001",
+        title="Consider active sea ice",
+        message="Sea ice forms north of 66.5 degrees in winter.",
+        scope={"space": sp.box(-180, 66.5, 180, 90), "resolution": {"gt": 10}},
+        properties={"instruction": "Use CICE in the compset."},
+    )
+)
+mine.to_file("mine.geojson")
+```
+
+## Define a dimension
+
+A dimension subclasses `qe.Dimension`, sets `name`, and implements `parse_rule(value)` (check a rule's value, from Python or a rule file's JSON), `parse_query(value)` and `matches(rule, query)` (whether they share at least one value). A rule file holds each value as the rule gives it, so a value given in Python is plain JSON, apart from space and time. A value can be any JSON value the dimension parses: a number, a range, a shape, or a mapping of several fields, such as `{"depth": 4000, "slope": 8}`. A dimension sees only its own value, so inputs it needs together go in that one value. `qe.Labels` in `queryearth/dimensions.py` is a 23-line example. Declare a dimension on the Registry, `qe.Registry([MyDimension()])`, and pass it to `from_file` to read rules that use it.

@@ -1,0 +1,195 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>queryearth &mdash; queryearth 0.7.0</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=fe7df9b0"></script>
+      <script src="_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script src="_static/versions.js?v=58ec1786"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Dimensions" href="dimensions.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="#" class="icon icon-home">
+            queryearth
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="dimensions.html">Dimensions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="concepts.html">Rules and queries</a></li>
+<li class="toctree-l1"><a class="reference internal" href="rules.html">Rule files</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api.html">API reference</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="#">queryearth</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="#" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">queryearth</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/index.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="queryearth">
+<h1>queryearth<a class="headerlink" href="#queryearth" title="Link to this heading"></a></h1>
+<p>queryearth matches rules to a query. A rule says something worth knowing, such as “tidal mixing dominates here, so force tides”, and is scoped by <a class="reference internal" href="dimensions.html"><span class="std std-doc">dimensions</span></a>: where (space), when (time), and anything else that matters, such as grid resolution or forcing product. A query gives values on any of the dimensions and gets back the rules that apply. Rules live in GeoJSON <a class="reference internal" href="rules.html"><span class="std std-doc">rule files</span></a>, so any GIS tool can show where they apply.</p>
+<p>Space, time and numeric axes are the base dimensions, and labels come with them. Defining your own dimension is a few lines of Python, written on the same three-method class the built-in ones use: see <a class="reference internal" href="dimensions.html"><span class="std std-doc">Dimensions</span></a>.</p>
+<section id="install">
+<h2>Install<a class="headerlink" href="#install" title="Link to this heading"></a></h2>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span>queryearth
+</pre></div>
+</div>
+<p>queryearth needs Python 3.11 or later, numpy, and shapely 2.1 or later.</p>
+</section>
+<section id="a-first-query">
+<h2>A first query<a class="headerlink" href="#a-first-query" title="Link to this heading"></a></h2>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">queryearth</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">qe</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">queryearth</span><span class="w"> </span><span class="kn">import</span> <span class="n">space</span> <span class="k">as</span> <span class="n">sp</span>
+
+<span class="n">registry</span> <span class="o">=</span> <span class="n">qe</span><span class="o">.</span><span class="n">Registry</span><span class="p">([</span><span class="n">qe</span><span class="o">.</span><span class="n">Axis</span><span class="p">(</span><span class="s2">"resolution"</span><span class="p">,</span> <span class="s2">"km"</span><span class="p">),</span> <span class="n">qe</span><span class="o">.</span><span class="n">Labels</span><span class="p">(</span><span class="s2">"product"</span><span class="p">)])</span>
+<span class="n">registry</span><span class="o">.</span><span class="n">add</span><span class="p">(</span>
+    <span class="n">qe</span><span class="o">.</span><span class="n">Rule</span><span class="p">(</span>
+        <span class="n">code</span><span class="o">=</span><span class="s2">"GULF001"</span><span class="p">,</span>
+        <span class="n">title</span><span class="o">=</span><span class="s2">"glorys is too fresh off the Mississippi"</span><span class="p">,</span>
+        <span class="n">message</span><span class="o">=</span><span class="s2">"Near the delta, glorys surface salinity runs low."</span><span class="p">,</span>
+        <span class="n">scope</span><span class="o">=</span><span class="p">{</span><span class="s2">"space"</span><span class="p">:</span> <span class="n">sp</span><span class="o">.</span><span class="n">box</span><span class="p">(</span><span class="o">-</span><span class="mi">92</span><span class="p">,</span> <span class="mi">27</span><span class="p">,</span> <span class="o">-</span><span class="mi">87</span><span class="p">,</span> <span class="mf">30.5</span><span class="p">),</span> <span class="s2">"product"</span><span class="p">:</span> <span class="s2">"glorys"</span><span class="p">},</span>
+    <span class="p">)</span>
+<span class="p">)</span>
+<span class="n">registry</span><span class="o">.</span><span class="n">add</span><span class="p">(</span>
+    <span class="n">qe</span><span class="o">.</span><span class="n">Rule</span><span class="p">(</span>
+        <span class="n">code</span><span class="o">=</span><span class="s2">"GRID001"</span><span class="p">,</span>
+        <span class="n">title</span><span class="o">=</span><span class="s2">"Turn off GM at high resolution"</span><span class="p">,</span>
+        <span class="n">message</span><span class="o">=</span><span class="s2">"Below 8 km eddies are partly resolved: set THICKNESSDIFFUSE = False."</span><span class="p">,</span>
+        <span class="n">level</span><span class="o">=</span><span class="s2">"info"</span><span class="p">,</span>
+        <span class="n">scope</span><span class="o">=</span><span class="p">{</span><span class="s2">"resolution"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"lt"</span><span class="p">:</span> <span class="mi">8</span><span class="p">}},</span>
+    <span class="p">)</span>
+<span class="p">)</span>
+
+<span class="n">findings</span> <span class="o">=</span> <span class="n">registry</span><span class="o">.</span><span class="n">query</span><span class="p">(</span>
+    <span class="n">space</span><span class="o">=</span><span class="n">sp</span><span class="o">.</span><span class="n">box</span><span class="p">(</span><span class="o">-</span><span class="mi">98</span><span class="p">,</span> <span class="mi">18</span><span class="p">,</span> <span class="o">-</span><span class="mi">80</span><span class="p">,</span> <span class="mi">31</span><span class="p">),</span>  <span class="c1"># west, south, east, north</span>
+    <span class="n">time</span><span class="o">=</span><span class="n">qe</span><span class="o">.</span><span class="n">interval</span><span class="p">(</span><span class="s2">"2020-01-01"</span><span class="p">,</span> <span class="s2">"2020-12-31"</span><span class="p">),</span>
+    <span class="n">resolution</span><span class="o">=</span><span class="p">(</span><span class="mi">5</span><span class="p">,</span> <span class="mi">9</span><span class="p">),</span>  <span class="c1"># the grid's smallest and largest cells, in km</span>
+    <span class="n">product</span><span class="o">=</span><span class="s2">"glorys"</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="nb">print</span><span class="p">([</span><span class="n">rule</span><span class="o">.</span><span class="n">code</span> <span class="k">for</span> <span class="n">rule</span> <span class="ow">in</span> <span class="n">findings</span><span class="p">])</span>  <span class="c1"># ['GULF001', 'GRID001'], warnings first</span>
+</pre></div>
+</div>
+<p>GULF001 applies because the query’s box overlaps the rule’s and the product is glorys; GRID001 because a grid from 5 to 9 km has cells below 8 km. Neither rule constrains time, so any time matches. See <a class="reference internal" href="concepts.html"><span class="std std-doc">Rules and queries</span></a> for the matching rule.</p>
+<p>Language models and other programs: <a href="llms.txt">llms.txt</a> describes rule files and the API on one page.</p>
+<div class="toctree-wrapper compound">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="dimensions.html">Dimensions</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="dimensions.html#what-comes-with-queryearth">What comes with queryearth</a></li>
+<li class="toctree-l2"><a class="reference internal" href="dimensions.html#the-contract">The contract</a></li>
+<li class="toctree-l2"><a class="reference internal" href="dimensions.html#a-worked-example-labels">A worked example: Labels</a></li>
+<li class="toctree-l2"><a class="reference internal" href="dimensions.html#writing-your-own">Writing your own</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="concepts.html">Rules and queries</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="concepts.html#rules">Rules</a></li>
+<li class="toctree-l2"><a class="reference internal" href="concepts.html#categories">Categories</a></li>
+<li class="toctree-l2"><a class="reference internal" href="concepts.html#queries">Queries</a></li>
+<li class="toctree-l2"><a class="reference internal" href="concepts.html#findings">Findings</a></li>
+<li class="toctree-l2"><a class="reference internal" href="concepts.html#space">Space</a></li>
+<li class="toctree-l2"><a class="reference internal" href="concepts.html#time">Time</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="rules.html">Rule files</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="rules.html#reading-and-writing">Reading and writing</a></li>
+<li class="toctree-l2"><a class="reference internal" href="rules.html#properties-from-queryearth-0-6">Properties from queryearth 0.6</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="api.html">API reference</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="api.html#queryearth.Axis"><code class="docutils literal notranslate"><span class="pre">Axis</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#queryearth.Dimension"><code class="docutils literal notranslate"><span class="pre">Dimension</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#queryearth.DuplicateCodeError"><code class="docutils literal notranslate"><span class="pre">DuplicateCodeError</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#queryearth.Interval"><code class="docutils literal notranslate"><span class="pre">Interval</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#queryearth.Labels"><code class="docutils literal notranslate"><span class="pre">Labels</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#queryearth.Registry"><code class="docutils literal notranslate"><span class="pre">Registry</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#queryearth.Rule"><code class="docutils literal notranslate"><span class="pre">Rule</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#queryearth.Space"><code class="docutils literal notranslate"><span class="pre">Space</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#queryearth.SpaceDimension"><code class="docutils literal notranslate"><span class="pre">SpaceDimension</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#queryearth.TimeDimension"><code class="docutils literal notranslate"><span class="pre">TimeDimension</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#queryearth.interval"><code class="docutils literal notranslate"><span class="pre">interval()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#module-queryearth.space">queryearth.space</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="dimensions.html" class="btn btn-neutral float-right" title="Dimensions" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2026, Manish Venumuddula.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

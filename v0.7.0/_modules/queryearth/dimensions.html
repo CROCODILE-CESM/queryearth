@@ -1,0 +1,377 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>queryearth.dimensions &mdash; queryearth 0.7.0</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=fe7df9b0"></script>
+      <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script src="../../_static/versions.js?v=58ec1786"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            queryearth
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../dimensions.html">Dimensions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../concepts.html">Rules and queries</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../rules.html">Rule files</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api.html">API reference</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">queryearth</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">queryearth.dimensions</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for queryearth.dimensions</h1><div class="highlight"><pre>
+<span></span><span class="sd">"""Dimensions: what a rule's scope and a query give values on, and how they match.</span>
+
+<span class="sd">Every dimension subclasses Dimension and implements its three methods: the base</span>
+<span class="sd">dimensions space, time and Axis, the Labels extension that comes with them, and</span>
+<span class="sd">any dimension you write. Space and time are on every Registry; the others are</span>
+<span class="sd">declared on it. applies() is the matching rule, in one place.</span>
+<span class="sd">"""</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">abc</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">math</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numbers</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">collections.abc</span><span class="w"> </span><span class="kn">import</span> <span class="n">Mapping</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">dataclasses</span><span class="w"> </span><span class="kn">import</span> <span class="n">dataclass</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">fnmatch</span><span class="w"> </span><span class="kn">import</span> <span class="n">fnmatchcase</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">queryearth</span><span class="w"> </span><span class="kn">import</span> <span class="n">space</span> <span class="k">as</span> <span class="n">sp</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">queryearth.time</span><span class="w"> </span><span class="kn">import</span> <span class="n">Interval</span><span class="p">,</span> <span class="n">interval</span>
+
+<span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span><span class="s2">"Axis"</span><span class="p">,</span> <span class="s2">"Dimension"</span><span class="p">,</span> <span class="s2">"Labels"</span><span class="p">,</span> <span class="s2">"SpaceDimension"</span><span class="p">,</span> <span class="s2">"TimeDimension"</span><span class="p">,</span> <span class="s2">"applies"</span><span class="p">]</span>
+
+
+<div class="viewcode-block" id="Dimension">
+<a class="viewcode-back" href="../../api.html#queryearth.Dimension">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">Dimension</span><span class="p">(</span><span class="n">abc</span><span class="o">.</span><span class="n">ABC</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""One kind of scope, such as space, time or grid resolution.</span>
+
+<span class="sd">    A subclass sets name, the key that scopes, queries and rule files use for</span>
+<span class="sd">    it, and implements the three methods below; Python refuses to create one</span>
+<span class="sd">    that leaves any out. The Registry calls them and does the rest: it refuses</span>
+<span class="sd">    undeclared names, and applies() decides whether a rule applies. A value</span>
+<span class="sd">    can be anything the dimension parses, such as a number, a range, a shape</span>
+<span class="sd">    or a mapping of several fields; a dimension sees only its own value. A</span>
+<span class="sd">    rule file holds each value as the rule gives it, so a value given in</span>
+<span class="sd">    Python is plain JSON, apart from space and time.</span>
+<span class="sd">    """</span>
+
+    <span class="n">name</span><span class="p">:</span> <span class="nb">str</span>
+
+<div class="viewcode-block" id="Dimension.parse_rule">
+<a class="viewcode-back" href="../../api.html#queryearth.Dimension.parse_rule">[docs]</a>
+    <span class="nd">@abc</span><span class="o">.</span><span class="n">abstractmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">parse_rule</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""A rule's value, given in Python or read from a rule file's JSON, in</span>
+<span class="sd">        the form matches() takes; ValueError if it is not valid."""</span></div>
+
+
+<div class="viewcode-block" id="Dimension.parse_query">
+<a class="viewcode-back" href="../../api.html#queryearth.Dimension.parse_query">[docs]</a>
+    <span class="nd">@abc</span><span class="o">.</span><span class="n">abstractmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">parse_query</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""A query's value, in the form matches() takes; ValueError if it is</span>
+<span class="sd">        not valid."""</span></div>
+
+
+<div class="viewcode-block" id="Dimension.matches">
+<a class="viewcode-back" href="../../api.html#queryearth.Dimension.matches">[docs]</a>
+    <span class="nd">@abc</span><span class="o">.</span><span class="n">abstractmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">matches</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">rule</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">query</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Whether a parsed rule value and a parsed query value share at least</span>
+<span class="sd">        one value, such as a point, an instant or a number."""</span></div>
+</div>
+
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">applies</span><span class="p">(</span>
+    <span class="n">dimensions</span><span class="p">:</span> <span class="n">Mapping</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Dimension</span><span class="p">],</span>
+    <span class="n">scope</span><span class="p">:</span> <span class="n">Mapping</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span>
+    <span class="n">query</span><span class="p">:</span> <span class="n">Mapping</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Whether a rule applies to a query.</span>
+
+<span class="sd">    scope and query map dimension names to values parsed by those dimensions.</span>
+<span class="sd">    A rule applies when, on every dimension its scope constrains, the query</span>
+<span class="sd">    gives a value and the dimension's matches() says the two share at least</span>
+<span class="sd">    one value. A dimension the rule leaves out matches anything. A dimension</span>
+<span class="sd">    the rule constrains and the query leaves out does not match, since the</span>
+<span class="sd">    query gives no value to share.</span>
+<span class="sd">    """</span>
+    <span class="k">return</span> <span class="nb">all</span><span class="p">(</span>
+        <span class="n">name</span> <span class="ow">in</span> <span class="n">query</span> <span class="ow">and</span> <span class="n">dimensions</span><span class="p">[</span><span class="n">name</span><span class="p">]</span><span class="o">.</span><span class="n">matches</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">query</span><span class="p">[</span><span class="n">name</span><span class="p">])</span>
+        <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">scope</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
+    <span class="p">)</span>
+
+
+<div class="viewcode-block" id="SpaceDimension">
+<a class="viewcode-back" href="../../api.html#queryearth.SpaceDimension">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">SpaceDimension</span><span class="p">(</span><span class="n">Dimension</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Space: a rule gives a polygon, a query a point or a polygon.</span>
+
+<span class="sd">    In a rule file, a rule's space is the Feature's GeoJSON geometry.</span>
+<span class="sd">    """</span>
+
+    <span class="n">name</span> <span class="o">=</span> <span class="s2">"space"</span>
+
+<div class="viewcode-block" id="SpaceDimension.parse_rule">
+<a class="viewcode-back" href="../../api.html#queryearth.SpaceDimension.parse_rule">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">parse_rule</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">sp</span><span class="o">.</span><span class="n">Space</span><span class="p">:</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">sp</span><span class="o">.</span><span class="n">Space</span><span class="p">)</span> <span class="ow">and</span> <span class="n">value</span><span class="o">.</span><span class="n">kind</span> <span class="o">!=</span> <span class="s2">"polygon"</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"a rule's space is a polygon, not a point"</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">value</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">sp</span><span class="o">.</span><span class="n">Space</span><span class="p">)</span> <span class="k">else</span> <span class="n">sp</span><span class="o">.</span><span class="n">polygon</span><span class="p">(</span><span class="n">value</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="SpaceDimension.parse_query">
+<a class="viewcode-back" href="../../api.html#queryearth.SpaceDimension.parse_query">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">parse_query</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">sp</span><span class="o">.</span><span class="n">Space</span><span class="p">:</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">sp</span><span class="o">.</span><span class="n">Space</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">"a query's space is a point or polygon from queryearth.space, "</span>
+                <span class="sa">f</span><span class="s2">"such as sp.box(-60, 30, -50, 40), not </span><span class="si">{</span><span class="n">value</span><span class="si">!r}</span><span class="s2">"</span>
+            <span class="p">)</span>
+        <span class="k">return</span> <span class="n">value</span></div>
+
+
+<div class="viewcode-block" id="SpaceDimension.matches">
+<a class="viewcode-back" href="../../api.html#queryearth.SpaceDimension.matches">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">matches</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">rule</span><span class="p">:</span> <span class="n">sp</span><span class="o">.</span><span class="n">Space</span><span class="p">,</span> <span class="n">query</span><span class="p">:</span> <span class="n">sp</span><span class="o">.</span><span class="n">Space</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">sp</span><span class="o">.</span><span class="n">meets</span><span class="p">(</span><span class="n">rule</span><span class="p">,</span> <span class="n">query</span><span class="p">)</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="TimeDimension">
+<a class="viewcode-back" href="../../api.html#queryearth.TimeDimension">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">TimeDimension</span><span class="p">(</span><span class="n">Dimension</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Time: a rule and a query each give an interval, made by interval().</span>
+
+<span class="sd">    In a rule file, a rule's time is the Feature's JSON-FG time member,</span>
+<span class="sd">    {"interval": [start, end]}, with ".." for an open end.</span>
+<span class="sd">    """</span>
+
+    <span class="n">name</span> <span class="o">=</span> <span class="s2">"time"</span>
+
+<div class="viewcode-block" id="TimeDimension.parse_rule">
+<a class="viewcode-back" href="../../api.html#queryearth.TimeDimension.parse_rule">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">parse_rule</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Interval</span><span class="p">:</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">Interval</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">value</span>
+        <span class="n">pair</span> <span class="o">=</span> <span class="n">value</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"interval"</span><span class="p">)</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">Mapping</span><span class="p">)</span> <span class="k">else</span> <span class="kc">None</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">pair</span><span class="p">,</span> <span class="nb">list</span><span class="p">)</span> <span class="ow">or</span> <span class="nb">len</span><span class="p">(</span><span class="n">pair</span><span class="p">)</span> <span class="o">!=</span> <span class="mi">2</span> <span class="ow">or</span> <span class="nb">len</span><span class="p">(</span><span class="n">value</span><span class="p">)</span> <span class="o">!=</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s1">'a time is qe.interval(start, end), or </span><span class="se">{{</span><span class="s1">"interval": [start, end]</span><span class="se">}}</span><span class="s1"> '</span>
+                <span class="sa">f</span><span class="s2">"in a rule file, not </span><span class="si">{</span><span class="n">value</span><span class="si">!r}</span><span class="s2">"</span>
+            <span class="p">)</span>
+        <span class="k">return</span> <span class="n">interval</span><span class="p">(</span><span class="o">*</span><span class="n">pair</span><span class="p">)</span></div>
+
+
+    <span class="n">parse_query</span> <span class="o">=</span> <span class="n">parse_rule</span>
+
+<div class="viewcode-block" id="TimeDimension.matches">
+<a class="viewcode-back" href="../../api.html#queryearth.TimeDimension.matches">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">matches</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">rule</span><span class="p">:</span> <span class="n">Interval</span><span class="p">,</span> <span class="n">query</span><span class="p">:</span> <span class="n">Interval</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">rule</span><span class="o">.</span><span class="n">meets</span><span class="p">(</span><span class="n">query</span><span class="p">)</span></div>
+</div>
+
+
+
+<span class="n">_BOUNDS</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"gt"</span><span class="p">,</span> <span class="s2">"ge"</span><span class="p">,</span> <span class="s2">"lt"</span><span class="p">,</span> <span class="s2">"le"</span><span class="p">}</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_number</span><span class="p">(</span><span class="n">value</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">what</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span> <span class="o">|</span> <span class="nb">float</span><span class="p">:</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">bool</span><span class="p">)</span> <span class="ow">or</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">numbers</span><span class="o">.</span><span class="n">Real</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">what</span><span class="si">}</span><span class="s2"> must be a number, not </span><span class="si">{</span><span class="n">value</span><span class="si">!r}</span><span class="s2">"</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">math</span><span class="o">.</span><span class="n">isnan</span><span class="p">(</span><span class="n">value</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">what</span><span class="si">}</span><span class="s2"> is not a number"</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">value</span> <span class="k">if</span> <span class="nb">type</span><span class="p">(</span><span class="n">value</span><span class="p">)</span> <span class="ow">is</span> <span class="nb">int</span> <span class="k">else</span> <span class="nb">float</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="Axis">
+<a class="viewcode-back" href="../../api.html#queryearth.Axis">[docs]</a>
+<span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">Axis</span><span class="p">(</span><span class="n">Dimension</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""A named numeric dimension in one unit, such as grid resolution in km.</span>
+
+<span class="sd">    A rule gives a range with any of gt, ge, lt and le, and optionally the</span>
+<span class="sd">    unit, such as {"lt": 8} or {"gt": 2, "le": 10, "unit": "km"}; a query gives</span>
+<span class="sd">    a number or a closed range (lo, hi). They match when they share a number.</span>
+<span class="sd">    queryearth converts no units, so a rule that gives another unit is refused.</span>
+<span class="sd">    """</span>
+
+    <span class="n">name</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">unit</span><span class="p">:</span> <span class="nb">str</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">__post_init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">unit</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">or</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">unit</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"axis </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="si">!r}</span><span class="s2"> needs a unit, such as 'km'"</span><span class="p">)</span>
+
+<div class="viewcode-block" id="Axis.parse_rule">
+<a class="viewcode-back" href="../../api.html#queryearth.Axis.parse_rule">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">parse_rule</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="nb">bool</span><span class="p">,</span> <span class="nb">float</span><span class="p">,</span> <span class="nb">bool</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">"""The range as (lo, lo_closed, hi, hi_closed); a missing end is infinite."""</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">Mapping</span><span class="p">)</span> <span class="ow">or</span> <span class="nb">set</span><span class="p">(</span><span class="n">value</span><span class="p">)</span> <span class="o">-</span> <span class="p">{</span><span class="o">*</span><span class="n">_BOUNDS</span><span class="p">,</span> <span class="s2">"unit"</span><span class="p">}:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">"axis </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="si">!r}</span><span class="s2"> takes a range of gt, ge, lt, le and unit, "</span>
+                <span class="sa">f</span><span class="s2">"such as </span><span class="se">{{</span><span class="s2">'lt': 8</span><span class="se">}}</span><span class="s2">, not </span><span class="si">{</span><span class="n">value</span><span class="si">!r}</span><span class="s2">"</span>
+            <span class="p">)</span>
+        <span class="k">if</span> <span class="p">{</span><span class="s2">"gt"</span><span class="p">,</span> <span class="s2">"ge"</span><span class="p">}</span> <span class="o">&lt;=</span> <span class="nb">set</span><span class="p">(</span><span class="n">value</span><span class="p">)</span> <span class="ow">or</span> <span class="p">{</span><span class="s2">"lt"</span><span class="p">,</span> <span class="s2">"le"</span><span class="p">}</span> <span class="o">&lt;=</span> <span class="nb">set</span><span class="p">(</span><span class="n">value</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"give at most one of gt and ge, and one of lt and le"</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">set</span><span class="p">(</span><span class="n">value</span><span class="p">)</span> <span class="o">&amp;</span> <span class="n">_BOUNDS</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"a range needs at least one of gt, ge, lt and le"</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">value</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"unit"</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">unit</span><span class="p">)</span> <span class="o">!=</span> <span class="bp">self</span><span class="o">.</span><span class="n">unit</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">"unit </span><span class="si">{</span><span class="n">value</span><span class="p">[</span><span class="s1">'unit'</span><span class="p">]</span><span class="si">!r}</span><span class="s2"> is not the unit </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">unit</span><span class="si">!r}</span><span class="s2"> of axis "</span>
+                <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="si">!r}</span><span class="s2">; queryearth converts no units"</span>
+            <span class="p">)</span>
+        <span class="n">lo</span> <span class="o">=</span> <span class="nb">next</span><span class="p">((</span><span class="n">_number</span><span class="p">(</span><span class="n">value</span><span class="p">[</span><span class="n">k</span><span class="p">],</span> <span class="n">k</span><span class="p">)</span> <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"gt"</span><span class="p">,</span> <span class="s2">"ge"</span><span class="p">)</span> <span class="k">if</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">value</span><span class="p">),</span> <span class="o">-</span><span class="n">math</span><span class="o">.</span><span class="n">inf</span><span class="p">)</span>
+        <span class="n">hi</span> <span class="o">=</span> <span class="nb">next</span><span class="p">((</span><span class="n">_number</span><span class="p">(</span><span class="n">value</span><span class="p">[</span><span class="n">k</span><span class="p">],</span> <span class="n">k</span><span class="p">)</span> <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"lt"</span><span class="p">,</span> <span class="s2">"le"</span><span class="p">)</span> <span class="k">if</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">value</span><span class="p">),</span> <span class="n">math</span><span class="o">.</span><span class="n">inf</span><span class="p">)</span>
+        <span class="n">lo_closed</span><span class="p">,</span> <span class="n">hi_closed</span> <span class="o">=</span> <span class="s2">"ge"</span> <span class="ow">in</span> <span class="n">value</span><span class="p">,</span> <span class="s2">"le"</span> <span class="ow">in</span> <span class="n">value</span>
+        <span class="k">if</span> <span class="n">lo</span> <span class="o">&gt;</span> <span class="n">hi</span> <span class="ow">or</span> <span class="p">(</span><span class="n">lo</span> <span class="o">==</span> <span class="n">hi</span> <span class="ow">and</span> <span class="ow">not</span> <span class="p">(</span><span class="n">lo_closed</span> <span class="ow">and</span> <span class="n">hi_closed</span><span class="p">)):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"the range </span><span class="si">{</span><span class="nb">dict</span><span class="p">(</span><span class="n">value</span><span class="p">)</span><span class="si">}</span><span class="s2"> holds no number"</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">lo</span><span class="p">,</span> <span class="n">lo_closed</span><span class="p">,</span> <span class="n">hi</span><span class="p">,</span> <span class="n">hi_closed</span></div>
+
+
+<div class="viewcode-block" id="Axis.parse_query">
+<a class="viewcode-back" href="../../api.html#queryearth.Axis.parse_query">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">parse_query</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">]:</span>
+        <span class="n">pair</span> <span class="o">=</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="p">(</span><span class="nb">list</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">))</span> <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="n">value</span><span class="p">)</span> <span class="o">==</span> <span class="mi">2</span>
+        <span class="n">lo</span><span class="p">,</span> <span class="n">hi</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="n">_number</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="sa">f</span><span class="s2">"axis </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="si">!r}</span><span class="s2">"</span><span class="p">)</span> <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="p">(</span><span class="n">value</span> <span class="k">if</span> <span class="n">pair</span> <span class="k">else</span> <span class="p">[</span><span class="n">value</span><span class="p">]</span> <span class="o">*</span> <span class="mi">2</span><span class="p">)</span>
+        <span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span><span class="n">math</span><span class="o">.</span><span class="n">isfinite</span><span class="p">(</span><span class="n">lo</span><span class="p">)</span> <span class="ow">and</span> <span class="n">math</span><span class="o">.</span><span class="n">isfinite</span><span class="p">(</span><span class="n">hi</span><span class="p">))</span> <span class="ow">or</span> <span class="n">lo</span> <span class="o">&gt;</span> <span class="n">hi</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"axis </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="si">!r}</span><span class="s2"> takes a number or a range lo &lt;= hi"</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">lo</span><span class="p">,</span> <span class="n">hi</span></div>
+
+
+<div class="viewcode-block" id="Axis.matches">
+<a class="viewcode-back" href="../../api.html#queryearth.Axis.matches">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">matches</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">rule</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="nb">bool</span><span class="p">,</span> <span class="nb">float</span><span class="p">,</span> <span class="nb">bool</span><span class="p">],</span> <span class="n">query</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">]</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+        <span class="n">lo</span><span class="p">,</span> <span class="n">lo_closed</span><span class="p">,</span> <span class="n">hi</span><span class="p">,</span> <span class="n">hi_closed</span> <span class="o">=</span> <span class="n">rule</span>
+        <span class="n">a</span><span class="p">,</span> <span class="n">b</span> <span class="o">=</span> <span class="n">query</span>
+        <span class="k">return</span> <span class="p">(</span><span class="n">lo</span> <span class="o">&lt;</span> <span class="n">b</span> <span class="ow">or</span> <span class="p">(</span><span class="n">lo</span> <span class="o">==</span> <span class="n">b</span> <span class="ow">and</span> <span class="n">lo_closed</span><span class="p">))</span> <span class="ow">and</span> <span class="p">(</span>
+            <span class="n">a</span> <span class="o">&lt;</span> <span class="n">hi</span> <span class="ow">or</span> <span class="p">(</span><span class="n">a</span> <span class="o">==</span> <span class="n">hi</span> <span class="ow">and</span> <span class="n">hi_closed</span><span class="p">)</span>
+        <span class="p">)</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="Labels">
+<a class="viewcode-back" href="../../api.html#queryearth.Labels">[docs]</a>
+<span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">Labels</span><span class="p">(</span><span class="n">Dimension</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Names, such as a forcing product or a model option.</span>
+
+<span class="sd">    A rule gives a name or a list of names, which may use the wildcards * and</span>
+<span class="sd">    ? (case-sensitive), such as ["jra", "era5*"]; a query gives a name or a</span>
+<span class="sd">    list of names. They match when a query name matches one of the rule's.</span>
+<span class="sd">    """</span>
+
+    <span class="n">name</span><span class="p">:</span> <span class="nb">str</span>
+
+<div class="viewcode-block" id="Labels.parse_rule">
+<a class="viewcode-back" href="../../api.html#queryearth.Labels.parse_rule">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">parse_rule</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="o">...</span><span class="p">]:</span>
+        <span class="n">names</span> <span class="o">=</span> <span class="p">[</span><span class="n">value</span><span class="p">]</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="k">else</span> <span class="n">value</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">names</span><span class="p">,</span> <span class="p">(</span><span class="nb">list</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">))</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">names</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"labels </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="si">!r}</span><span class="s2"> takes a name or a list of names"</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">all</span><span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">n</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">and</span> <span class="n">n</span> <span class="k">for</span> <span class="n">n</span> <span class="ow">in</span> <span class="n">names</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"labels </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="si">!r}</span><span class="s2"> takes names, not </span><span class="si">{</span><span class="n">value</span><span class="si">!r}</span><span class="s2">"</span><span class="p">)</span>
+        <span class="k">return</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">names</span><span class="p">)</span></div>
+
+
+    <span class="n">parse_query</span> <span class="o">=</span> <span class="n">parse_rule</span>
+
+<div class="viewcode-block" id="Labels.matches">
+<a class="viewcode-back" href="../../api.html#queryearth.Labels.matches">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">matches</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">rule</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span> <span class="n">query</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="o">...</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+        <span class="k">return</span> <span class="nb">any</span><span class="p">(</span><span class="n">fnmatchcase</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">pattern</span><span class="p">)</span> <span class="k">for</span> <span class="n">pattern</span> <span class="ow">in</span> <span class="n">rule</span> <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">query</span><span class="p">)</span></div>
+</div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2026, Manish Venumuddula.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

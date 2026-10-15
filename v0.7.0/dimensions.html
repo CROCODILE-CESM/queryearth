@@ -1,0 +1,265 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dimensions &mdash; queryearth 0.7.0</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=fe7df9b0"></script>
+      <script src="_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script src="_static/versions.js?v=58ec1786"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Rules and queries" href="concepts.html" />
+    <link rel="prev" title="queryearth" href="index.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            queryearth
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Dimensions</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#what-comes-with-queryearth">What comes with queryearth</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#the-contract">The contract</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#a-worked-example-labels">A worked example: Labels</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#writing-your-own">Writing your own</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="concepts.html">Rules and queries</a></li>
+<li class="toctree-l1"><a class="reference internal" href="rules.html">Rule files</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api.html">API reference</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">queryearth</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Dimensions</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/dimensions.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="dimensions">
+<h1>Dimensions<a class="headerlink" href="#dimensions" title="Link to this heading"></a></h1>
+<p>Everything a rule can be scoped by is a <strong>dimension</strong>: space, time, grid resolution, forcing product, and any you define. Each dimension has a name, which is its key in rules, queries and rule files, and decides for itself what its values look like and when two of them match.</p>
+<section id="what-comes-with-queryearth">
+<h2>What comes with queryearth<a class="headerlink" href="#what-comes-with-queryearth" title="Link to this heading"></a></h2>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Dimension</p></th>
+<th class="head"><p>A rule gives</p></th>
+<th class="head"><p>A query gives</p></th>
+<th class="head"><p>In a rule file</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>space</p></td>
+<td><p>a polygon: <code class="docutils literal notranslate"><span class="pre">sp.box(west,</span> <span class="pre">south,</span> <span class="pre">east,</span> <span class="pre">north)</span></code> or <code class="docutils literal notranslate"><span class="pre">sp.polygon(geojson)</span></code></p></td>
+<td><p>a point or a polygon</p></td>
+<td><p>the Feature’s <code class="docutils literal notranslate"><span class="pre">geometry</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p>time</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">qe.interval(start,</span> <span class="pre">end)</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">qe.interval(start,</span> <span class="pre">end)</span></code></p></td>
+<td><p>the Feature’s <code class="docutils literal notranslate"><span class="pre">time</span></code>: <code class="docutils literal notranslate"><span class="pre">{&quot;interval&quot;:</span> <span class="pre">[start,</span> <span class="pre">end]}</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">qe.Axis(name,</span> <span class="pre">unit)</span></code></p></td>
+<td><p>a range with any of <code class="docutils literal notranslate"><span class="pre">gt</span></code>, <code class="docutils literal notranslate"><span class="pre">ge</span></code>, <code class="docutils literal notranslate"><span class="pre">lt</span></code>, <code class="docutils literal notranslate"><span class="pre">le</span></code>: <code class="docutils literal notranslate"><span class="pre">{&quot;lt&quot;:</span> <span class="pre">8}</span></code></p></td>
+<td><p>a number, or a range <code class="docutils literal notranslate"><span class="pre">(lo,</span> <span class="pre">hi)</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">&quot;dimensions&quot;:</span> <span class="pre">{name:</span> <span class="pre">{&quot;lt&quot;:</span> <span class="pre">8,</span> <span class="pre">&quot;unit&quot;:</span> <span class="pre">&quot;km&quot;}}</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">qe.Labels(name)</span></code></p></td>
+<td><p>a name or names, with <code class="docutils literal notranslate"><span class="pre">*</span></code> and <code class="docutils literal notranslate"><span class="pre">?</span></code> wildcards: <code class="docutils literal notranslate"><span class="pre">[&quot;jra&quot;,</span> <span class="pre">&quot;era5*&quot;]</span></code></p></td>
+<td><p>a name or names</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">&quot;dimensions&quot;:</span> <span class="pre">{name:</span> <span class="pre">[&quot;jra&quot;,</span> <span class="pre">&quot;era5*&quot;]}</span></code></p></td>
+</tr>
+</tbody>
+</table>
+<p>Space, time and axes are the base dimensions, and labels the extension that comes with them. Every Registry has space and time; declare the others when you make it:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">registry</span> <span class="o">=</span> <span class="n">qe</span><span class="o">.</span><span class="n">Registry</span><span class="p">([</span><span class="n">qe</span><span class="o">.</span><span class="n">Axis</span><span class="p">(</span><span class="s2">"resolution"</span><span class="p">,</span> <span class="s2">"km"</span><span class="p">),</span> <span class="n">qe</span><span class="o">.</span><span class="n">Labels</span><span class="p">(</span><span class="s2">"product"</span><span class="p">)])</span>
+</pre></div>
+</div>
+<p><a class="reference internal" href="concepts.html#space"><span class="std std-ref">Rules and queries</span></a> has the details of space and time.</p>
+<p><strong>Rules are data; code lives in dimensions.</strong></p>
+<ul class="simple">
+<li><p>A new kind of value, or a new way to compare values, is a new dimension.</p></li>
+<li><p>A value derived from your case is computed when you build the query, and given to an <code class="docutils literal notranslate"><span class="pre">Axis</span></code> or your own dimension: CrocoDash computes <code class="docutils literal notranslate"><span class="pre">cell_size_ratio</span> <span class="pre">=</span> <span class="pre">largest</span> <span class="pre">/</span> <span class="pre">smallest</span></code> from its grid’s cells and queries an Axis with it.</p></li>
+<li><p>Advice is a rule: plain data in a rule file, which never runs code.</p></li>
+</ul>
+</section>
+<section id="the-contract">
+<h2>The contract<a class="headerlink" href="#the-contract" title="Link to this heading"></a></h2>
+<p>A dimension subclasses <a class="reference internal" href="api.html#queryearth.Dimension" title="queryearth.Dimension"><code class="xref py py-class docutils literal notranslate"><span class="pre">Dimension</span></code></a>, sets <code class="docutils literal notranslate"><span class="pre">name</span></code>, and implements three methods. Python refuses to create one that leaves any out.</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Method</p></th>
+<th class="head"><p>Does</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">parse_rule(value)</span></code></p></td>
+<td><p>checks a rule’s value, given in Python or read from a rule file’s JSON, and returns it in the form <code class="docutils literal notranslate"><span class="pre">matches</span></code> takes; raises <code class="docutils literal notranslate"><span class="pre">ValueError</span></code> for a bad one</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">parse_query(value)</span></code></p></td>
+<td><p>the same for a query’s value</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">matches(rule,</span> <span class="pre">query)</span></code></p></td>
+<td><p>says whether the two share at least one value, such as a point, an instant, a number or a name</p></td>
+</tr>
+</tbody>
+</table>
+<p>That is all a dimension does. The Registry does the rest, the same way for every dimension, built in or yours:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">Registry.add</span></code> calls <code class="docutils literal notranslate"><span class="pre">parse_rule</span></code> on each value in a rule’s scope, and refuses a name the Registry has not declared.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">Registry.query</span></code> calls <code class="docutils literal notranslate"><span class="pre">parse_query</span></code> on each value in the query, and refuses an undeclared name, so a misspelt one never looks like “no rule applies”.</p></li>
+<li><p>A rule applies when, on <strong>every</strong> dimension it constrains, the query gives a value and <code class="docutils literal notranslate"><span class="pre">matches</span></code> is true: the two share at least one value. A dimension the rule leaves out matches anything. A dimension the rule constrains and the query leaves out does not match, since the query gives no value to share.</p></li>
+<li><p>A rule keeps each value as it was given, and a rule file holds it that way, under the rule’s <code class="docutils literal notranslate"><span class="pre">&quot;dimensions&quot;</span></code> property; <code class="docutils literal notranslate"><span class="pre">Registry.from_file</span></code> parses it with <code class="docutils literal notranslate"><span class="pre">parse_rule</span></code> when it adds the rule. So writing a rule needs no dimension, and a value given in Python is plain JSON, apart from space and time, whose <code class="docutils literal notranslate"><span class="pre">Space</span></code> and <code class="docutils literal notranslate"><span class="pre">Interval</span></code> objects write themselves.</p></li>
+</ul>
+<p>Space and time are written on the same class, in <code class="docutils literal notranslate"><span class="pre">queryearth/dimensions.py</span></code>, and differ in one place only: in a rule file their values go in the Feature’s <code class="docutils literal notranslate"><span class="pre">geometry</span></code> and <code class="docutils literal notranslate"><span class="pre">time</span></code> members, where GeoJSON and JSON-FG put them, so that other tools can read them.</p>
+</section>
+<section id="a-worked-example-labels">
+<h2>A worked example: Labels<a class="headerlink" href="#a-worked-example-labels" title="Link to this heading"></a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">Labels</span></code> matches names, such as a forcing product or a compset’s ice component, with wildcards. This is its whole source:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">Labels</span><span class="p">(</span><span class="n">Dimension</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Names, such as a forcing product or a model option.</span>
+
+<span class="sd">    A rule gives a name or a list of names, which may use the wildcards * and</span>
+<span class="sd">    ? (case-sensitive), such as ["jra", "era5*"]; a query gives a name or a</span>
+<span class="sd">    list of names. They match when a query name matches one of the rule's.</span>
+<span class="sd">    """</span>
+
+    <span class="n">name</span><span class="p">:</span> <span class="nb">str</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">parse_rule</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="o">...</span><span class="p">]:</span>
+        <span class="n">names</span> <span class="o">=</span> <span class="p">[</span><span class="n">value</span><span class="p">]</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="k">else</span> <span class="n">value</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">names</span><span class="p">,</span> <span class="p">(</span><span class="nb">list</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">))</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">names</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"labels </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="si">!r}</span><span class="s2"> takes a name or a list of names"</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">all</span><span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">n</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">and</span> <span class="n">n</span> <span class="k">for</span> <span class="n">n</span> <span class="ow">in</span> <span class="n">names</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"labels </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="si">!r}</span><span class="s2"> takes names, not </span><span class="si">{</span><span class="n">value</span><span class="si">!r}</span><span class="s2">"</span><span class="p">)</span>
+        <span class="k">return</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">names</span><span class="p">)</span>
+
+    <span class="n">parse_query</span> <span class="o">=</span> <span class="n">parse_rule</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">matches</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">rule</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span> <span class="n">query</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="o">...</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+        <span class="k">return</span> <span class="nb">any</span><span class="p">(</span><span class="n">fnmatchcase</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">pattern</span><span class="p">)</span> <span class="k">for</span> <span class="n">pattern</span> <span class="ow">in</span> <span class="n">rule</span> <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">query</span><span class="p">)</span>
+</pre></div>
+</div>
+<ul class="simple">
+<li><p>It is a frozen dataclass, so <code class="docutils literal notranslate"><span class="pre">Labels(&quot;product&quot;)</span></code> sets <code class="docutils literal notranslate"><span class="pre">name</span></code>.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">parse_rule</span></code> takes one name or a list, and checks that each is a non-empty string. It returns a tuple, which is what <code class="docutils literal notranslate"><span class="pre">matches</span></code> takes.</p></li>
+<li><p>A query gives names in the same form, so <code class="docutils literal notranslate"><span class="pre">parse_query</span></code> is <code class="docutils literal notranslate"><span class="pre">parse_rule</span></code>.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">matches</span></code> is true when some query name matches some rule pattern, by <code class="docutils literal notranslate"><span class="pre">fnmatch</span></code>’s case-sensitive globs: the rule <code class="docutils literal notranslate"><span class="pre">[&quot;jra&quot;,</span> <span class="pre">&quot;era5*&quot;]</span></code> matches the query <code class="docutils literal notranslate"><span class="pre">&quot;era5_land&quot;</span></code>, not <code class="docutils literal notranslate"><span class="pre">&quot;ERA5&quot;</span></code>.</p></li>
+</ul>
+</section>
+<section id="writing-your-own">
+<h2>Writing your own<a class="headerlink" href="#writing-your-own" title="Link to this heading"></a></h2>
+<p>Write the three methods for whatever your values are. A value can be any JSON value the dimension knows how to parse: a number, a range, a shape, or a mapping of several fields. A dimension sees only its own value, so inputs it needs together go in that one value, or you combine them when you build the query, as CrocoDash does with <code class="docutils literal notranslate"><span class="pre">cell_size_ratio</span></code>.</p>
+<p>This dimension describes the sea floor under a model, by its depth and its slope, in one value. A rule bounds either field, using an <code class="docutils literal notranslate"><span class="pre">Axis</span></code> for each:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">Bathymetry</span><span class="p">(</span><span class="n">qe</span><span class="o">.</span><span class="n">Dimension</span><span class="p">):</span>
+    <span class="n">name</span> <span class="o">=</span> <span class="s2">"bathymetry"</span>
+    <span class="n">fields</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"depth"</span><span class="p">:</span> <span class="n">qe</span><span class="o">.</span><span class="n">Axis</span><span class="p">(</span><span class="s2">"depth"</span><span class="p">,</span> <span class="s2">"m"</span><span class="p">),</span> <span class="s2">"slope"</span><span class="p">:</span> <span class="n">qe</span><span class="o">.</span><span class="n">Axis</span><span class="p">(</span><span class="s2">"slope"</span><span class="p">,</span> <span class="s2">"degree"</span><span class="p">)}</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">parse_rule</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>  <span class="c1"># a range on either field: {"slope": {"gt": 5}}</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">dict</span><span class="p">)</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">value</span> <span class="ow">or</span> <span class="nb">set</span><span class="p">(</span><span class="n">value</span><span class="p">)</span> <span class="o">-</span> <span class="nb">set</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">fields</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"a bathymetry rule bounds depth or slope, not </span><span class="si">{</span><span class="n">value</span><span class="si">!r}</span><span class="s2">"</span><span class="p">)</span>
+        <span class="k">return</span> <span class="p">{</span><span class="n">k</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">fields</span><span class="p">[</span><span class="n">k</span><span class="p">]</span><span class="o">.</span><span class="n">parse_rule</span><span class="p">(</span><span class="n">v</span><span class="p">)</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">value</span><span class="o">.</span><span class="n">items</span><span class="p">()}</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">parse_query</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>  <span class="c1"># both fields: {"depth": 4000, "slope": 8}</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">dict</span><span class="p">)</span> <span class="ow">or</span> <span class="nb">set</span><span class="p">(</span><span class="n">value</span><span class="p">)</span> <span class="o">!=</span> <span class="nb">set</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">fields</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"bathymetry gives depth and slope, not </span><span class="si">{</span><span class="n">value</span><span class="si">!r}</span><span class="s2">"</span><span class="p">)</span>
+        <span class="k">return</span> <span class="p">{</span><span class="n">k</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">fields</span><span class="p">[</span><span class="n">k</span><span class="p">]</span><span class="o">.</span><span class="n">parse_query</span><span class="p">(</span><span class="n">v</span><span class="p">)</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">value</span><span class="o">.</span><span class="n">items</span><span class="p">()}</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">matches</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">rule</span><span class="p">,</span> <span class="n">query</span><span class="p">):</span>
+        <span class="k">return</span> <span class="nb">all</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">fields</span><span class="p">[</span><span class="n">k</span><span class="p">]</span><span class="o">.</span><span class="n">matches</span><span class="p">(</span><span class="n">r</span><span class="p">,</span> <span class="n">query</span><span class="p">[</span><span class="n">k</span><span class="p">])</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">rule</span><span class="o">.</span><span class="n">items</span><span class="p">())</span>
+
+
+<span class="n">registry</span> <span class="o">=</span> <span class="n">qe</span><span class="o">.</span><span class="n">Registry</span><span class="p">([</span><span class="n">Bathymetry</span><span class="p">()])</span>
+<span class="n">registry</span><span class="o">.</span><span class="n">add</span><span class="p">(</span>
+    <span class="n">qe</span><span class="o">.</span><span class="n">Rule</span><span class="p">(</span>
+        <span class="s2">"TOPO001"</span><span class="p">,</span>
+        <span class="s2">"Steep slopes"</span><span class="p">,</span>
+        <span class="s2">"Pressure-gradient errors grow over steep bathymetry."</span><span class="p">,</span>
+        <span class="n">scope</span><span class="o">=</span><span class="p">{</span><span class="s2">"bathymetry"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"slope"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"gt"</span><span class="p">:</span> <span class="mi">5</span><span class="p">}}},</span>
+    <span class="p">)</span>
+<span class="p">)</span>
+<span class="n">registry</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="n">bathymetry</span><span class="o">=</span><span class="p">{</span><span class="s2">"depth"</span><span class="p">:</span> <span class="mi">4000</span><span class="p">,</span> <span class="s2">"slope"</span><span class="p">:</span> <span class="mi">8</span><span class="p">})</span>  <span class="c1"># [TOPO001]</span>
+</pre></div>
+</div>
+<p>A rule file holds the rule as <code class="docutils literal notranslate"><span class="pre">&quot;dimensions&quot;:</span> <span class="pre">{&quot;bathymetry&quot;:</span> <span class="pre">{&quot;slope&quot;:</span> <span class="pre">{&quot;gt&quot;:</span> <span class="pre">5}}}</span></code>, as given. To read it, declare the dimension again: <code class="docutils literal notranslate"><span class="pre">qe.Registry.from_file(&quot;bathymetry.geojson&quot;,</span> <span class="pre">dimensions=[Bathymetry()])</span></code>. A file that names a dimension the Registry has not declared is refused, naming the file, the rule and the dimension: the file holds values, and the code that knows what they mean is yours.</p>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="index.html" class="btn btn-neutral float-left" title="queryearth" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="concepts.html" class="btn btn-neutral float-right" title="Rules and queries" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2026, Manish Venumuddula.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

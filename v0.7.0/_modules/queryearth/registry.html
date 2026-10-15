@@ -1,0 +1,279 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>queryearth.registry &mdash; queryearth 0.7.0</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=fe7df9b0"></script>
+      <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script src="../../_static/versions.js?v=58ec1786"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            queryearth
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../dimensions.html">Dimensions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../concepts.html">Rules and queries</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../rules.html">Rule files</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api.html">API reference</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">queryearth</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">queryearth.registry</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for queryearth.registry</h1><div class="highlight"><pre>
+<span></span><span class="sd">"""The Registry: the dimensions, the rules, the query, and rule files.</span>
+
+<span class="sd">A rule file is a GeoJSON FeatureCollection with one Feature per rule, in the</span>
+<span class="sd">form Rule.to_feature() writes and Rule.from_feature() reads.</span>
+<span class="sd">"""</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">re</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">collections.abc</span><span class="w"> </span><span class="kn">import</span> <span class="n">Iterable</span><span class="p">,</span> <span class="n">Mapping</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">queryearth.dimensions</span><span class="w"> </span><span class="kn">import</span> <span class="n">Dimension</span><span class="p">,</span> <span class="n">SpaceDimension</span><span class="p">,</span> <span class="n">TimeDimension</span><span class="p">,</span> <span class="n">applies</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">queryearth.rules</span><span class="w"> </span><span class="kn">import</span> <span class="n">LEVELS</span><span class="p">,</span> <span class="n">Rule</span>
+
+<span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span><span class="s2">"DuplicateCodeError"</span><span class="p">,</span> <span class="s2">"Registry"</span><span class="p">]</span>
+
+<span class="c1"># The release that last changed the rule file format. to_file() writes it in the</span>
+<span class="c1"># "queryearth" member, and from_file() refuses a file that needs a later release.</span>
+<span class="n">FORMAT</span> <span class="o">=</span> <span class="s2">"0.7"</span>
+<span class="c1"># A list of numbers, such as a point, as json.dumps(indent=2) spreads it over</span>
+<span class="c1"># lines. A JSON string never holds a newline, so only real lists match.</span>
+<span class="n">_NUMBERS</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span>
+    <span class="sa">r</span><span class="s2">"\[\n\s*(-?[0-9][0-9.eE+-]*(?:,\n\s*-?[0-9][0-9.eE+-]*)*)\n\s*\]"</span>
+<span class="p">)</span>
+
+
+<div class="viewcode-block" id="DuplicateCodeError">
+<a class="viewcode-back" href="../../api.html#queryearth.DuplicateCodeError">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">DuplicateCodeError</span><span class="p">(</span><span class="ne">ValueError</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""A code the Registry already holds was added again."""</span></div>
+
+
+
+<div class="viewcode-block" id="Registry">
+<a class="viewcode-back" href="../../api.html#queryearth.Registry">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">Registry</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""The rules, and the dimensions their scopes use; answers queries.</span>
+
+<span class="sd">    Every Registry has space and time. dimensions declares the others, such as</span>
+<span class="sd">    Axis("resolution", "km"), Labels("product") or one of your own; a</span>
+<span class="sd">    dimension's name is its key in scopes, queries and rule files.</span>
+<span class="sd">    """</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dimensions</span><span class="p">:</span> <span class="n">Iterable</span><span class="p">[</span><span class="n">Dimension</span><span class="p">]</span> <span class="o">=</span> <span class="p">())</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">dimensions</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Dimension</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">for</span> <span class="n">dimension</span> <span class="ow">in</span> <span class="p">(</span><span class="n">SpaceDimension</span><span class="p">(),</span> <span class="n">TimeDimension</span><span class="p">(),</span> <span class="o">*</span><span class="n">dimensions</span><span class="p">):</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">dimension</span><span class="p">,</span> <span class="n">Dimension</span><span class="p">):</span>
+                <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">dimension</span><span class="si">!r}</span><span class="s2"> does not subclass qe.Dimension"</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">dimension</span><span class="o">.</span><span class="n">name</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">dimensions</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"dimension </span><span class="si">{</span><span class="n">dimension</span><span class="o">.</span><span class="n">name</span><span class="si">!r}</span><span class="s2"> is declared twice"</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">dimensions</span><span class="p">[</span><span class="n">dimension</span><span class="o">.</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="n">dimension</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_rules</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Rule</span><span class="p">,</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]]</span> <span class="o">=</span> <span class="p">{}</span>  <span class="c1"># parsed scopes</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">rules</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">Rule</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">"""Every rule, in the order added."""</span>
+        <span class="k">return</span> <span class="p">[</span><span class="n">rule</span> <span class="k">for</span> <span class="n">rule</span><span class="p">,</span> <span class="n">_</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_rules</span><span class="o">.</span><span class="n">values</span><span class="p">()]</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_dimension</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dimension</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">dimensions</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">"undeclared dimension </span><span class="si">{</span><span class="n">name</span><span class="si">!r}</span><span class="s2">; this Registry has </span><span class="si">{</span><span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">dimensions</span><span class="p">)</span><span class="si">}</span><span class="s2">"</span>
+            <span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">dimensions</span><span class="p">[</span><span class="n">name</span><span class="p">]</span>
+
+<div class="viewcode-block" id="Registry.add">
+<a class="viewcode-back" href="../../api.html#queryearth.Registry.add">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">add</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">rule</span><span class="p">:</span> <span class="n">Rule</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Add a rule; Rule.from_feature() makes one from a GeoJSON Feature.</span>
+
+<span class="sd">        Each scope value is parsed by its dimension. A name the Registry does</span>
+<span class="sd">        not have is refused, so a misspelt one never matches by accident, and</span>
+<span class="sd">        a code already here raises DuplicateCodeError.</span>
+<span class="sd">        """</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">rule</span><span class="p">,</span> <span class="n">Rule</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"cannot add </span><span class="si">{</span><span class="n">rule</span><span class="si">!r}</span><span class="s2">: not a Rule"</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">rule</span><span class="o">.</span><span class="n">code</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_rules</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">DuplicateCodeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">rule</span><span class="o">.</span><span class="n">code</span><span class="si">}</span><span class="s2">: this code is already a rule here"</span><span class="p">)</span>
+        <span class="n">values</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">rule</span><span class="o">.</span><span class="n">scope</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="k">if</span> <span class="n">value</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="k">try</span><span class="p">:</span>
+                    <span class="n">values</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_dimension</span><span class="p">(</span><span class="n">name</span><span class="p">)</span><span class="o">.</span><span class="n">parse_rule</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+                <span class="k">except</span> <span class="p">(</span><span class="ne">ValueError</span><span class="p">,</span> <span class="ne">TypeError</span><span class="p">)</span> <span class="k">as</span> <span class="n">err</span><span class="p">:</span>
+                    <span class="n">err</span><span class="o">.</span><span class="n">args</span> <span class="o">=</span> <span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">rule</span><span class="o">.</span><span class="n">code</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">err</span><span class="si">}</span><span class="s2">"</span><span class="p">,)</span>
+                    <span class="k">raise</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_rules</span><span class="p">[</span><span class="n">rule</span><span class="o">.</span><span class="n">code</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">rule</span><span class="p">,</span> <span class="n">values</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Registry.query">
+<a class="viewcode-back" href="../../api.html#queryearth.Registry.query">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">query</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">values</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">Rule</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">"""The rules that apply to a query, highest level first, then by code.</span>
+
+<span class="sd">        values gives the query's value on any of the dimensions, by name, such</span>
+<span class="sd">        as space=sp.box(-60, 30, -50, 40), time=qe.interval("2020-01-01",</span>
+<span class="sd">        "2020-12-31") or resolution=8; None leaves a dimension out. applies()</span>
+<span class="sd">        says what "apply" means.</span>
+<span class="sd">        """</span>
+        <span class="n">query</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="n">name</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_dimension</span><span class="p">(</span><span class="n">name</span><span class="p">)</span><span class="o">.</span><span class="n">parse_query</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">values</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
+            <span class="k">if</span> <span class="n">value</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+        <span class="p">}</span>
+        <span class="n">found</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="n">r</span>
+            <span class="k">for</span> <span class="n">r</span><span class="p">,</span> <span class="n">scope</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_rules</span><span class="o">.</span><span class="n">values</span><span class="p">()</span>
+            <span class="k">if</span> <span class="n">applies</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">dimensions</span><span class="p">,</span> <span class="n">scope</span><span class="p">,</span> <span class="n">query</span><span class="p">)</span>
+        <span class="p">]</span>
+        <span class="k">return</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">found</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">rule</span><span class="p">:</span> <span class="p">(</span><span class="n">LEVELS</span><span class="o">.</span><span class="n">index</span><span class="p">(</span><span class="n">rule</span><span class="o">.</span><span class="n">level</span><span class="p">),</span> <span class="n">rule</span><span class="o">.</span><span class="n">code</span><span class="p">))</span></div>
+
+
+    <span class="c1"># ---- rule files ---------------------------------------------------------------</span>
+<div class="viewcode-block" id="Registry.to_file">
+<a class="viewcode-back" href="../../api.html#queryearth.Registry.to_file">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">to_file</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">os</span><span class="o">.</span><span class="n">PathLike</span><span class="p">[</span><span class="nb">str</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Write every rule to a rule file that from_file() reads back, as</span>
+<span class="sd">        indented GeoJSON with each point on one line."""</span>
+        <span class="n">features</span> <span class="o">=</span> <span class="p">[</span><span class="n">rule</span><span class="o">.</span><span class="n">to_feature</span><span class="p">()</span> <span class="k">for</span> <span class="n">rule</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">rules</span><span class="p">]</span>
+        <span class="n">data</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"type"</span><span class="p">:</span> <span class="s2">"FeatureCollection"</span><span class="p">,</span> <span class="s2">"queryearth"</span><span class="p">:</span> <span class="n">FORMAT</span><span class="p">,</span> <span class="s2">"features"</span><span class="p">:</span> <span class="n">features</span><span class="p">}</span>
+        <span class="n">text</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">ensure_ascii</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+        <span class="n">text</span> <span class="o">=</span> <span class="n">_NUMBERS</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span><span class="k">lambda</span> <span class="n">m</span><span class="p">:</span> <span class="s2">"["</span> <span class="o">+</span> <span class="n">re</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span><span class="sa">r</span><span class="s2">",\n\s*"</span><span class="p">,</span> <span class="s2">", "</span><span class="p">,</span> <span class="n">m</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span> <span class="o">+</span> <span class="s2">"]"</span><span class="p">,</span> <span class="n">text</span><span class="p">)</span>
+        <span class="n">Path</span><span class="p">(</span><span class="n">path</span><span class="p">)</span><span class="o">.</span><span class="n">write_text</span><span class="p">(</span><span class="n">text</span> <span class="o">+</span> <span class="s2">"</span><span class="se">\n</span><span class="s2">"</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s2">"utf-8"</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Registry.from_file">
+<a class="viewcode-back" href="../../api.html#queryearth.Registry.from_file">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">from_file</span><span class="p">(</span>
+        <span class="bp">cls</span><span class="p">,</span> <span class="o">*</span><span class="n">paths</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">os</span><span class="o">.</span><span class="n">PathLike</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span> <span class="n">dimensions</span><span class="p">:</span> <span class="n">Iterable</span><span class="p">[</span><span class="n">Dimension</span><span class="p">]</span> <span class="o">=</span> <span class="p">()</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Registry</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""A Registry with the rules of one or more rule files.</span>
+
+<span class="sd">        dimensions declares the dimensions other than space and time, as</span>
+<span class="sd">        Registry() does; a rule that uses any other is refused. Codes must be</span>
+<span class="sd">        unique across the files. Raises ValueError naming the file, the</span>
+<span class="sd">        feature's position and its code; nothing is returned unless every</span>
+<span class="sd">        rule was read.</span>
+<span class="sd">        """</span>
+        <span class="n">registry</span> <span class="o">=</span> <span class="bp">cls</span><span class="p">(</span><span class="n">dimensions</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">path</span> <span class="ow">in</span> <span class="n">paths</span><span class="p">:</span>
+            <span class="n">where</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">Path</span><span class="p">(</span><span class="n">path</span><span class="p">)</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2">: "</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">data</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="n">path</span><span class="p">)</span><span class="o">.</span><span class="n">read_text</span><span class="p">(</span><span class="n">encoding</span><span class="o">=</span><span class="s2">"utf-8"</span><span class="p">))</span>
+                <span class="k">if</span> <span class="p">(</span>
+                    <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">Mapping</span><span class="p">)</span>
+                    <span class="ow">or</span> <span class="n">data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"type"</span><span class="p">)</span> <span class="o">!=</span> <span class="s2">"FeatureCollection"</span>
+                <span class="p">):</span>
+                    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"not a GeoJSON FeatureCollection"</span><span class="p">)</span>
+                <span class="n">_check_format</span><span class="p">(</span><span class="n">data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"queryearth"</span><span class="p">,</span> <span class="n">FORMAT</span><span class="p">))</span>
+                <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">feature</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"features"</span><span class="p">,</span> <span class="p">[])):</span>
+                    <span class="n">where</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">Path</span><span class="p">(</span><span class="n">path</span><span class="p">)</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2">: feature </span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">: "</span>
+                    <span class="n">registry</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">Rule</span><span class="o">.</span><span class="n">from_feature</span><span class="p">(</span><span class="n">feature</span><span class="p">))</span>
+            <span class="k">except</span> <span class="p">(</span><span class="ne">ValueError</span><span class="p">,</span> <span class="ne">TypeError</span><span class="p">)</span> <span class="k">as</span> <span class="n">err</span><span class="p">:</span>
+                <span class="n">err</span><span class="o">.</span><span class="n">args</span> <span class="o">=</span> <span class="p">(</span><span class="n">where</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">err</span><span class="p">),)</span>
+                <span class="k">raise</span>
+        <span class="k">return</span> <span class="n">registry</span></div>
+</div>
+
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_check_format</span><span class="p">(</span><span class="n">given</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Refuse a file whose "queryearth" member names a later format than FORMAT."""</span>
+    <span class="n">found</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">fullmatch</span><span class="p">(</span><span class="sa">r</span><span class="s2">"([0-9]+)\.([0-9]+)(\.[0-9]+)?"</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">given</span><span class="p">))</span>
+    <span class="k">if</span> <span class="n">found</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s1">'"queryearth" is a release such as "</span><span class="si">{</span><span class="n">FORMAT</span><span class="si">}</span><span class="s1">", not </span><span class="si">{</span><span class="n">given</span><span class="si">!r}</span><span class="s1">'</span><span class="p">)</span>
+    <span class="k">if</span> <span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">found</span><span class="p">[</span><span class="mi">1</span><span class="p">]),</span> <span class="nb">int</span><span class="p">(</span><span class="n">found</span><span class="p">[</span><span class="mi">2</span><span class="p">]))</span> <span class="o">&gt;</span> <span class="nb">tuple</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="nb">int</span><span class="p">,</span> <span class="n">FORMAT</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">"."</span><span class="p">))):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">"this file needs queryearth </span><span class="si">{</span><span class="n">given</span><span class="si">}</span><span class="s2"> or later, and this queryearth "</span>
+            <span class="sa">f</span><span class="s2">"reads rule files up to </span><span class="si">{</span><span class="n">FORMAT</span><span class="si">}</span><span class="s2">; upgrade queryearth to read it"</span>
+        <span class="p">)</span>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2026, Manish Venumuddula.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
