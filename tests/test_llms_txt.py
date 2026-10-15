@@ -34,4 +34,4 @@ def test_the_rule_file_and_the_python_run_as_written(tmp_path):
     ]
     written = qe.Registry.from_file(tmp_path / "mine.geojson")
     assert [r["code"] for r in written.describe()["rules"]] == ["MINE001"]
-    assert written.groups == {"MINE": "My rules"}
+    assert written.categories == {"MINE": "My rules"}

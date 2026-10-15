@@ -33,13 +33,13 @@ def write(path, data):
 
 
 def toy_registry():
-    """The dimensions and groups the toy rules use, and a group for the tests'."""
+    """The dimensions and categories the toy rules use, and a category for the tests'."""
     names = ("product", "variable", "model")
     labels = [qe.Labels(name) for name in names]
     return qe.Registry(
         "toy",
         dimensions=[qe.Axis("resolution", "km"), *labels],
-        groups={"TOY": "Toy rules", "TST": "Test rules"},
+        categories={"TOY": "Toy rules", "TST": "Test rules"},
     )
 
 

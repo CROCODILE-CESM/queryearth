@@ -1,4 +1,4 @@
-"""Groups in groups, a Registry made from several rule files, and files at URLs."""
+"""Categories in categories, a Registry made from several rule files, and files at URLs."""
 
 import functools
 import http.server
@@ -22,8 +22,8 @@ def rule(code, **fields):
     return qe.Rule(code=code, title=f"{code} title", message="m", **fields)
 
 
-def collection(groups, codes, dimensions=()):
-    registry = qe.Registry("x", dimensions=dimensions, groups=groups)
+def collection(categories, codes, dimensions=()):
+    registry = qe.Registry("x", dimensions=dimensions, categories=categories)
     for code in codes:
         registry.add(rule(code))
     return registry.to_collection()
@@ -34,44 +34,44 @@ def write(path, data):
     return path
 
 
-# ---- groups in groups -----------------------------------------------------------------
-def test_groups_nest_to_any_depth():
-    registry = qe.Registry("mine", groups=NESTED)
-    assert registry.groups == NESTED
-    assert registry.group_path("TIDE") == ["DOMAIN", "OBC", "TIDE"]
-    assert registry.group_path("REGION") == ["REGION"]
+# ---- categories in categories -----------------------------------------------------------------
+def test_categories_nest_to_any_depth():
+    registry = qe.Registry("mine", categories=NESTED)
+    assert registry.categories == NESTED
+    assert registry.category_path("TIDE") == ["DOMAIN", "OBC", "TIDE"]
+    assert registry.category_path("REGION") == ["REGION"]
     registry.add(rule("TIDE001"))
-    registry.add(rule("DOMAIN001"))  # a parent group can hold rules too
+    registry.add(rule("DOMAIN001"))  # a parent category can hold rules too
     assert registry.next_code("TIDE") == "TIDE002"
 
 
 def test_a_parent_is_declared_first():
     with pytest.raises(ValueError, match="declare its parent 'DOMAIN' first"):
-        qe.Registry("mine", groups={"OBC": {"title": "o", "parent": "DOMAIN"}})
+        qe.Registry("mine", categories={"OBC": {"title": "o", "parent": "DOMAIN"}})
 
 
-def test_group_path_refuses_an_undeclared_group():
+def test_category_path_refuses_an_undeclared_category():
     with pytest.raises(qe.UnknownNameError):
-        qe.Registry("mine", groups=NESTED).group_path("ITF")
+        qe.Registry("mine", categories=NESTED).category_path("ITF")
 
 
-def test_nested_groups_round_trip_through_a_file(tmp_path):
+def test_nested_categories_round_trip_through_a_file(tmp_path):
     path = write(tmp_path / "nested.geojson", collection(NESTED, ["TIDE001"]))
     again = qe.Registry.from_file(path)
-    assert again.groups == NESTED
-    assert again.describe()["groups"] == NESTED
+    assert again.categories == NESTED
+    assert again.describe()["categories"] == NESTED
 
 
 def test_load_compares_parents_but_not_titles(tmp_path):
     path = write(tmp_path / "nested.geojson", collection(NESTED, ["TIDE001"]))
     retitled = {**NESTED, "OBC": {"title": "Edges", "parent": "DOMAIN"}}
-    assert qe.Registry("same", groups=retitled).load(path) == ["TIDE001"]
+    assert qe.Registry("same", categories=retitled).load(path) == ["TIDE001"]
     moved = {**NESTED, "TIDE": {"title": "Tidal boundaries", "parent": "REGION"}}
     moved = dict(sorted(moved.items(), key=lambda kv: kv[0] != "REGION"))
     with pytest.raises(qe.LoadError) as err:
-        qe.Registry("moved", groups=moved).load(path)
+        qe.Registry("moved", categories=moved).load(path)
     assert err.value.problems == (
-        "nested.geojson: group 'TIDE' sits in 'OBC' in the file, but in 'REGION' "
+        "nested.geojson: category 'TIDE' sits in 'OBC' in the file, but in 'REGION' "
         "on registry 'moved'",
     )
 
@@ -86,7 +86,7 @@ def test_from_file_merges_several_files(tmp_path):
     )
     merged = qe.Registry.from_file(mine, theirs)
     assert merged.name == "mine+theirs"
-    assert list(merged.groups) == [*NESTED, "CLAUDE"]
+    assert list(merged.categories) == [*NESTED, "CLAUDE"]
     assert [r["code"] for r in merged.describe()["rules"]] == ["OBC001", "CLAUDE001"]
     sources = {f.code: f.source for f in merged.query()}
     assert sources == {"OBC001": "mine.geojson", "CLAUDE001": "theirs.geojson"}
@@ -105,14 +105,14 @@ def test_files_must_agree_on_a_shared_dimension(tmp_path):
     assert problem.startswith("two.geojson: dimensions: 'resolution' is")
 
 
-def test_files_must_agree_on_a_shared_group(tmp_path):
+def test_files_must_agree_on_a_shared_category(tmp_path):
     one = write(tmp_path / "one.geojson", collection(NESTED, []))
     flat = {"REGION": "Regional advice", "TIDE": {"title": "t", "parent": "REGION"}}
     two = write(tmp_path / "two.geojson", collection(flat, []))
     with pytest.raises(qe.LoadError) as err:
         qe.Registry.from_file(one, two)
     assert err.value.problems == (
-        "two.geojson: groups: group 'TIDE' sits in 'REGION' here, but in 'OBC' "
+        "two.geojson: categories: category 'TIDE' sits in 'REGION' here, but in 'OBC' "
         "in an earlier file",
     )
 
@@ -167,7 +167,7 @@ def test_a_query_string_does_not_name_the_registry(tmp_path, served):
 
 
 def test_a_place_rule_from_a_url_still_matches(tmp_path, served):
-    registry = qe.Registry("x", groups=NESTED)
+    registry = qe.Registry("x", categories=NESTED)
     registry.add(rule("OBC001", scope=qe.Scope(sp.box(0, 0, 10, 10), edge=True)))
     write(tmp_path / "edge.geojson", registry.to_collection())
     again = qe.Registry.from_file(f"{served}/edge.geojson")

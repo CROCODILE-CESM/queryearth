@@ -1,4 +1,4 @@
-"""Groups of rules by code prefix, new codes, and writing and versioning rule files."""
+"""Categories of rules by code prefix, new codes, and writing and versioning rule files."""
 
 import json
 
@@ -8,7 +8,7 @@ import queryearth as qe
 from queryearth import space as sp
 from queryearth.rules import make_code, split_code
 
-GROUPS = {"GRID": "Grid and numerics", "ITF": "Indonesian Throughflow"}
+CATEGORIES = {"GRID": "Grid and numerics", "ITF": "Indonesian Throughflow"}
 
 
 def rule(code, **fields):
@@ -36,48 +36,51 @@ def test_a_bad_prefix_is_refused(prefix):
         make_code(prefix, 1)
 
 
-# ---- groups -------------------------------------------------------------------------------
-def test_a_registry_declares_its_groups():
-    registry = qe.Registry("mine", groups=GROUPS)
-    assert registry.groups == GROUPS
+# ---- categories -------------------------------------------------------------------------------
+def test_a_registry_declares_its_categories():
+    registry = qe.Registry("mine", categories=CATEGORIES)
+    assert registry.categories == CATEGORIES
     registry.add(rule("ITF001"))
-    with pytest.raises(qe.UnknownNameError, match="undeclared group 'OBC'"):
+    with pytest.raises(qe.UnknownNameError, match="undeclared category 'OBC'"):
         registry.add(rule("OBC001"))
 
 
-def test_without_groups_any_prefix_goes():
+def test_without_categories_any_prefix_goes():
     registry = qe.Registry("mine")
     registry.add(rule("ITF001"))
     registry.add(rule("OBC001"))
-    assert registry.groups == {}
+    assert registry.categories == {}
 
 
-def test_groups_are_declared_before_rules():
+def test_categories_are_declared_before_rules():
     registry = qe.Registry("mine")
     registry.add(rule("ITF001"))
     with pytest.raises(ValueError, match="before adding rules"):
-        registry.add_group("ITF", "Indonesian Throughflow")
+        registry.add_category("ITF", "Indonesian Throughflow")
 
 
 @pytest.mark.parametrize("title", ["", "  ", {"title": ""}])
-def test_a_group_needs_a_title(title):
+def test_a_category_needs_a_title(title):
     with pytest.raises(ValueError, match="needs a title"):
-        qe.Registry("mine", groups={"ITF": title})
+        qe.Registry("mine", categories={"ITF": title})
 
 
 @pytest.mark.parametrize("value", [None, 7, {"name": "x"}, {"title": "x", "kids": []}])
-def test_a_group_is_a_title_or_a_title_and_parent(value):
+def test_a_category_is_a_title_or_a_title_and_parent(value):
     with pytest.raises(ValueError, match="is its title, or"):
-        qe.Registry("mine", groups={"ITF": value})
+        qe.Registry("mine", categories={"ITF": value})
 
 
-def test_describe_gives_the_groups():
-    assert qe.Registry("mine", groups=GROUPS).describe()["groups"] == GROUPS
+def test_describe_gives_the_categories():
+    assert (
+        qe.Registry("mine", categories=CATEGORIES).describe()["categories"]
+        == CATEGORIES
+    )
 
 
 # ---- next_code ----------------------------------------------------------------------------
-def test_next_code_follows_the_highest_number_in_the_group():
-    registry = qe.Registry("mine", groups=GROUPS)
+def test_next_code_follows_the_highest_number_in_the_category():
+    registry = qe.Registry("mine", categories=CATEGORIES)
     assert registry.next_code("ITF") == "ITF001"
     for code in ("ITF001", "ITF007", "GRID002"):
         registry.add(rule(code))
@@ -98,15 +101,15 @@ def test_next_code_hyphenates_a_prefix_that_ends_in_a_digit():
     assert registry.next_code("ERA5") == "ERA5-015"
 
 
-def test_next_code_refuses_an_undeclared_group():
+def test_next_code_refuses_an_undeclared_category():
     with pytest.raises(qe.UnknownNameError):
-        qe.Registry("mine", groups=GROUPS).next_code("OBC")
+        qe.Registry("mine", categories=CATEGORIES).next_code("OBC")
 
 
 # ---- writing and reading files ------------------------------------------------------------
 def full_registry():
     registry = qe.Registry(
-        "mine", dimensions=[qe.Axis("resolution", "km")], groups=GROUPS
+        "mine", dimensions=[qe.Axis("resolution", "km")], categories=CATEGORIES
     )
     registry.add(rule("GRID001", scope=qe.Scope(dimensions={"resolution": {"lt": 10}})))
     registry.add(rule("ITF001", scope=qe.Scope(sp.box(115, -10, 120, -5), edge=True)))
@@ -119,17 +122,17 @@ def full_registry():
     return registry
 
 
-def test_to_collection_writes_the_format_groups_dimensions_and_records():
+def test_to_collection_writes_the_format_categories_dimensions_and_records():
     collection = full_registry().to_collection()
     assert list(collection) == [
         "type",
         "queryearth",
-        "groups",
+        "categories",
         "dimensions",
         "features",
     ]
     assert collection["queryearth"] == qe.FORMAT
-    assert collection["groups"] == GROUPS
+    assert collection["categories"] == CATEGORIES
     assert collection["dimensions"] == [
         {"name": "resolution", "kind": "axis", "unit": "km"}
     ]
@@ -140,14 +143,14 @@ def test_to_file_and_from_file_round_trip(tmp_path):
     path = tmp_path / "mine.geojson"
     full_registry().to_file(path)
     again = qe.Registry.from_file(path)
-    assert again.groups == GROUPS
+    assert again.categories == CATEGORIES
     assert again.to_collection() == full_registry().to_collection()
     domain = sp.box(117, -12, 125, 0)  # its west edge crosses ITF001
     assert [f.code for f in again.query(space=domain)] == ["ITF001"]
 
 
-def test_a_registry_without_groups_writes_none():
-    assert "groups" not in qe.Registry("bare").to_collection()
+def test_a_registry_without_categories_writes_none():
+    assert "categories" not in qe.Registry("bare").to_collection()
 
 
 def test_a_file_needing_a_later_release_is_refused(tmp_path):
@@ -185,45 +188,80 @@ def test_a_file_without_a_release_loads(tmp_path):
     assert qe.Registry.from_file(write(tmp_path / "old.geojson", collection))
 
 
-def test_load_needs_the_file_groups_declared_here(tmp_path):
+def test_load_needs_the_file_categories_declared_here(tmp_path):
     path = tmp_path / "mine.geojson"
     full_registry().to_file(path)
     other = qe.Registry(
-        "other", dimensions=[qe.Axis("resolution", "km")], groups={"GRID": "Grid"}
+        "other", dimensions=[qe.Axis("resolution", "km")], categories={"GRID": "Grid"}
     )
     with pytest.raises(qe.LoadError) as err:
         other.load(path)
     assert err.value.problems == (
-        "mine.geojson: group 'ITF' is not declared on registry 'other'",
+        "mine.geojson: category 'ITF' is not declared on registry 'other'",
     )
     assert other.describe()["rules"] == []  # nothing added
 
 
-def test_load_ignores_group_titles(tmp_path):
+def test_load_ignores_category_titles(tmp_path):
     path = tmp_path / "mine.geojson"
     full_registry().to_file(path)
     other = qe.Registry(
         "other",
         dimensions=[qe.Axis("resolution", "km")],
-        groups={"GRID": "Grid", "ITF": "ITF"},
+        categories={"GRID": "Grid", "ITF": "ITF"},
     )
     assert other.load(path) == ["GRID001", "ITF001"]
-    assert other.groups == {"GRID": "Grid", "ITF": "ITF"}
+    assert other.categories == {"GRID": "Grid", "ITF": "ITF"}
 
 
-def test_a_file_rule_outside_the_groups_is_refused(tmp_path):
+def test_a_file_rule_outside_the_categories_is_refused(tmp_path):
     collection = full_registry().to_collection()
-    collection["groups"] = {"GRID": "Grid and numerics"}
+    collection["categories"] = {"GRID": "Grid and numerics"}
     with pytest.raises(qe.LoadError) as err:
         qe.Registry.from_file(write(tmp_path / "bad.geojson", collection))
-    assert "undeclared group 'ITF'" in err.value.problems[0]
+    assert "undeclared category 'ITF'" in err.value.problems[0]
 
 
-def test_from_file_reports_bad_groups(tmp_path):
+def test_from_file_reports_bad_categories(tmp_path):
     collection = full_registry().to_collection()
-    collection["groups"] = {"itf": "lower case"}
+    collection["categories"] = {"itf": "lower case"}
     with pytest.raises(qe.LoadError) as err:
         qe.Registry.from_file(write(tmp_path / "bad.geojson", collection))
     assert err.value.problems[0].startswith(
-        "bad.geojson: groups: 'itf' is not a code prefix"
+        "bad.geojson: categories: 'itf' is not a code prefix"
     )
+
+
+# ---- files from before 0.6 call categories "groups" -------------------------------------
+@pytest.mark.parametrize("release", ["0.4", "0.5", None])
+def test_an_older_file_with_groups_still_loads(tmp_path, release):
+    collection = full_registry().to_collection()
+    collection["groups"] = collection.pop("categories")
+    if release is None:
+        del collection["queryearth"]
+    else:
+        collection["queryearth"] = release
+    path = write(tmp_path / "old.geojson", collection)
+    assert qe.Registry.from_file(path).categories == CATEGORIES
+    other = qe.Registry(
+        "other", dimensions=[qe.Axis("resolution", "km")], categories=CATEGORIES
+    )
+    assert other.load(path) == ["GRID001", "ITF001"]
+
+
+def test_groups_in_a_new_file_is_refused(tmp_path):
+    collection = full_registry().to_collection()
+    collection["groups"] = collection.pop("categories")
+    with pytest.raises(qe.LoadError) as err:
+        qe.Registry.from_file(write(tmp_path / "new.geojson", collection))
+    assert err.value.problems[0] == (
+        'new.geojson: categories: "groups" is called "categories" since queryearth 0.6'
+    )
+
+
+def test_groups_and_categories_together_is_refused(tmp_path):
+    collection = full_registry().to_collection()
+    collection["groups"] = collection["categories"]
+    collection["queryearth"] = "0.5"
+    with pytest.raises(qe.LoadError, match='"groups" is called "categories"'):
+        full_registry().load(write(tmp_path / "both.geojson", collection))

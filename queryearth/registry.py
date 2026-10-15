@@ -63,7 +63,7 @@ __all__ = ["FORMAT", "Registry", "PointResult"]
 
 # The release that last changed the rule file format. to_file() writes it in the
 # "queryearth" member, and a file that needs a later release is refused.
-FORMAT = "0.5"
+FORMAT = "0.6"
 
 _SLUG = re.compile(r"[a-z][a-z0-9_]*")
 _RELEASE = re.compile(r"([0-9]+)\.([0-9]+)(?:\.[0-9]+)?")
@@ -108,8 +108,8 @@ def _open(source: Source) -> tuple[str, str, Any]:
         raise LoadError([f"{path.name}: {err}"]) from err
 
 
-def _group_entry(prefix: str, value: Any) -> tuple[str, str | None]:
-    """A group's title and parent, from its title or {"title", "parent"}."""
+def _category_entry(prefix: str, value: Any) -> tuple[str, str | None]:
+    """A category's title and parent, from its title or {"title", "parent"}."""
     if isinstance(value, str):
         title, parent = value, None
     elif (
@@ -124,11 +124,11 @@ def _group_entry(prefix: str, value: Any) -> tuple[str, str | None]:
         title, parent = value["title"], value.get("parent")
     else:
         raise ValueError(
-            f'group {prefix!r} is its title, or {{"title": ..., "parent": ...}}, '
+            f'category {prefix!r} is its title, or {{"title": ..., "parent": ...}}, '
             f"not {value!r}"
         )
     if not isinstance(title, str) or not title.strip():
-        raise ValueError(f"group {prefix!r} needs a title")
+        raise ValueError(f"category {prefix!r} needs a title")
     if parent is not None:
         check_prefix(parent)
     return title, parent
@@ -146,6 +146,18 @@ def _plain(dimension: Any) -> dict[str, Any]:
     return {
         k: v for k, v in describe_dimension(dimension).items() if k != "description"
     }
+
+
+def _categories_member(data: Any) -> Any:
+    """A file's "categories" member. Files from before 0.6 call it "groups"."""
+    if not isinstance(data, Mapping) or "groups" not in data:
+        return data.get("categories") if isinstance(data, Mapping) else None
+    given = data.get("queryearth")
+    found = _RELEASE.fullmatch(given) if isinstance(given, str) else None
+    old = found is None or tuple(int(n) for n in found.groups()[:2]) < (0, 6)
+    if "categories" in data or not old:
+        raise ValueError('"groups" is called "categories" since queryearth 0.6')
+    return data["groups"]
 
 
 def _format_problems(collection: Any, where: str) -> list[str]:
@@ -185,22 +197,22 @@ class Registry:
         name: str = "",
         *,
         dimensions: Iterable[Any] = (),
-        groups: Mapping[str, Any] | None = None,
+        categories: Mapping[str, Any] | None = None,
     ) -> None:
         self.name = name
         self._dimensions: dict[str, Any] = {
             "space": SpaceDimension(),
             "time": TimeDimension(),
         }
-        self._groups: dict[str, tuple[str, str | None]] = {}  # title, parent
+        self._categories: dict[str, tuple[str, str | None]] = {}  # title, parent
         self._entries: list[_Entry] = []
         self._codes: dict[str, int] = {}
         self._prefilters_cache: dict[str, Any] | None = None
         self._last: tuple[Any, Any] = (None, None)  # the last query parsed
         for dimension in dimensions:
             self.add_dimension(dimension)
-        for prefix, value in (groups or {}).items():
-            self.add_group(prefix, *_group_entry(prefix, value))
+        for prefix, value in (categories or {}).items():
+            self.add_category(prefix, *_category_entry(prefix, value))
 
     def __repr__(self) -> str:
         return f"Registry({self.name!r}, rules={len(self._entries)})"
@@ -236,51 +248,53 @@ class Registry:
             raise ValueError(f"dimension name {name!r} is reserved or already declared")
         self._dimensions[name] = dimension
 
-    def add_group(self, prefix: str, title: str, parent: str | None = None) -> None:
-        """Declare a group of rules, before any rule is added: the rules whose
+    def add_category(self, prefix: str, title: str, parent: str | None = None) -> None:
+        """Declare a category of rules, before any rule is added: the rules whose
         codes have this prefix, such as ITF for ITF001. Once a Registry declares
-        groups, every rule's prefix must be one of them. A group can sit in a
-        parent group, declared before it, to any depth."""
+        categories, every rule's prefix must be one of them. A category can sit in a
+        parent category, declared before it, to any depth."""
         if self._entries:
-            raise ValueError("declare groups before adding rules")
+            raise ValueError("declare categories before adding rules")
         check_prefix(prefix)
-        title, parent = _group_entry(
+        title, parent = _category_entry(
             prefix, title if parent is None else {"title": title, "parent": parent}
         )
-        if prefix in self._groups:
-            raise ValueError(f"group {prefix!r} is already declared")
-        if parent is not None and parent not in self._groups:
-            raise ValueError(f"group {prefix!r}: declare its parent {parent!r} first")
-        self._groups[prefix] = (title, parent)
+        if prefix in self._categories:
+            raise ValueError(f"category {prefix!r} is already declared")
+        if parent is not None and parent not in self._categories:
+            raise ValueError(
+                f"category {prefix!r}: declare its parent {parent!r} first"
+            )
+        self._categories[prefix] = (title, parent)
 
     @property
-    def groups(self) -> dict[str, Any]:
-        """The declared groups as a rule file gives them, in the order declared:
-        prefix to title, or to {"title", "parent"} for a group in a group."""
+    def categories(self) -> dict[str, Any]:
+        """The declared categories as a rule file gives them, in the order declared:
+        prefix to title, or to {"title", "parent"} for a subcategory."""
         return {
             prefix: title if parent is None else {"title": title, "parent": parent}
-            for prefix, (title, parent) in self._groups.items()
+            for prefix, (title, parent) in self._categories.items()
         }
 
-    def group_path(self, prefix: str) -> list[str]:
-        """A group and the groups it sits in, outermost first: ["DOMAIN", "OBC"]."""
-        if prefix not in self._groups:
+    def category_path(self, prefix: str) -> list[str]:
+        """A category and the categories it sits in, outermost first: ["DOMAIN", "OBC"]."""
+        if prefix not in self._categories:
             raise UnknownNameError(
-                f"undeclared group {prefix!r}; declared: {list(self._groups)}"
+                f"undeclared category {prefix!r}; declared: {list(self._categories)}"
             )
         path = [prefix]
-        while (parent := self._groups[path[0]][1]) is not None:
+        while (parent := self._categories[path[0]][1]) is not None:
             path.insert(0, parent)
         return path
 
     def next_code(self, prefix: str) -> str:
-        """The code for a new rule in a group: one more than the highest number
+        """The code for a new rule in a category: one more than the highest number
         any rule here has with that prefix, withdrawn ones too, so no number is
-        given twice. ITF001 when the group has no rules yet."""
+        given twice. ITF001 when the category has no rules yet."""
         check_prefix(prefix)
-        if self._groups and prefix not in self._groups:
+        if self._categories and prefix not in self._categories:
             raise UnknownNameError(
-                f"undeclared group {prefix!r}; declared: {list(self._groups)}"
+                f"undeclared category {prefix!r}; declared: {list(self._categories)}"
             )
         numbers = [n for p, n in map(split_code, self._codes) if p == prefix]
         return make_code(prefix, max(numbers, default=0) + 1)
@@ -307,9 +321,9 @@ class Registry:
         a GitHub repository or gist. A file declares the dimensions its rules use
         in its "dimensions" member, in the form describe() gives:
         [{"name": "resolution", "kind": "axis", "unit": "km"}]; space and time
-        need no declaring. Its "groups" member gives its groups, and "queryearth"
+        need no declaring. Its "categories" member gives its categories, and "queryearth"
         the release whose format it uses. The Registry declares every file's
-        dimensions and groups, which must agree where files share a name, and a
+        dimensions and categories, which must agree where files share a name, and a
         code must be unique across the files. Raises LoadError listing every
         problem, as load() does.
         """
@@ -322,7 +336,7 @@ class Registry:
         if problems:
             raise LoadError(problems)
         dimensions: dict[str, Any] = {}
-        groups: dict[str, Any] = {}
+        categories: dict[str, Any] = {}
         for where, _, data in opened:
             data = data if isinstance(data, Mapping) else {}
             try:
@@ -339,26 +353,26 @@ class Registry:
             except (ValueError, TypeError) as err:
                 problems.append(f"{where}: dimensions: {err}")
             try:
-                given = data.get("groups") or {}
+                given = _categories_member(data) or {}
                 if not isinstance(given, Mapping):
                     raise ValueError("it maps each prefix to a title")
                 for prefix, value in given.items():
-                    parent = _group_entry(prefix, value)[1]
-                    known = groups.setdefault(prefix, value)
-                    if _group_entry(prefix, known)[1] != parent:
+                    parent = _category_entry(prefix, value)[1]
+                    known = categories.setdefault(prefix, value)
+                    if _category_entry(prefix, known)[1] != parent:
                         raise ValueError(
-                            f"group {prefix!r} sits in {parent!r} here, but in "
-                            f"{_group_entry(prefix, known)[1]!r} in an earlier file"
+                            f"category {prefix!r} sits in {parent!r} here, but in "
+                            f"{_category_entry(prefix, known)[1]!r} in an earlier file"
                         )
             except (ValueError, TypeError) as err:
-                problems.append(f"{where}: groups: {err}")
+                problems.append(f"{where}: categories: {err}")
         if problems:
             raise LoadError(problems)
         name = "+".join(stem for _, stem, _ in opened)
         try:
-            registry = cls(name, dimensions=dimensions.values(), groups=groups)
+            registry = cls(name, dimensions=dimensions.values(), categories=categories)
         except (ValueError, TypeError) as err:
-            raise LoadError([f"{opened[0][0]}: groups: {err}"]) from err
+            raise LoadError([f"{opened[0][0]}: categories: {err}"]) from err
         for where, _, data in opened:
             try:
                 registry._add_all(_collection(data), where, where)
@@ -382,7 +396,7 @@ class Registry:
         as source. Loading never runs code. Raises LoadError listing every
         problem with the file, the feature's position and its code, and then
         leaves the Registry as it was. A file that declares its dimensions or
-        groups must declare them as this Registry does.
+        categories must declare them as this Registry does.
         """
         where, _, data = _open(source)
         return self._add_all(_collection(data), where, where)
@@ -399,7 +413,11 @@ class Registry:
             raise LoadError([f"{where}: not a GeoJSON FeatureCollection or Feature"])
         problems = _format_problems(collection, where)
         problems += self._declared_problems(collection.get("dimensions"), where)
-        problems += self._group_problems(collection.get("groups"), where)
+        try:
+            declared = _categories_member(collection)
+        except ValueError as err:
+            declared, problems = None, [*problems, f"{where}: categories: {err}"]
+        problems += self._category_problems(declared, where)
         if problems:
             raise LoadError(problems)
         saved = {k: copy.copy(v) for k, v in vars(self).items()}
@@ -454,28 +472,28 @@ class Registry:
                 )
         return problems
 
-    def _group_problems(self, declared: Any, where: str) -> list[str]:
-        """How a collection's "groups" member disagrees with this Registry; the
+    def _category_problems(self, declared: Any, where: str) -> list[str]:
+        """How a collection's "categories" member disagrees with this Registry; the
         titles are for people, so they may differ."""
         if declared is None:
             return []
         if not isinstance(declared, Mapping):
-            return [f"{where}: groups: it maps each prefix to a title"]
+            return [f"{where}: categories: it maps each prefix to a title"]
         problems = []
         for prefix, value in declared.items():
             try:
-                parent = _group_entry(prefix, value)[1]
+                parent = _category_entry(prefix, value)[1]
             except ValueError as err:
-                problems.append(f"{where}: groups: {err}")
+                problems.append(f"{where}: categories: {err}")
                 continue
-            if prefix not in self._groups:
+            if prefix not in self._categories:
                 problems.append(
-                    f"{where}: group {prefix!r} is not declared on registry {self.name!r}"
+                    f"{where}: category {prefix!r} is not declared on registry {self.name!r}"
                 )
-            elif self._groups[prefix][1] != parent:
+            elif self._categories[prefix][1] != parent:
                 problems.append(
-                    f"{where}: group {prefix!r} sits in {parent!r} in the file, but in "
-                    f"{self._groups[prefix][1]!r} on registry {self.name!r}"
+                    f"{where}: category {prefix!r} sits in {parent!r} in the file, but in "
+                    f"{self._categories[prefix][1]!r} on registry {self.name!r}"
                 )
         return problems
 
@@ -498,10 +516,10 @@ class Registry:
         else:
             raise TypeError(f"cannot add {rule!r}: not a Rule or a RuleKind")
         code = rule.code
-        group = split_code(code)[0]
-        if self._groups and group not in self._groups:
+        category = split_code(code)[0]
+        if self._categories and category not in self._categories:
             raise UnknownNameError(
-                f"{code}: undeclared group {group!r}; declared: {list(self._groups)}"
+                f"{code}: undeclared category {category!r}; declared: {list(self._categories)}"
             )
         compiled = self._compile(scope, _strings(get("requires", ())), code)
         qualname = rule._qualname() if form == "computed" else None
@@ -562,7 +580,7 @@ class Registry:
         return found
 
     def describe(self) -> dict[str, Any]:
-        """What this Registry can answer, as a JSON-ready dict: its groups and
+        """What this Registry can answer, as a JSON-ready dict: its categories and
         its declared dimensions as a rule file gives them, the values its rules
         give on each dimension (values()), and each rule's code, title and level.
         Space and time are always there and are not listed."""
@@ -581,7 +599,7 @@ class Registry:
             )
         return {
             "name": self.name,
-            "groups": self.groups,
+            "categories": self.categories,
             "dimensions": [describe_dimension(d) for _, d in declared],
             "values": {name: _jsonable(self.values(name)) for name, _ in declared},
             "rules": rules,
@@ -590,12 +608,12 @@ class Registry:
     # ---- writing ------------------------------------------------------------------
     def to_collection(self) -> dict[str, Any]:
         """This Registry as a rule file, a JSON-ready FeatureCollection: the
-        file format it needs, its groups, its declared dimensions and a record
+        file format it needs, its categories, its declared dimensions and a record
         for each static rule. Computed rules are code, so they are left out;
         describe() lists them."""
         collection: dict[str, Any] = {"type": "FeatureCollection", "queryearth": FORMAT}
-        if self._groups:
-            collection["groups"] = self.groups
+        if self._categories:
+            collection["categories"] = self.categories
         declared = list(self._dimensions.values())[2:]
         collection["dimensions"] = [describe_dimension(d) for d in declared]
         collection["features"] = [

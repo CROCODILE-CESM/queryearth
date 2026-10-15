@@ -35,7 +35,7 @@ CheckResult = bool | Mapping[str, Any] | Iterable[Mapping[str, Any]] | None
 RuleFunc = Callable[[Query, Match], CheckResult]
 
 # A prefix plus three or four digits, with a hyphen after a prefix that ends in
-# a digit, so every code parses one way (Q8). The prefix is the rule's group.
+# a digit, so every code parses one way (Q8). The prefix is the rule's category.
 CODE = re.compile(
     r"(?:([A-Z][A-Z0-9]{0,10}[A-Z])-?|([A-Z][A-Z0-9]{0,10}[0-9])-)([0-9]{3,4})"
 )
@@ -52,7 +52,7 @@ def check_code(code: Any) -> None:
 
 
 def split_code(code: str) -> tuple[str, int]:
-    """A valid code's prefix, which is its group, and its number: ("ERA5", 14)
+    """A valid code's prefix, which is its category, and its number: ("ERA5", 14)
     for ERA5-014."""
     check_code(code)
     found = CODE.fullmatch(code)
@@ -72,7 +72,7 @@ def make_code(prefix: str, number: int) -> str:
 
 
 def check_prefix(prefix: Any) -> None:
-    """Raise ValueError unless prefix is a code's prefix, and so a group."""
+    """Raise ValueError unless prefix is a code's prefix, and so a category."""
     code = f"{prefix}-001" if isinstance(prefix, str) else None
     found = CODE.fullmatch(code) if code else None
     if found is None or (found[1] or found[2]) != prefix:
