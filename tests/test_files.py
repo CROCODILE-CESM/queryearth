@@ -34,7 +34,7 @@ def write(path, *features):
 
 def test_a_rule_file_reads_back_exactly_as_written(tmp_path):
     registry = qe.Registry(DIMENSIONS)
-    registry.add(ARCTIC)
+    registry.add(qe.Rule.from_feature(ARCTIC))
     registry.add(
         qe.Rule(
             "BERING001",
@@ -73,10 +73,15 @@ def test_properties_the_core_does_not_use_pass_through_unchanged(tmp_path):
 
 def test_a_finding_prints_as_its_feature():
     registry = qe.Registry(DIMENSIONS)
-    registry.add(ARCTIC)
+    registry.add(qe.Rule.from_feature(ARCTIC))
     (finding,) = registry.query(space=sp.point(0, 70), ice="sice")
-    printed = json.loads(json.dumps(registry.to_feature(finding)))
+    printed = json.loads(json.dumps(finding.to_feature()))
     assert printed["properties"] == {**ARCTIC["properties"], "level": "warning"}
+
+
+def test_a_rule_writes_its_values_as_given_with_no_registry():
+    rule = qe.Rule("GRID001", "Turn off GM", "...", scope={"resolution": {"lt": 8}})
+    assert rule.to_feature()["properties"]["dimensions"] == {"resolution": {"lt": 8}}
 
 
 def test_several_files_load_into_one_registry(tmp_path):
@@ -98,9 +103,9 @@ def test_a_file_that_needs_a_later_queryearth_is_refused(tmp_path):
 
 def test_a_code_can_only_be_added_once(tmp_path):
     registry = qe.Registry(DIMENSIONS)
-    registry.add(ARCTIC)
+    registry.add(qe.Rule.from_feature(ARCTIC))
     with pytest.raises(qe.DuplicateCodeError, match="POLAR001"):
-        registry.add(ARCTIC)
+        registry.add(qe.Rule.from_feature(ARCTIC))
     twice = write(tmp_path / "twice.geojson", ARCTIC, ARCTIC)
     with pytest.raises(qe.DuplicateCodeError, match="twice.geojson: feature 1"):
         qe.Registry.from_file(twice, dimensions=DIMENSIONS)

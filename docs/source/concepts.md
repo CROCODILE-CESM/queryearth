@@ -56,7 +56,7 @@ What a query returns are the {class}`~queryearth.Rule` objects that apply. To pr
 import json
 
 for rule in registry.query(space=domain, resolution=(9.1, 9.3)):
-    print(json.dumps(registry.to_feature(rule), indent=2))
+    print(json.dumps(rule.to_feature(), indent=2))
 ```
 
 ## Space

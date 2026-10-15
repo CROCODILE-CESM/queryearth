@@ -88,7 +88,7 @@ findings = registry.query(
     resolution=8,
     product="glorys",
 )
-text = json.dumps([registry.to_feature(rule) for rule in findings])  # as GeoJSON
+text = json.dumps([rule.to_feature() for rule in findings])  # as GeoJSON
 ```
 
 `findings` lists the rules that apply, highest level first, then by code: here MINE002, then MINE001. A query or a rule that names a dimension the Registry has not declared raises `ValueError`, and adding a code twice raises `qe.DuplicateCodeError`.
@@ -111,4 +111,4 @@ mine.to_file("mine.geojson")
 
 ## Define a dimension
 
-A dimension subclasses `qe.Dimension`, sets `name`, and implements `parse_rule(value)` (check a rule's value, from Python or a rule file's JSON), `parse_query(value)`, `matches(rule, query)` (whether they share at least one value) and `to_json(rule)` (the rule's value back as JSON). A value can be any JSON value the dimension parses: a number, a range, a shape, or a mapping of several fields, such as `{"depth": 4000, "slope": 8}`. A dimension sees only its own value, so inputs it needs together go in that one value. `qe.Labels` in `queryearth/dimensions.py` is a 26-line example. Declare a dimension on the Registry, `qe.Registry([MyDimension()])`, and pass it to `from_file` to read rules that use it.
+A dimension subclasses `qe.Dimension`, sets `name`, and implements `parse_rule(value)` (check a rule's value, from Python or a rule file's JSON), `parse_query(value)` and `matches(rule, query)` (whether they share at least one value). A rule file holds each value as the rule gives it, so a value given in Python is plain JSON, apart from space and time. A value can be any JSON value the dimension parses: a number, a range, a shape, or a mapping of several fields, such as `{"depth": 4000, "slope": 8}`. A dimension sees only its own value, so inputs it needs together go in that one value. `qe.Labels` in `queryearth/dimensions.py` is a 23-line example. Declare a dimension on the Registry, `qe.Registry([MyDimension()])`, and pass it to `from_file` to read rules that use it.

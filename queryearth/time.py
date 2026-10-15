@@ -94,6 +94,10 @@ class Interval:
             ".." if self.end is None else _text(self.end - last, self.precision),
         )
 
+    def to_json(self) -> dict[str, list[str]]:
+        """The JSON-FG time member a rule file holds: {"interval": [start, end]}."""
+        return {"interval": list(self.to_wire())}
+
 
 def interval(start: Any, end: Any) -> Interval:
     """A closed interval whose ends are inclusive at their precision.

@@ -46,13 +46,6 @@ def test_axis_ranges_that_hold_no_number_are_refused():
             resolution.parse_rule(bad)
 
 
-def test_an_axis_writes_its_unit_with_each_range():
-    assert resolution.to_json(resolution.parse_rule({"lt": 8})) == {
-        "lt": 8,
-        "unit": "km",
-    }
-
-
 # ---- time -------------------------------------------------------------------------
 def test_an_end_date_covers_its_whole_day():
     years = ("2000-01-01", "2006-12-31")
@@ -74,7 +67,7 @@ def test_times_come_from_strings_dates_numpy_and_cftime_like_objects():
 
 def test_a_rule_file_time_reads_back_as_written():
     member = {"interval": ["2000-01-01", ".."]}
-    assert time.to_json(time.parse_rule(member)) == member
+    assert time.parse_rule(member).to_json() == member
 
 
 def test_impossible_times_are_refused():
@@ -119,9 +112,6 @@ class Bathymetry(qe.Dimension):
     def matches(self, rule, query):
         return all(self.fields[k].matches(r, query[k]) for k, r in rule.items())
 
-    def to_json(self, rule):
-        return {k: self.fields[k].to_json(r) for k, r in rule.items()}
-
 
 def test_a_dimension_of_your_own_takes_a_value_of_several_fields(tmp_path):
     registry = qe.Registry([Bathymetry()])
@@ -143,12 +133,12 @@ def test_a_dimension_of_your_own_takes_a_value_of_several_fields(tmp_path):
         tmp_path / "bathymetry.geojson", dimensions=[Bathymetry()]
     )
     (rule,) = again.query(bathymetry={"depth": 200, "slope": 12})
-    assert again.to_feature(rule)["properties"]["dimensions"] == {
-        "bathymetry": {"slope": {"gt": 5, "unit": "degree"}}
+    assert rule.to_feature()["properties"]["dimensions"] == {
+        "bathymetry": {"slope": {"gt": 5}}
     }
 
 
-def test_a_dimension_must_implement_all_four_methods():
+def test_a_dimension_must_implement_all_three_methods():
     class OnlyMatches(qe.Dimension):
         name = "half"
 

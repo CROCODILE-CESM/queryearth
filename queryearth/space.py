@@ -36,6 +36,12 @@ class Space:
     kind: Literal["point", "polygon"]
     geometry: shapely.Geometry
 
+    def to_json(self) -> dict[str, Any]:
+        """The GeoJSON geometry, the same every time. Edges longer than 180
+        degrees are split, since a reader would take them the short way round."""
+        shape = shapely.normalize(shapely.segmentize(self.geometry, 180.0))
+        return shapely.geometry.mapping(shapely.orient_polygons(shape))
+
 
 # ---- coordinates -----------------------------------------------------------------
 def wrap_lon(x: Any) -> Any:

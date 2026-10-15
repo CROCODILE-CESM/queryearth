@@ -2,7 +2,7 @@
 
 queryearth matches rules to a query. A rule says something worth knowing, such as "tidal mixing dominates here, so force tides", and is scoped by [dimensions](dimensions.md): where (space), when (time), and anything else that matters, such as grid resolution or forcing product. A query gives values on any of the dimensions and gets back the rules that apply. Rules live in GeoJSON [rule files](rules.md), so any GIS tool can show where they apply.
 
-Space, time and numeric axes are the base dimensions, and labels come with them. Defining your own dimension is a few lines of Python, written on the same four-method class the built-in ones use: see [Dimensions](dimensions.md).
+Space, time and numeric axes are the base dimensions, and labels come with them. Defining your own dimension is a few lines of Python, written on the same three-method class the built-in ones use: see [Dimensions](dimensions.md).
 
 ## Install
 

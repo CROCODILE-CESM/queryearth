@@ -1,6 +1,6 @@
 """Dimensions: what a rule's scope and a query give values on, and how they match.
 
-Every dimension subclasses Dimension and implements its four methods: the base
+Every dimension subclasses Dimension and implements its three methods: the base
 dimensions space, time and Axis, the Labels extension that comes with them, and
 any dimension you write. Space and time are on every Registry; the others are
 declared on it. applies() is the matching rule, in one place.
@@ -16,8 +16,6 @@ from dataclasses import dataclass
 from fnmatch import fnmatchcase
 from typing import Any
 
-import shapely
-
 from queryearth import space as sp
 from queryearth.time import Interval, interval
 
@@ -28,11 +26,13 @@ class Dimension(abc.ABC):
     """One kind of scope, such as space, time or grid resolution.
 
     A subclass sets name, the key that scopes, queries and rule files use for
-    it, and implements the four methods below; Python refuses to create one
+    it, and implements the three methods below; Python refuses to create one
     that leaves any out. The Registry calls them and does the rest: it refuses
     undeclared names, and applies() decides whether a rule applies. A value
     can be anything the dimension parses, such as a number, a range, a shape
-    or a mapping of several fields; a dimension sees only its own value.
+    or a mapping of several fields; a dimension sees only its own value. A
+    rule file holds each value as the rule gives it, so a value given in
+    Python is plain JSON, apart from space and time.
     """
 
     name: str
@@ -51,10 +51,6 @@ class Dimension(abc.ABC):
     def matches(self, rule: Any, query: Any) -> bool:
         """Whether a parsed rule value and a parsed query value share at least
         one value, such as a point, an instant or a number."""
-
-    @abc.abstractmethod
-    def to_json(self, rule: Any) -> Any:
-        """A parsed rule value as JSON for a rule file; parse_rule() reads it back."""
 
 
 def applies(
@@ -101,12 +97,6 @@ class SpaceDimension(Dimension):
     def matches(self, rule: sp.Space, query: sp.Space) -> bool:
         return sp.meets(rule, query)
 
-    def to_json(self, rule: sp.Space) -> dict[str, Any]:
-        # Split edges longer than 180 degrees, which a reader would take the
-        # short way round; normalising makes the output the same every time.
-        shape = shapely.normalize(shapely.segmentize(rule.geometry, 180.0))
-        return shapely.geometry.mapping(shapely.orient_polygons(shape))
-
 
 class TimeDimension(Dimension):
     """Time: a rule and a query each give an interval, made by interval().
@@ -132,9 +122,6 @@ class TimeDimension(Dimension):
 
     def matches(self, rule: Interval, query: Interval) -> bool:
         return rule.meets(query)
-
-    def to_json(self, rule: Interval) -> dict[str, list[str]]:
-        return {"interval": list(rule.to_wire())}
 
 
 _BOUNDS = {"gt", "ge", "lt", "le"}
@@ -206,15 +193,6 @@ class Axis(Dimension):
             a < hi or (a == hi and hi_closed)
         )
 
-    def to_json(self, rule: tuple[float, bool, float, bool]) -> dict[str, Any]:
-        lo, lo_closed, hi, hi_closed = rule
-        bounds = {}
-        if lo > -math.inf:
-            bounds["ge" if lo_closed else "gt"] = lo
-        if hi < math.inf:
-            bounds["le" if hi_closed else "lt"] = hi
-        return bounds | {"unit": self.unit}
-
 
 @dataclass(frozen=True)
 class Labels(Dimension):
@@ -239,6 +217,3 @@ class Labels(Dimension):
 
     def matches(self, rule: tuple[str, ...], query: tuple[str, ...]) -> bool:
         return any(fnmatchcase(name, pattern) for pattern in rule for name in query)
-
-    def to_json(self, rule: tuple[str, ...]) -> list[str]:
-        return list(rule)

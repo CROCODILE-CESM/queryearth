@@ -2,7 +2,7 @@
 
 queryearth matches rules to a query. A rule says something worth knowing, such as "tidal mixing dominates here, so force tides", and is scoped by **dimensions**: where (space), when (time), and anything else that matters, such as grid resolution or forcing product. A query gives values on any of the dimensions and gets back the rules that apply. Rules live in GeoJSON files, so any GIS tool can show where they apply.
 
-Space, time and numeric axes are the base dimensions, and labels come with them. **Defining your own dimension is a few lines of Python**, written on the same four-method class the built-in ones use.
+Space, time and numeric axes are the base dimensions, and labels come with them. **Defining your own dimension is a few lines of Python**, written on the same three-method class the built-in ones use.
 
 **Documentation:** https://crocodile-cesm.github.io/queryearth/
 
@@ -38,23 +38,22 @@ findings = registry.query(
     product="glorys",
 )
 print([rule.code for rule in findings])  # ['GULF001', 'GRID001'], warnings first
-print(registry.to_feature(findings[0]))  # a finding, as the GeoJSON Feature of its rule
+print(findings[0].to_feature())  # a finding, as the GeoJSON Feature of its rule
 ```
 
 A rule applies when, on every dimension it constrains, the query gives a value and the two overlap. A dimension the rule leaves out matches anything; a dimension the rule constrains and the query leaves out does not match.
 
 ## Define your own dimension
 
-A dimension subclasses `qe.Dimension`, sets its `name` and implements four methods:
+A dimension subclasses `qe.Dimension`, sets its `name` and implements three methods:
 
 | Method | Does |
 |---|---|
 | `parse_rule(value)` | checks a rule's value, from Python or from a rule file's JSON, and returns it in the form `matches` takes |
 | `parse_query(value)` | the same for a query's value |
 | `matches(rule, query)` | says whether the two share at least one value |
-| `to_json(rule)` | gives the rule's value back as JSON for the rule file |
 
-A value can be anything the dimension knows how to parse from JSON: a number, a range, a shape, or a mapping of several fields, such as `{"depth": 4000, "slope": 8}`. A dimension sees only its own value, so inputs it needs together go in that one value.
+A value can be anything the dimension knows how to parse from JSON: a number, a range, a shape, or a mapping of several fields, such as `{"depth": 4000, "slope": 8}`. A dimension sees only its own value, so inputs it needs together go in that one value. A rule keeps each value as you gave it, and a rule file holds it that way, so a value you give in Python is plain JSON, apart from space and time.
 
 Space, time and `Axis` are written this way, and so is `Labels`, which comes with queryearth as the worked example:
 
@@ -82,9 +81,6 @@ class Labels(Dimension):
 
     def matches(self, rule: tuple[str, ...], query: tuple[str, ...]) -> bool:
         return any(fnmatchcase(name, pattern) for pattern in rule for name in query)
-
-    def to_json(self, rule: tuple[str, ...]) -> list[str]:
-        return list(rule)
 ```
 
 **Rules are data; code lives in dimensions.**
@@ -97,7 +93,7 @@ Declare a dimension when you make the Registry, `qe.Registry([qe.Labels("product
 
 ## Rule files
 
-A rule file is a GeoJSON FeatureCollection with one Feature per rule. Its geometry is the rule's space, its JSON-FG `time` member the rule's time, and its properties hold the code, title, message, level, the value on each other dimension under `"dimensions"`, and anything else, such as an instruction or references, which queryearth keeps unchanged.
+A rule file is a GeoJSON FeatureCollection with one Feature per rule. Its geometry is the rule's space, its JSON-FG `time` member the rule's time, and its properties hold the code, title, message, level, the value on each other dimension under `"dimensions"`, as the rule gives it, and anything else, such as an instruction or references, which queryearth keeps unchanged. `Rule.from_feature()` reads one Feature and `rule.to_feature()` writes it; `Registry.from_file()` and `registry.to_file()` read and write a whole file.
 
 A code may be a path, such as `REGION/ITF/ITF001`: its category, `rule.category`, is the path before the last slash. To keep the findings in one category, filter on the code: `[r for r in findings if r.code.startswith("REGION/")]`.
 

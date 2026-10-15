@@ -27,21 +27,20 @@ registry = qe.Registry([qe.Axis("resolution", "km"), qe.Labels("product")])
 
 ## The contract
 
-A dimension subclasses {class}`~queryearth.Dimension`, sets `name`, and implements four methods. Python refuses to create one that leaves any out.
+A dimension subclasses {class}`~queryearth.Dimension`, sets `name`, and implements three methods. Python refuses to create one that leaves any out.
 
 | Method | Does |
 |---|---|
 | `parse_rule(value)` | checks a rule's value, given in Python or read from a rule file's JSON, and returns it in the form `matches` takes; raises `ValueError` for a bad one |
 | `parse_query(value)` | the same for a query's value |
 | `matches(rule, query)` | says whether the two share at least one value, such as a point, an instant, a number or a name |
-| `to_json(rule)` | gives the rule's parsed value back as JSON for the rule file, which `parse_rule` reads back |
 
 That is all a dimension does. The Registry does the rest, the same way for every dimension, built in or yours:
 
 - `Registry.add` calls `parse_rule` on each value in a rule's scope, and refuses a name the Registry has not declared.
 - `Registry.query` calls `parse_query` on each value in the query, and refuses an undeclared name, so a misspelt one never looks like "no rule applies".
 - A rule applies when, on **every** dimension it constrains, the query gives a value and `matches` is true: the two share at least one value. A dimension the rule leaves out matches anything. A dimension the rule constrains and the query leaves out does not match, since the query gives no value to share.
-- `Registry.to_file` writes each value with `to_json`, under the rule's `"dimensions"` property; `Registry.from_file` reads it back with `parse_rule`.
+- A rule keeps each value as it was given, and a rule file holds it that way, under the rule's `"dimensions"` property; `Registry.from_file` parses it with `parse_rule` when it adds the rule. So writing a rule needs no dimension, and a value given in Python is plain JSON, apart from space and time, whose `Space` and `Interval` objects write themselves.
 
 Space and time are written on the same class, in `queryearth/dimensions.py`, and differ in one place only: in a rule file their values go in the Feature's `geometry` and `time` members, where GeoJSON and JSON-FG put them, so that other tools can read them.
 
@@ -58,11 +57,10 @@ Space and time are written on the same class, in `queryearth/dimensions.py`, and
 - `parse_rule` takes one name or a list, and checks that each is a non-empty string. It returns a tuple, which is what `matches` takes.
 - A query gives names in the same form, so `parse_query` is `parse_rule`.
 - `matches` is true when some query name matches some rule pattern, by `fnmatch`'s case-sensitive globs: the rule `["jra", "era5*"]` matches the query `"era5_land"`, not `"ERA5"`.
-- `to_json` writes the names back as a list, which is how a rule file holds them: `"dimensions": {"atmosphere": ["jra", "nyf"]}`.
 
 ## Writing your own
 
-Write the four methods for whatever your values are. A value can be any JSON value the dimension knows how to parse: a number, a range, a shape, or a mapping of several fields. A dimension sees only its own value, so inputs it needs together go in that one value, or you combine them when you build the query, as CrocoDash does with `cell_size_ratio`.
+Write the three methods for whatever your values are. A value can be any JSON value the dimension knows how to parse: a number, a range, a shape, or a mapping of several fields. A dimension sees only its own value, so inputs it needs together go in that one value, or you combine them when you build the query, as CrocoDash does with `cell_size_ratio`.
 
 This dimension describes the sea floor under a model, by its depth and its slope, in one value. A rule bounds either field, using an `Axis` for each:
 
@@ -84,9 +82,6 @@ class Bathymetry(qe.Dimension):
     def matches(self, rule, query):
         return all(self.fields[k].matches(r, query[k]) for k, r in rule.items())
 
-    def to_json(self, rule):
-        return {k: self.fields[k].to_json(r) for k, r in rule.items()}
-
 
 registry = qe.Registry([Bathymetry()])
 registry.add(
@@ -100,4 +95,4 @@ registry.add(
 registry.query(bathymetry={"depth": 4000, "slope": 8})  # [TOPO001]
 ```
 
-A rule file holds the rule as `"dimensions": {"bathymetry": {"slope": {"gt": 5, "unit": "degree"}}}`. To read it, declare the dimension again: `qe.Registry.from_file("bathymetry.geojson", dimensions=[Bathymetry()])`. A file that names a dimension the Registry has not declared is refused, naming the file, the rule and the dimension: the file holds values, and the code that knows what they mean is yours.
+A rule file holds the rule as `"dimensions": {"bathymetry": {"slope": {"gt": 5}}}`, as given. To read it, declare the dimension again: `qe.Registry.from_file("bathymetry.geojson", dimensions=[Bathymetry()])`. A file that names a dimension the Registry has not declared is refused, naming the file, the rule and the dimension: the file holds values, and the code that knows what they mean is yours.

@@ -2,7 +2,7 @@
 
 This core is queryearth cut back to what is realistic to review: rules scoped by space, time, axes and labels, one matching rule, and GeoJSON rule files. Everything else queryearth 0.6.0 had is kept at the tag [v0.6.0](https://github.com/CROCODILE-CESM/queryearth/tree/v0.6.0) and listed here: what has come back into the core since, then what is planned, parked and dropped. Paths are at v0.6.0 unless they say "core". The full 0.6.0 design, its decisions and its correctness fixtures are `docs/design.md` and `docs/reference/` at the tag, and `examples/toy/` there exercises most of the features.
 
-The core grows in three places: a new `Dimension` subclass (its four methods), the `Registry` (adding, querying, reading and writing), and `Rule.properties`, which already carries anything else a rule says, unread. Rules stay data; code lives in dimensions.
+The core grows in three places: a new `Dimension` subclass (its three methods), the `Registry` (adding, querying, reading and writing), and `Rule.properties`, which already carries anything else a rule says, unread. Rules stay data; code lives in dimensions.
 
 ## Now in the core
 
@@ -26,7 +26,7 @@ At v0.6.0 a category was the code's prefix (ITF001 in ITF), declared on the Regi
 
 **At v0.6.0.** `queryearth/time.py`: `TimeSpec`, `parse_time`, and `overlap`, which cuts an overlap into calendar months.
 
-**Plugs in.** `TimeDimension.parse_rule` and `to_json` take and write a list of intervals and a set of months, and `matches` checks whether the query's interval meets any interval in one of the months (the month cutting in `overlap`). The file form is the 0.6.0 one: `periods` and `recurrence` beside the `time` member, which the core refuses today so that an old record is never read as applying all year. Alternatively, months alone can be a dimension of its own, such as `Months("season")`, with no core change.
+**Plugs in.** `TimeDimension.parse_rule` takes a list of intervals and a set of months, which a rule keeps and writes as given, and `matches` checks whether the query's interval meets any interval in one of the months (the month cutting in `overlap`). The file form is the 0.6.0 one: `periods` and `recurrence` beside the `time` member, which the core refuses today so that an old record is never read as applying all year. Alternatively, months alone can be a dimension of its own, such as `Months("season")`, with no core change.
 
 ### report()
 
@@ -52,7 +52,7 @@ At v0.6.0 a category was the code's prefix (ITF001 in ITF), declared on the Regi
 
 **At v0.6.0.** `queryearth/registry.py`: `_read_pack`, `Registry.to_pack`, `PACK`, `CATEGORY`. Tests: `tests/test_packs.py`.
 
-**Plugs in.** A reader that maps each category path to a folder and each code's last part to a file name, turning the folder into the FeatureCollection `from_file` reads, and a writer from `to_feature`. Until then, a folder of Feature files converts to a rule file by gathering its Features, which is how CrocoDash's two packs were converted for the core.
+**Plugs in.** A reader that maps each category path to a folder and each code's last part to a file name, turning the folder into the FeatureCollection `from_file` reads, and a writer from `Rule.to_feature`. Until then, a folder of Feature files converts to a rule file by gathering its Features, which is how CrocoDash's two packs were converted for the core.
 
 ### Features for AI agents
 
