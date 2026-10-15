@@ -1,0 +1,436 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>queryearth.time &mdash; queryearth 0.6.0</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=8fa8b3e9"></script>
+      <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script src="../../_static/versions.js?v=58ec1786"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            queryearth
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../concepts.html">Concepts</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../rules.html">Writing rules</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../results.html">Using findings</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../extending.html">Extending queryearth</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../example.html">The toy example</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api.html">API reference</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">queryearth</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">queryearth.time</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for queryearth.time</h1><div class="highlight"><pre>
+<span></span><span class="sd">"""Time: integer-second keys, half-open intervals and their measures.</span>
+
+<span class="sd">Every instant is one integer key, toordinal() * DAY plus the seconds of the day,</span>
+<span class="sd">in the proleptic Gregorian calendar of Python's datetime, so durations are plain</span>
+<span class="sd">subtraction. Inside the code an interval is half-open, [start, end), with None</span>
+<span class="sd">for an open end; on the wire it is closed at its stated precision, a day or a</span>
+<span class="sd">second (design.md section 7). cftime, pandas and numpy values are read by duck</span>
+<span class="sd">typing; none is imported.</span>
+<span class="sd">"""</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">calendar</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">datetime</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">_dt</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">math</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">collections.abc</span><span class="w"> </span><span class="kn">import</span> <span class="n">Mapping</span><span class="p">,</span> <span class="n">Sequence</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">dataclasses</span><span class="w"> </span><span class="kn">import</span> <span class="n">dataclass</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Literal</span>
+
+<span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="s2">"DAY"</span><span class="p">,</span>
+    <span class="s2">"Interval"</span><span class="p">,</span>
+    <span class="s2">"TimeSpec"</span><span class="p">,</span>
+    <span class="s2">"interval"</span><span class="p">,</span>
+    <span class="s2">"overlap"</span><span class="p">,</span>
+    <span class="s2">"overlaps"</span><span class="p">,</span>
+    <span class="s2">"parse_time"</span><span class="p">,</span>
+    <span class="s2">"time_fraction"</span><span class="p">,</span>
+<span class="p">]</span>
+
+<span class="n">Precision</span> <span class="o">=</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">"day"</span><span class="p">,</span> <span class="s2">"second"</span><span class="p">]</span>  <span class="c1"># max() of two is the finer one</span>
+
+<span class="n">DAY</span> <span class="o">=</span> <span class="mi">86_400</span>  <span class="c1"># key units in one day</span>
+
+
+<span class="c1"># ---- keys and the wire form --------------------------------------------------------</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">_instant</span><span class="p">(</span><span class="n">value</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Precision</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""The key and precision of one time value; None or ".." is an open end.</span>
+
+<span class="sd">    Strings are ISO 8601, where a date is day precision, and a numpy datetime64</span>
+<span class="sd">    is read through str(). Anything else needs year, month and day attributes,</span>
+<span class="sd">    and is second precision if it has an hour. A part of a second is dropped.</span>
+<span class="sd">    """</span>
+    <span class="k">if</span> <span class="n">value</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">and</span> <span class="n">value</span> <span class="o">==</span> <span class="s2">".."</span><span class="p">):</span>
+        <span class="k">return</span> <span class="kc">None</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">or</span> <span class="s2">"datetime64"</span> <span class="ow">in</span> <span class="nb">str</span><span class="p">(</span><span class="nb">getattr</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="s2">"dtype"</span><span class="p">,</span> <span class="s2">""</span><span class="p">)):</span>
+            <span class="n">text</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>  <span class="c1"># numpy writes ISO 8601, such as 2020-01-09T06:00:00</span>
+            <span class="n">day</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">text</span><span class="p">)</span> <span class="o">&lt;=</span> <span class="mi">10</span>  <span class="c1"># a date, such as 2020-01-09</span>
+            <span class="k">if</span> <span class="n">text</span><span class="p">[</span><span class="mi">11</span><span class="p">:</span><span class="mi">13</span><span class="p">]</span> <span class="o">==</span> <span class="s2">"24"</span><span class="p">:</span>  <span class="c1"># Python 3.14 reads it as the next midnight</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"hour 24 is not allowed"</span><span class="p">)</span>
+            <span class="n">value</span> <span class="o">=</span> <span class="p">(</span><span class="n">_dt</span><span class="o">.</span><span class="n">date</span> <span class="k">if</span> <span class="n">day</span> <span class="k">else</span> <span class="n">_dt</span><span class="o">.</span><span class="n">datetime</span><span class="p">)</span><span class="o">.</span><span class="n">fromisoformat</span><span class="p">(</span><span class="n">text</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">_dt</span><span class="o">.</span><span class="n">datetime</span><span class="p">)</span> <span class="ow">and</span> <span class="n">value</span><span class="o">.</span><span class="n">utcoffset</span><span class="p">()</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">value</span> <span class="o">=</span> <span class="n">value</span><span class="o">.</span><span class="n">astimezone</span><span class="p">(</span><span class="n">_dt</span><span class="o">.</span><span class="n">timezone</span><span class="o">.</span><span class="n">utc</span><span class="p">)</span>
+        <span class="n">clock</span> <span class="o">=</span> <span class="p">[</span><span class="nb">getattr</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span> <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"hour"</span><span class="p">,</span> <span class="s2">"minute"</span><span class="p">,</span> <span class="s2">"second"</span><span class="p">)]</span>
+        <span class="n">when</span> <span class="o">=</span> <span class="n">_dt</span><span class="o">.</span><span class="n">datetime</span><span class="p">(</span><span class="n">value</span><span class="o">.</span><span class="n">year</span><span class="p">,</span> <span class="n">value</span><span class="o">.</span><span class="n">month</span><span class="p">,</span> <span class="n">value</span><span class="o">.</span><span class="n">day</span><span class="p">,</span> <span class="o">*</span><span class="n">clock</span><span class="p">)</span>
+    <span class="k">except</span> <span class="p">(</span><span class="ne">AttributeError</span><span class="p">,</span> <span class="ne">TypeError</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">"cannot read a time from </span><span class="si">{</span><span class="n">value</span><span class="si">!r}</span><span class="s2">; pass an ISO 8601 string, a date or "</span>
+            <span class="s2">"datetime, a numpy datetime64 or an object with year, month and day"</span>
+        <span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="kc">None</span>
+    <span class="k">except</span> <span class="p">(</span><span class="ne">ValueError</span><span class="p">,</span> <span class="ne">OverflowError</span><span class="p">)</span> <span class="k">as</span> <span class="n">err</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">value</span><span class="si">!r}</span><span class="s2"> is not a time from year 1 to 9999 in the proleptic "</span>
+            <span class="sa">f</span><span class="s2">"Gregorian calendar: </span><span class="si">{</span><span class="n">err</span><span class="si">}</span><span class="s2">"</span>
+        <span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="kc">None</span>
+    <span class="n">key</span> <span class="o">=</span> <span class="n">when</span><span class="o">.</span><span class="n">toordinal</span><span class="p">()</span> <span class="o">*</span> <span class="n">DAY</span> <span class="o">+</span> <span class="p">(</span><span class="n">when</span><span class="o">.</span><span class="n">hour</span> <span class="o">*</span> <span class="mi">60</span> <span class="o">+</span> <span class="n">when</span><span class="o">.</span><span class="n">minute</span><span class="p">)</span> <span class="o">*</span> <span class="mi">60</span> <span class="o">+</span> <span class="n">when</span><span class="o">.</span><span class="n">second</span>
+    <span class="k">return</span> <span class="n">key</span><span class="p">,</span> <span class="s2">"second"</span> <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="s2">"hour"</span><span class="p">)</span> <span class="k">else</span> <span class="s2">"day"</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_text</span><span class="p">(</span><span class="n">key</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">precision</span><span class="p">:</span> <span class="n">Precision</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""The wire form of the instant at key: a date, or a timestamp in UTC."""</span>
+    <span class="n">when</span> <span class="o">=</span> <span class="n">_dt</span><span class="o">.</span><span class="n">datetime</span><span class="o">.</span><span class="n">fromordinal</span><span class="p">(</span><span class="n">key</span> <span class="o">//</span> <span class="n">DAY</span><span class="p">)</span> <span class="o">+</span> <span class="n">_dt</span><span class="o">.</span><span class="n">timedelta</span><span class="p">(</span><span class="n">seconds</span><span class="o">=</span><span class="n">key</span> <span class="o">%</span> <span class="n">DAY</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">when</span><span class="o">.</span><span class="n">date</span><span class="p">()</span><span class="o">.</span><span class="n">isoformat</span><span class="p">()</span> <span class="k">if</span> <span class="n">precision</span> <span class="o">==</span> <span class="s2">"day"</span> <span class="k">else</span> <span class="n">when</span><span class="o">.</span><span class="n">isoformat</span><span class="p">()</span> <span class="o">+</span> <span class="s2">"Z"</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_lo</span><span class="p">(</span><span class="n">key</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+    <span class="k">return</span> <span class="o">-</span><span class="n">math</span><span class="o">.</span><span class="n">inf</span> <span class="k">if</span> <span class="n">key</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">key</span>  <span class="c1"># an open start comes first</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_hi</span><span class="p">(</span><span class="n">key</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+    <span class="k">return</span> <span class="n">math</span><span class="o">.</span><span class="n">inf</span> <span class="k">if</span> <span class="n">key</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">key</span>  <span class="c1"># an open end comes last</span>
+
+
+<span class="c1"># ---- intervals -----------------------------------------------------------------</span>
+<div class="viewcode-block" id="Interval">
+<a class="viewcode-back" href="../../api.html#queryearth.Interval">[docs]</a>
+<span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">Interval</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""A half-open interval [start, end) of keys; None is an open end.</span>
+
+<span class="sd">    Not ordered: an open end does not compare with a key. A day-precision</span>
+<span class="sd">    interval has its ends at midnight and is written back as dates.</span>
+<span class="sd">    """</span>
+
+    <span class="n">start</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span>
+    <span class="n">end</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span>
+    <span class="n">precision</span><span class="p">:</span> <span class="n">Precision</span> <span class="o">=</span> <span class="s2">"day"</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">__post_init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">precision</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"day"</span><span class="p">,</span> <span class="s2">"second"</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"precision is 'day' or 'second', not </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">precision</span><span class="si">!r}</span><span class="s2">"</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">start</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">end</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">key</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="p">(</span><span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="nb">int</span><span class="p">)</span> <span class="ow">or</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="nb">bool</span><span class="p">)):</span>
+                <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"interval ends are integer keys, not </span><span class="si">{</span><span class="n">key</span><span class="si">!r}</span><span class="s2">"</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">key</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">precision</span> <span class="o">==</span> <span class="s2">"day"</span> <span class="ow">and</span> <span class="n">key</span> <span class="o">%</span> <span class="n">DAY</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"a day-precision interval needs ends at midnight"</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">_lo</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">start</span><span class="p">)</span> <span class="o">&gt;=</span> <span class="n">_hi</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">end</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"interval ends out of order: </span><span class="si">{</span><span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">to_wire</span><span class="p">())</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+
+<div class="viewcode-block" id="Interval.to_wire">
+<a class="viewcode-back" href="../../api.html#queryearth.Interval.to_wire">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">to_wire</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">"""The closed wire form: an end date covers its whole day."""</span>
+        <span class="n">last</span> <span class="o">=</span> <span class="n">DAY</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">precision</span> <span class="o">==</span> <span class="s2">"day"</span> <span class="k">else</span> <span class="mi">1</span>
+        <span class="k">return</span> <span class="p">(</span>
+            <span class="s2">".."</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">start</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">_text</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">start</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">precision</span><span class="p">),</span>
+            <span class="s2">".."</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">end</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">_text</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">end</span> <span class="o">-</span> <span class="n">last</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">precision</span><span class="p">),</span>
+        <span class="p">)</span></div>
+</div>
+
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_closed</span><span class="p">(</span>
+    <span class="n">a</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Precision</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span> <span class="n">b</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Precision</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Interval</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""The Interval from closed ends (key, precision), None for an open end."""</span>
+    <span class="n">precision</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">a</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="k">if</span> <span class="n">a</span> <span class="k">else</span> <span class="s2">"day"</span><span class="p">,</span> <span class="n">b</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="k">if</span> <span class="n">b</span> <span class="k">else</span> <span class="s2">"day"</span><span class="p">)</span>
+    <span class="n">end</span> <span class="o">=</span> <span class="kc">None</span> <span class="k">if</span> <span class="n">b</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">b</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="p">(</span><span class="n">DAY</span> <span class="k">if</span> <span class="n">b</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">==</span> <span class="s2">"day"</span> <span class="k">else</span> <span class="mi">1</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">Interval</span><span class="p">(</span><span class="kc">None</span> <span class="k">if</span> <span class="n">a</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">a</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">end</span><span class="p">,</span> <span class="n">precision</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="TimeSpec">
+<a class="viewcode-back" href="../../api.html#queryearth.TimeSpec">[docs]</a>
+<span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">TimeSpec</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""A union of intervals, optionally limited to some months of every year.</span>
+
+<span class="sd">    The intervals are kept sorted, and those that overlap or touch are merged.</span>
+<span class="sd">    """</span>
+
+    <span class="n">intervals</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Interval</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span>
+    <span class="n">months</span><span class="p">:</span> <span class="nb">frozenset</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">__post_init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">months</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">months</span> <span class="o">=</span> <span class="nb">frozenset</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">months</span><span class="p">)</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">months</span> <span class="ow">or</span> <span class="ow">not</span> <span class="nb">all</span><span class="p">(</span>
+                <span class="nb">isinstance</span><span class="p">(</span><span class="n">m</span><span class="p">,</span> <span class="nb">int</span><span class="p">)</span> <span class="ow">and</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">m</span><span class="p">,</span> <span class="nb">bool</span><span class="p">)</span> <span class="ow">and</span> <span class="mi">1</span> <span class="o">&lt;=</span> <span class="n">m</span> <span class="o">&lt;=</span> <span class="mi">12</span>
+                <span class="k">for</span> <span class="n">m</span> <span class="ow">in</span> <span class="n">months</span>
+            <span class="p">):</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">"months must be integers from 1 to 12, got </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">months</span><span class="si">!r}</span><span class="s2">"</span>
+                <span class="p">)</span>
+            <span class="nb">object</span><span class="o">.</span><span class="fm">__setattr__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">"months"</span><span class="p">,</span> <span class="n">months</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">all</span><span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">iv</span><span class="p">,</span> <span class="n">Interval</span><span class="p">)</span> <span class="k">for</span> <span class="n">iv</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">intervals</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"a TimeSpec holds Interval objects, not </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">intervals</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+        <span class="n">merged</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">Interval</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">iv</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">intervals</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">iv</span><span class="p">:</span> <span class="n">_lo</span><span class="p">(</span><span class="n">iv</span><span class="o">.</span><span class="n">start</span><span class="p">)):</span>
+            <span class="k">if</span> <span class="n">merged</span> <span class="ow">and</span> <span class="n">_lo</span><span class="p">(</span><span class="n">iv</span><span class="o">.</span><span class="n">start</span><span class="p">)</span> <span class="o">&lt;=</span> <span class="n">_hi</span><span class="p">(</span><span class="n">merged</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">end</span><span class="p">):</span>
+                <span class="n">last</span> <span class="o">=</span> <span class="n">merged</span><span class="o">.</span><span class="n">pop</span><span class="p">()</span>
+                <span class="n">end</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">last</span><span class="o">.</span><span class="n">end</span><span class="p">,</span> <span class="n">iv</span><span class="o">.</span><span class="n">end</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="n">_hi</span><span class="p">)</span>
+                <span class="n">iv</span> <span class="o">=</span> <span class="n">Interval</span><span class="p">(</span><span class="n">last</span><span class="o">.</span><span class="n">start</span><span class="p">,</span> <span class="n">end</span><span class="p">,</span> <span class="nb">max</span><span class="p">(</span><span class="n">last</span><span class="o">.</span><span class="n">precision</span><span class="p">,</span> <span class="n">iv</span><span class="o">.</span><span class="n">precision</span><span class="p">))</span>
+            <span class="n">merged</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">iv</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">merged</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s2">"a TimeSpec needs at least one interval; None means always"</span>
+            <span class="p">)</span>
+        <span class="nb">object</span><span class="o">.</span><span class="fm">__setattr__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">"intervals"</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">merged</span><span class="p">))</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">extent</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">"""The first start and the last end, None for an open end."""</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">intervals</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">start</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">intervals</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">end</span>
+
+<div class="viewcode-block" id="TimeSpec.to_wire">
+<a class="viewcode-back" href="../../api.html#queryearth.TimeSpec.to_wire">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">to_wire</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">],</span> <span class="o">...</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">"""Every interval in closed wire form; months are not expanded here."""</span>
+        <span class="k">return</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">iv</span><span class="o">.</span><span class="n">to_wire</span><span class="p">()</span> <span class="k">for</span> <span class="n">iv</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">intervals</span><span class="p">)</span></div>
+</div>
+
+
+
+<span class="c1"># ---- building time specifications ----------------------------------------------</span>
+<div class="viewcode-block" id="interval">
+<a class="viewcode-back" href="../../api.html#queryearth.interval">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">interval</span><span class="p">(</span><span class="n">start</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">end</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">TimeSpec</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""A closed interval whose ends are inclusive at their precision.</span>
+
+<span class="sd">    Ends are ISO 8601 strings, ".." or None for an open end, or date-like values.</span>
+<span class="sd">    A date covers its whole day, and a value with a time of day covers its</span>
+<span class="sd">    second, even at midnight.</span>
+<span class="sd">    """</span>
+    <span class="k">return</span> <span class="n">TimeSpec</span><span class="p">((</span><span class="n">_closed</span><span class="p">(</span><span class="n">_instant</span><span class="p">(</span><span class="n">start</span><span class="p">),</span> <span class="n">_instant</span><span class="p">(</span><span class="n">end</span><span class="p">)),))</span></div>
+
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_wire_interval</span><span class="p">(</span><span class="n">pair</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Interval</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""A closed wire interval [start, end]; both ends at one precision (JSON-FG)."""</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">pair</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">or</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">pair</span><span class="p">,</span> <span class="n">Sequence</span><span class="p">)</span> <span class="ow">or</span> <span class="nb">len</span><span class="p">(</span><span class="n">pair</span><span class="p">)</span> <span class="o">!=</span> <span class="mi">2</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"a wire interval is a pair [start, end], got </span><span class="si">{</span><span class="n">pair</span><span class="si">!r}</span><span class="s2">"</span><span class="p">)</span>
+    <span class="n">a</span><span class="p">,</span> <span class="n">b</span> <span class="o">=</span> <span class="n">_instant</span><span class="p">(</span><span class="n">pair</span><span class="p">[</span><span class="mi">0</span><span class="p">]),</span> <span class="n">_instant</span><span class="p">(</span><span class="n">pair</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+    <span class="k">if</span> <span class="n">a</span> <span class="ow">and</span> <span class="n">b</span> <span class="ow">and</span> <span class="n">a</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">!=</span> <span class="n">b</span><span class="p">[</span><span class="mi">1</span><span class="p">]:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="nb">list</span><span class="p">(</span><span class="n">pair</span><span class="p">)</span><span class="si">}</span><span class="s2"> mixes a date and a timestamp (JSON-FG)"</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">_closed</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="parse_time">
+<a class="viewcode-back" href="../../api.html#queryearth.parse_time">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">parse_time</span><span class="p">(</span><span class="n">member</span><span class="p">:</span> <span class="n">Mapping</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span> <span class="o">**</span><span class="n">props</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">TimeSpec</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Read a JSON-FG time member with the record's time properties.</span>
+
+<span class="sd">    props may hold every record property; periods, recurrence, time_start and</span>
+<span class="sd">    time_end are read and the rest ignored. Returns None when the record has no</span>
+<span class="sd">    time and no recurrence, which means always; an interval open at both ends,</span>
+<span class="sd">    with no periods or recurrence, also means always.</span>
+<span class="sd">    """</span>
+    <span class="n">start</span><span class="p">,</span> <span class="n">end</span> <span class="o">=</span> <span class="n">props</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"time_start"</span><span class="p">),</span> <span class="n">props</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"time_end"</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">start</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">end</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">member</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s2">"time_start and time_end cannot be combined with a non-null time"</span>
+            <span class="p">)</span>
+        <span class="n">extent</span> <span class="o">=</span> <span class="n">_wire_interval</span><span class="p">([</span><span class="n">start</span> <span class="ow">or</span> <span class="s2">".."</span><span class="p">,</span> <span class="n">end</span> <span class="ow">or</span> <span class="s2">".."</span><span class="p">])</span>
+    <span class="k">elif</span> <span class="n">member</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">extent</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="k">elif</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">member</span><span class="p">,</span> <span class="n">Mapping</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"a JSON-FG time member is an object or null, not </span><span class="si">{</span><span class="n">member</span><span class="si">!r}</span><span class="s2">"</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="nb">len</span><span class="p">(</span><span class="n">member</span><span class="p">)</span> <span class="o">!=</span> <span class="mi">1</span> <span class="ow">or</span> <span class="ow">not</span> <span class="nb">set</span><span class="p">(</span><span class="n">member</span><span class="p">)</span> <span class="o">&lt;=</span> <span class="p">{</span><span class="s2">"date"</span><span class="p">,</span> <span class="s2">"timestamp"</span><span class="p">,</span> <span class="s2">"interval"</span><span class="p">}:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">"a time member holds one of date, timestamp or interval: </span><span class="si">{</span><span class="nb">dict</span><span class="p">(</span><span class="n">member</span><span class="p">)</span><span class="si">}</span><span class="s2">"</span>
+        <span class="p">)</span>
+    <span class="k">elif</span> <span class="s2">"interval"</span> <span class="ow">in</span> <span class="n">member</span><span class="p">:</span>
+        <span class="n">extent</span> <span class="o">=</span> <span class="n">_wire_interval</span><span class="p">(</span><span class="n">member</span><span class="p">[</span><span class="s2">"interval"</span><span class="p">])</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="p">((</span><span class="n">kind</span><span class="p">,</span> <span class="n">value</span><span class="p">),)</span> <span class="o">=</span> <span class="n">member</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
+        <span class="n">read</span> <span class="o">=</span> <span class="n">_instant</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">read</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">read</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">!=</span> <span class="p">(</span><span class="s2">"day"</span> <span class="k">if</span> <span class="n">kind</span> <span class="o">==</span> <span class="s2">"date"</span> <span class="k">else</span> <span class="s2">"second"</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">value</span><span class="si">!r}</span><span class="s2"> is not a </span><span class="si">{</span><span class="n">kind</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+        <span class="n">extent</span> <span class="o">=</span> <span class="n">_closed</span><span class="p">(</span><span class="n">read</span><span class="p">,</span> <span class="n">read</span><span class="p">)</span>
+    <span class="n">months</span> <span class="o">=</span> <span class="n">props</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"recurrence"</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">months</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">if</span> <span class="p">(</span>
+            <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">months</span><span class="p">,</span> <span class="n">Mapping</span><span class="p">)</span>
+            <span class="ow">or</span> <span class="nb">set</span><span class="p">(</span><span class="n">months</span><span class="p">)</span> <span class="o">!=</span> <span class="p">{</span><span class="s2">"months"</span><span class="p">}</span>
+            <span class="ow">or</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">months</span><span class="p">[</span><span class="s2">"months"</span><span class="p">],</span> <span class="p">(</span><span class="nb">list</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">))</span>
+            <span class="ow">or</span> <span class="nb">len</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="n">months</span><span class="p">[</span><span class="s2">"months"</span><span class="p">]))</span> <span class="o">!=</span> <span class="nb">len</span><span class="p">(</span><span class="n">months</span><span class="p">[</span><span class="s2">"months"</span><span class="p">])</span>
+        <span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s1">'recurrence is </span><span class="se">{{</span><span class="s1">"months": [...]</span><span class="se">}}</span><span class="s1">, got </span><span class="si">{</span><span class="n">months</span><span class="si">!r}</span><span class="s1">'</span><span class="p">)</span>
+        <span class="n">months</span> <span class="o">=</span> <span class="nb">frozenset</span><span class="p">(</span><span class="n">months</span><span class="p">[</span><span class="s2">"months"</span><span class="p">])</span>
+    <span class="n">periods</span> <span class="o">=</span> <span class="n">props</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"periods"</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">periods</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">extent</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"periods refine the time member, so the record needs one"</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">periods</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">or</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">periods</span><span class="p">,</span> <span class="n">Sequence</span><span class="p">)</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">periods</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"periods is a non-empty list of intervals: </span><span class="si">{</span><span class="n">periods</span><span class="si">!r}</span><span class="s2">"</span><span class="p">)</span>
+        <span class="n">parts</span> <span class="o">=</span> <span class="p">[</span><span class="n">_wire_interval</span><span class="p">(</span><span class="n">p</span><span class="p">)</span> <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">periods</span><span class="p">]</span>
+        <span class="k">for</span> <span class="n">part</span><span class="p">,</span> <span class="n">raw</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">parts</span><span class="p">,</span> <span class="n">periods</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">_lo</span><span class="p">(</span><span class="n">part</span><span class="o">.</span><span class="n">start</span><span class="p">)</span> <span class="o">&lt;</span> <span class="n">_lo</span><span class="p">(</span><span class="n">extent</span><span class="o">.</span><span class="n">start</span><span class="p">)</span> <span class="ow">or</span> <span class="n">_hi</span><span class="p">(</span><span class="n">part</span><span class="o">.</span><span class="n">end</span><span class="p">)</span> <span class="o">&gt;</span> <span class="n">_hi</span><span class="p">(</span><span class="n">extent</span><span class="o">.</span><span class="n">end</span><span class="p">):</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"period </span><span class="si">{</span><span class="nb">list</span><span class="p">(</span><span class="n">raw</span><span class="p">)</span><span class="si">}</span><span class="s2"> lies outside the time member"</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">TimeSpec</span><span class="p">(</span><span class="nb">tuple</span><span class="p">(</span><span class="n">parts</span><span class="p">),</span> <span class="n">months</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">extent</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="p">(</span><span class="n">extent</span><span class="o">.</span><span class="n">start</span><span class="p">,</span> <span class="n">extent</span><span class="o">.</span><span class="n">end</span><span class="p">)</span> <span class="o">!=</span> <span class="p">(</span><span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">TimeSpec</span><span class="p">((</span><span class="n">extent</span><span class="p">,),</span> <span class="n">months</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">months</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">TimeSpec</span><span class="p">((</span><span class="n">Interval</span><span class="p">(</span><span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">),),</span> <span class="n">months</span><span class="p">)</span>
+    <span class="k">return</span> <span class="kc">None</span></div>
+
+
+
+<span class="c1"># ---- measures --------------------------------------------------------------------</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">overlap</span><span class="p">(</span><span class="n">rule</span><span class="p">:</span> <span class="n">TimeSpec</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span> <span class="n">query</span><span class="p">:</span> <span class="n">TimeSpec</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">TimeSpec</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Where a rule's time meets a query's; None if nowhere.</span>
+
+<span class="sd">    Month recurrence cuts the overlap into calendar months, merging runs that</span>
+<span class="sd">    touch; an overlap with an open end is returned unexpanded, with its months,</span>
+<span class="sd">    since every month occurs. An untimed rule (None) overlaps the query's whole</span>
+<span class="sd">    period.</span>
+<span class="sd">    """</span>
+    <span class="k">if</span> <span class="n">rule</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">query</span>
+    <span class="n">pieces</span><span class="p">,</span> <span class="n">a</span><span class="p">,</span> <span class="n">b</span> <span class="o">=</span> <span class="p">[],</span> <span class="nb">list</span><span class="p">(</span><span class="n">rule</span><span class="o">.</span><span class="n">intervals</span><span class="p">),</span> <span class="nb">list</span><span class="p">(</span><span class="n">query</span><span class="o">.</span><span class="n">intervals</span><span class="p">)</span>
+    <span class="k">while</span> <span class="n">a</span> <span class="ow">and</span> <span class="n">b</span><span class="p">:</span>  <span class="c1"># both sorted and disjoint; drop whichever ends first</span>
+        <span class="n">x</span><span class="p">,</span> <span class="n">y</span> <span class="o">=</span> <span class="n">a</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">b</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">lo</span><span class="p">,</span> <span class="n">hi</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">x</span><span class="o">.</span><span class="n">start</span><span class="p">,</span> <span class="n">y</span><span class="o">.</span><span class="n">start</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="n">_lo</span><span class="p">),</span> <span class="nb">min</span><span class="p">(</span><span class="n">x</span><span class="o">.</span><span class="n">end</span><span class="p">,</span> <span class="n">y</span><span class="o">.</span><span class="n">end</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="n">_hi</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">_lo</span><span class="p">(</span><span class="n">lo</span><span class="p">)</span> <span class="o">&lt;</span> <span class="n">_hi</span><span class="p">(</span><span class="n">hi</span><span class="p">):</span>
+            <span class="n">pieces</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">Interval</span><span class="p">(</span><span class="n">lo</span><span class="p">,</span> <span class="n">hi</span><span class="p">,</span> <span class="nb">max</span><span class="p">(</span><span class="n">x</span><span class="o">.</span><span class="n">precision</span><span class="p">,</span> <span class="n">y</span><span class="o">.</span><span class="n">precision</span><span class="p">)))</span>
+        <span class="p">(</span><span class="n">a</span> <span class="k">if</span> <span class="n">_hi</span><span class="p">(</span><span class="n">x</span><span class="o">.</span><span class="n">end</span><span class="p">)</span> <span class="o">&lt;=</span> <span class="n">_hi</span><span class="p">(</span><span class="n">y</span><span class="o">.</span><span class="n">end</span><span class="p">)</span> <span class="k">else</span> <span class="n">b</span><span class="p">)</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+    <span class="n">months</span> <span class="o">=</span> <span class="n">rule</span><span class="o">.</span><span class="n">months</span>
+    <span class="k">if</span> <span class="n">query</span><span class="o">.</span><span class="n">months</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">months</span> <span class="o">=</span> <span class="n">query</span><span class="o">.</span><span class="n">months</span> <span class="k">if</span> <span class="n">months</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">months</span> <span class="o">&amp;</span> <span class="n">query</span><span class="o">.</span><span class="n">months</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">pieces</span> <span class="ow">or</span> <span class="n">months</span> <span class="o">==</span> <span class="nb">frozenset</span><span class="p">():</span>
+        <span class="k">return</span> <span class="kc">None</span>
+    <span class="k">if</span> <span class="n">months</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="nb">any</span><span class="p">(</span><span class="kc">None</span> <span class="ow">in</span> <span class="p">(</span><span class="n">p</span><span class="o">.</span><span class="n">start</span><span class="p">,</span> <span class="n">p</span><span class="o">.</span><span class="n">end</span><span class="p">)</span> <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">pieces</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">TimeSpec</span><span class="p">(</span><span class="nb">tuple</span><span class="p">(</span><span class="n">pieces</span><span class="p">),</span> <span class="n">months</span><span class="p">)</span>
+    <span class="n">runs</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">piece</span> <span class="ow">in</span> <span class="n">pieces</span><span class="p">:</span>  <span class="c1"># cut into calendar months, a month at a time</span>
+        <span class="n">first</span> <span class="o">=</span> <span class="n">_dt</span><span class="o">.</span><span class="n">date</span><span class="o">.</span><span class="n">fromordinal</span><span class="p">(</span><span class="n">piece</span><span class="o">.</span><span class="n">start</span> <span class="o">//</span> <span class="n">DAY</span><span class="p">)</span>
+        <span class="n">y</span><span class="p">,</span> <span class="n">m</span><span class="p">,</span> <span class="n">start</span> <span class="o">=</span> <span class="n">first</span><span class="o">.</span><span class="n">year</span><span class="p">,</span> <span class="n">first</span><span class="o">.</span><span class="n">month</span><span class="p">,</span> <span class="n">first</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="n">day</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">toordinal</span><span class="p">()</span> <span class="o">*</span> <span class="n">DAY</span>
+        <span class="k">while</span> <span class="n">start</span> <span class="o">&lt;</span> <span class="n">piece</span><span class="o">.</span><span class="n">end</span><span class="p">:</span>
+            <span class="n">end</span> <span class="o">=</span> <span class="n">start</span> <span class="o">+</span> <span class="n">calendar</span><span class="o">.</span><span class="n">monthrange</span><span class="p">(</span><span class="n">y</span><span class="p">,</span> <span class="n">m</span><span class="p">)[</span><span class="mi">1</span><span class="p">]</span> <span class="o">*</span> <span class="n">DAY</span>
+            <span class="k">if</span> <span class="n">m</span> <span class="ow">in</span> <span class="n">months</span><span class="p">:</span>
+                <span class="n">lo</span><span class="p">,</span> <span class="n">hi</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">piece</span><span class="o">.</span><span class="n">start</span><span class="p">,</span> <span class="n">start</span><span class="p">),</span> <span class="nb">min</span><span class="p">(</span><span class="n">piece</span><span class="o">.</span><span class="n">end</span><span class="p">,</span> <span class="n">end</span><span class="p">)</span>
+                <span class="n">runs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">Interval</span><span class="p">(</span><span class="n">lo</span><span class="p">,</span> <span class="n">hi</span><span class="p">,</span> <span class="n">piece</span><span class="o">.</span><span class="n">precision</span><span class="p">))</span>
+            <span class="n">y</span><span class="p">,</span> <span class="n">m</span><span class="p">,</span> <span class="n">start</span> <span class="o">=</span> <span class="n">y</span> <span class="o">+</span> <span class="n">m</span> <span class="o">//</span> <span class="mi">12</span><span class="p">,</span> <span class="n">m</span> <span class="o">%</span> <span class="mi">12</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span> <span class="n">end</span>
+    <span class="k">return</span> <span class="n">TimeSpec</span><span class="p">(</span><span class="nb">tuple</span><span class="p">(</span><span class="n">runs</span><span class="p">))</span> <span class="k">if</span> <span class="n">runs</span> <span class="k">else</span> <span class="kc">None</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">overlaps</span><span class="p">(</span><span class="n">rule</span><span class="p">:</span> <span class="n">TimeSpec</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span> <span class="n">query</span><span class="p">:</span> <span class="n">TimeSpec</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Whether a rule's time meets a query's (see overlap)."""</span>
+    <span class="k">return</span> <span class="n">overlap</span><span class="p">(</span><span class="n">rule</span><span class="p">,</span> <span class="n">query</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">time_fraction</span><span class="p">(</span><span class="n">part</span><span class="p">:</span> <span class="n">TimeSpec</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span> <span class="n">query</span><span class="p">:</span> <span class="n">TimeSpec</span> <span class="o">|</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""The share of the query's duration that part covers.</span>
+
+<span class="sd">    None when the query has no time or an open end. A month recurrence on</span>
+<span class="sd">    either side is expanded before durations are measured.</span>
+<span class="sd">    """</span>
+    <span class="k">if</span> <span class="n">query</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="kc">None</span> <span class="ow">in</span> <span class="n">query</span><span class="o">.</span><span class="n">extent</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">None</span>
+    <span class="k">if</span> <span class="n">query</span><span class="o">.</span><span class="n">months</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">query</span> <span class="o">=</span> <span class="n">overlap</span><span class="p">(</span><span class="n">query</span><span class="p">,</span> <span class="n">query</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">query</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">None</span>
+    <span class="k">if</span> <span class="n">part</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">part</span><span class="o">.</span><span class="n">months</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">part</span> <span class="o">=</span> <span class="n">overlap</span><span class="p">(</span><span class="n">part</span><span class="p">,</span> <span class="n">part</span><span class="p">)</span>  <span class="c1"># bounded, since it lies inside a bounded query</span>
+    <span class="n">total</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span><span class="n">iv</span><span class="o">.</span><span class="n">end</span> <span class="o">-</span> <span class="n">iv</span><span class="o">.</span><span class="n">start</span> <span class="k">for</span> <span class="n">iv</span> <span class="ow">in</span> <span class="n">query</span><span class="o">.</span><span class="n">intervals</span><span class="p">)</span>
+    <span class="n">covered</span> <span class="o">=</span> <span class="mi">0</span> <span class="k">if</span> <span class="n">part</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="nb">sum</span><span class="p">(</span><span class="n">iv</span><span class="o">.</span><span class="n">end</span> <span class="o">-</span> <span class="n">iv</span><span class="o">.</span><span class="n">start</span> <span class="k">for</span> <span class="n">iv</span> <span class="ow">in</span> <span class="n">part</span><span class="o">.</span><span class="n">intervals</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">covered</span> <span class="o">/</span> <span class="n">total</span> <span class="k">if</span> <span class="n">total</span> <span class="k">else</span> <span class="kc">None</span>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2026, Manish Venumuddula.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
