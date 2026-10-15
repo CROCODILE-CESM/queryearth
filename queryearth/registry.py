@@ -68,6 +68,11 @@ FORMAT = "0.6"
 _SLUG = re.compile(r"[a-z][a-z0-9_]*")
 _RELEASE = re.compile(r"([0-9]+)\.([0-9]+)(?:\.[0-9]+)?")
 _URL = re.compile(r"https?://", re.IGNORECASE)
+# A list of numbers, such as a point, as json.dumps(indent=2) spreads it over lines.
+# A JSON string never holds a newline, so only real lists match.
+_NUMBERS = re.compile(
+    r"\[\n\s*(-?[0-9][0-9.eE+-]*(?:,\n\s*-?[0-9][0-9.eE+-]*)*)\n\s*\]"
+)
 
 _default: Registry | None = None
 _default_lock = threading.Lock()
@@ -225,6 +230,14 @@ def _collection(data: Any) -> Any:
     if isinstance(data, Mapping) and data.get("type") == "Feature":
         return {"type": "FeatureCollection", "features": [data]}
     return data
+
+
+def _json(data: Any) -> str:
+    """The text of a rule file or a pack's file: indented JSON, with each list of
+    numbers, such as a point, on one line."""
+    text = json.dumps(data, indent=2, ensure_ascii=False)
+    text = _NUMBERS.sub(lambda m: "[" + re.sub(r",\n\s*", ", ", m[1]) + "]", text)
+    return text + "\n"
 
 
 def _plain(dimension: Any) -> dict[str, Any]:
@@ -717,8 +730,7 @@ class Registry:
 
     def to_file(self, path: str | os.PathLike[str]) -> None:
         """Write to_collection() to a rule file that from_file() reads back."""
-        text = json.dumps(self.to_collection(), indent=2, ensure_ascii=False)
-        Path(path).write_text(text + "\n", encoding="utf-8")
+        Path(path).write_text(_json(self.to_collection()), encoding="utf-8")
 
     def to_pack(self, path: str | os.PathLike[str]) -> None:
         """Write this Registry as a pack that from_file() reads back: pack.json
@@ -762,8 +774,7 @@ class Registry:
                 old.unlink()
         for target, data in written.items():
             target.parent.mkdir(parents=True, exist_ok=True)
-            text = json.dumps(data, indent=2, ensure_ascii=False) + "\n"
-            target.write_text(text, encoding="utf-8")
+            target.write_text(_json(data), encoding="utf-8")
         for old in sorted(folder.rglob("*"), reverse=True):
             if old.is_dir() and not any(old.iterdir()):
                 old.rmdir()

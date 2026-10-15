@@ -123,7 +123,7 @@ The values in `dimensions` take the forms in the [table of dimensions](concepts.
 
 {meth}`Rule.to_feature() <queryearth.Rule.to_feature>` turns a rule back into a record, leaving out the fields at their defaults and writing the scope's `dimensions` as given, so that `Rule.from_feature(rule.to_feature())` gives the same rule. A `box` is written as its polygon, split at ±180, and time as the `time` member plus `periods` and `recurrence` where needed. A rule whose space is a point, or whose level is not info, warning or error, has no record form and raises `ValueError`. A computed rule is code, so it has no record form either.
 
-{meth}`Registry.to_file() <queryearth.Registry.to_file>` writes a Registry's rule file: the `queryearth` release of its format, its categories and dimensions, and a record for each rule, in the order they were added. Computed rules are left out. {meth}`Registry.to_collection() <queryearth.Registry.to_collection>` gives the same FeatureCollection as a dict.
+{meth}`Registry.to_file() <queryearth.Registry.to_file>` writes a Registry's rule file: the `queryearth` release of its format, its categories and dimensions, and a record for each rule, in the order they were added, as indented JSON with each point on one line. Computed rules are left out. {meth}`Registry.to_collection() <queryearth.Registry.to_collection>` gives the same FeatureCollection as a dict.
 
 ```python
 registry.to_file("mine.geojson")

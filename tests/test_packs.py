@@ -96,6 +96,22 @@ def test_load_reads_a_pack_too(tmp_path):
     ]
 
 
+def test_each_point_is_written_on_one_line(tmp_path):
+    found = registry()
+    found.add(
+        qe.Rule(code="OBC003", title="t", message="see [\n 1,\n 2\n] and [ 3, 4 ]")
+    )
+    found.to_pack(tmp_path / "mine")
+    found.to_file(tmp_path / "mine.geojson")
+    point, message = "[0.0, 0.0]", '"see [\\n 1,\\n 2\\n] and [ 3, 4 ]"'
+    assert point in (tmp_path / "mine/DOMAIN/OBC/OBC001.geojson").read_text()
+    assert message in (tmp_path / "mine/DOMAIN/OBC/OBC003.geojson").read_text()
+    text = (tmp_path / "mine.geojson").read_text()
+    assert point in text and message in text
+    again = qe.Registry.from_file(tmp_path / "mine.geojson")
+    assert again.to_collection() == found.to_collection()
+
+
 def test_without_categories_each_prefix_gets_a_folder(tmp_path):
     plain = qe.Registry("plain")
     plain.add(rule("ITF001"))
