@@ -1,0 +1,480 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>queryearth.space &mdash; queryearth 0.5.0</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=1dd76d02"></script>
+      <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script src="../../_static/versions.js?v=58ec1786"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            queryearth
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../concepts.html">Concepts</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../rules.html">Writing rules</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../results.html">Using findings</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../extending.html">Extending queryearth</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../example.html">The toy example</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api.html">API reference</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">queryearth</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">queryearth.space</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for queryearth.space</h1><div class="highlight"><pre>
+<span></span><span class="sd">"""Space: points and polygons with straight lon/lat edges, and closed-set measures.</span>
+
+<span class="sd">Coordinates are float64 (longitude, latitude) in degrees on WGS84 (CRS84), and</span>
+<span class="sd">edges are straight lines in longitude-latitude. Every polygon is normalised once,</span>
+<span class="sd">when it is built: longitudes wrapped exactly, rings cut at +-180, invalid rings</span>
+<span class="sd">repaired and rings oriented; a ring that goes around a pole is refused (design.md</span>
+<span class="sd">section 6). Areas use a closed form on a sphere of radius R_KM.</span>
+
+<span class="sd">Import as ``from queryearth import space as sp``.</span>
+<span class="sd">"""</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">math</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">collections.abc</span><span class="w"> </span><span class="kn">import</span> <span class="n">Mapping</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">dataclasses</span><span class="w"> </span><span class="kn">import</span> <span class="n">dataclass</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Literal</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">shapely</span>
+
+<span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="s2">"R_KM"</span><span class="p">,</span>
+    <span class="s2">"Space"</span><span class="p">,</span>
+    <span class="s2">"area_km2"</span><span class="p">,</span>
+    <span class="s2">"box"</span><span class="p">,</span>
+    <span class="s2">"edge"</span><span class="p">,</span>
+    <span class="s2">"edge_meets"</span><span class="p">,</span>
+    <span class="s2">"measure"</span><span class="p">,</span>
+    <span class="s2">"meets"</span><span class="p">,</span>
+    <span class="s2">"point"</span><span class="p">,</span>
+    <span class="s2">"points_mask"</span><span class="p">,</span>
+    <span class="s2">"polygon"</span><span class="p">,</span>
+    <span class="s2">"wrap_lon"</span><span class="p">,</span>
+<span class="p">]</span>
+
+<span class="n">R_KM</span> <span class="o">=</span> <span class="mf">6371.0088</span>  <span class="c1"># mean Earth radius; area fractions do not depend on it</span>
+<span class="n">LAT_TOLERANCE</span> <span class="o">=</span> <span class="mf">1e-9</span>  <span class="c1"># degrees beyond +-90 that are clamped rather than refused</span>
+<span class="n">_EAST</span> <span class="o">=</span> <span class="n">shapely</span><span class="o">.</span><span class="n">LineString</span><span class="p">([(</span><span class="mf">180.0</span><span class="p">,</span> <span class="o">-</span><span class="mf">90.0</span><span class="p">),</span> <span class="p">(</span><span class="mf">180.0</span><span class="p">,</span> <span class="mf">90.0</span><span class="p">)])</span>
+<span class="n">_POLES</span> <span class="o">=</span> <span class="n">shapely</span><span class="o">.</span><span class="n">MultiLineString</span><span class="p">(</span>
+    <span class="p">[[(</span><span class="o">-</span><span class="mf">180.0</span><span class="p">,</span> <span class="mf">90.0</span><span class="p">),</span> <span class="p">(</span><span class="mf">180.0</span><span class="p">,</span> <span class="mf">90.0</span><span class="p">)],</span> <span class="p">[(</span><span class="o">-</span><span class="mf">180.0</span><span class="p">,</span> <span class="o">-</span><span class="mf">90.0</span><span class="p">),</span> <span class="p">(</span><span class="mf">180.0</span><span class="p">,</span> <span class="o">-</span><span class="mf">90.0</span><span class="p">)]]</span>
+<span class="p">)</span>
+
+
+<div class="viewcode-block" id="Space">
+<a class="viewcode-back" href="../../api.html#queryearth.Space">[docs]</a>
+<span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">eq</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">Space</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""A point or a normalised (multi)polygon; compares and hashes by identity.</span>
+
+<span class="sd">    geometry is a shapely Point or (Multi)Polygon in [-180, 180] with no part</span>
+<span class="sd">    crossing +-180; area_km2 is the spherical area of a polygon, None for a point.</span>
+<span class="sd">    """</span>
+
+    <span class="n">kind</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">"point"</span><span class="p">,</span> <span class="s2">"polygon"</span><span class="p">]</span>
+    <span class="n">geometry</span><span class="p">:</span> <span class="n">shapely</span><span class="o">.</span><span class="n">Geometry</span>
+    <span class="n">area_km2</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span></div>
+
+
+
+<span class="c1"># ---- coordinates -----------------------------------------------------------------</span>
+<div class="viewcode-block" id="wrap_lon">
+<a class="viewcode-back" href="../../api.html#queryearth.wrap_lon">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">wrap_lon</span><span class="p">(</span><span class="n">x</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""x in [-180, 180] with no rounding error, as a float or an array like x.</span>
+
+<span class="sd">    180 and -180 stay as given. Adding or subtracting 360 is exact, since the</span>
+<span class="sd">    remainder and 360 are within a factor of two of each other.</span>
+<span class="sd">    """</span>
+    <span class="n">r</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">fmod</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="mf">360.0</span><span class="p">)</span>
+    <span class="n">r</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">r</span> <span class="o">&gt;</span> <span class="mf">180.0</span><span class="p">,</span> <span class="n">r</span> <span class="o">-</span> <span class="mf">360.0</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">r</span> <span class="o">&lt;</span> <span class="o">-</span><span class="mf">180.0</span><span class="p">,</span> <span class="n">r</span> <span class="o">+</span> <span class="mf">360.0</span><span class="p">,</span> <span class="n">r</span><span class="p">))</span>
+    <span class="k">return</span> <span class="n">r</span> <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">ndim</span><span class="p">(</span><span class="n">r</span><span class="p">)</span> <span class="k">else</span> <span class="nb">float</span><span class="p">(</span><span class="n">r</span><span class="p">)</span></div>
+
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_lat</span><span class="p">(</span><span class="n">value</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Latitudes clamped to [-90, 90], or ValueError beyond LAT_TOLERANCE."""</span>
+    <span class="n">value</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">any</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">value</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mf">90.0</span> <span class="o">+</span> <span class="n">LAT_TOLERANCE</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"a latitude is outside [-90, 90]: </span><span class="si">{</span><span class="n">value</span><span class="si">!r}</span><span class="s2">"</span><span class="p">)</span>
+    <span class="n">value</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">clip</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="o">-</span><span class="mf">90.0</span><span class="p">,</span> <span class="mf">90.0</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">value</span> <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">ndim</span><span class="p">(</span><span class="n">value</span><span class="p">)</span> <span class="k">else</span> <span class="nb">float</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_shift</span><span class="p">(</span><span class="n">geometry</span><span class="p">:</span> <span class="n">shapely</span><span class="o">.</span><span class="n">Geometry</span><span class="p">,</span> <span class="n">dx</span><span class="p">:</span> <span class="nb">float</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">shapely</span><span class="o">.</span><span class="n">Geometry</span><span class="p">:</span>
+    <span class="k">return</span> <span class="n">shapely</span><span class="o">.</span><span class="n">transform</span><span class="p">(</span><span class="n">geometry</span><span class="p">,</span> <span class="k">lambda</span> <span class="n">c</span><span class="p">:</span> <span class="n">c</span> <span class="o">+</span> <span class="p">(</span><span class="n">dx</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">))</span>
+
+
+<span class="c1"># ---- polygon normalisation (design.md section 6.2) -----------------------------</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">_polygonal</span><span class="p">(</span><span class="n">shape</span><span class="p">:</span> <span class="n">shapely</span><span class="o">.</span><span class="n">Geometry</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">shapely</span><span class="o">.</span><span class="n">Geometry</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""The polygon parts of a geometry, merged."""</span>
+    <span class="c1"># make_valid can nest a MultiPolygon inside a GeometryCollection</span>
+    <span class="n">parts</span> <span class="o">=</span> <span class="n">shapely</span><span class="o">.</span><span class="n">get_parts</span><span class="p">(</span><span class="n">shapely</span><span class="o">.</span><span class="n">get_parts</span><span class="p">(</span><span class="n">shape</span><span class="p">))</span>
+    <span class="k">return</span> <span class="n">shapely</span><span class="o">.</span><span class="n">union_all</span><span class="p">(</span><span class="n">parts</span><span class="p">[</span><span class="n">shapely</span><span class="o">.</span><span class="n">get_type_id</span><span class="p">(</span><span class="n">parts</span><span class="p">)</span> <span class="o">==</span> <span class="mi">3</span><span class="p">])</span>  <span class="c1"># Polygon</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_lines</span><span class="p">(</span><span class="n">shape</span><span class="p">:</span> <span class="n">shapely</span><span class="o">.</span><span class="n">Geometry</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">shapely</span><span class="o">.</span><span class="n">Geometry</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""The line parts of a geometry, merged."""</span>
+    <span class="n">parts</span> <span class="o">=</span> <span class="n">shapely</span><span class="o">.</span><span class="n">get_parts</span><span class="p">(</span><span class="n">shapely</span><span class="o">.</span><span class="n">get_parts</span><span class="p">(</span><span class="n">shape</span><span class="p">))</span>
+    <span class="k">return</span> <span class="n">shapely</span><span class="o">.</span><span class="n">union_all</span><span class="p">(</span><span class="n">parts</span><span class="p">[</span><span class="n">shapely</span><span class="o">.</span><span class="n">get_type_id</span><span class="p">(</span><span class="n">parts</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span><span class="p">])</span>  <span class="c1"># LineString</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_split_at_seam</span><span class="p">(</span><span class="n">shape</span><span class="p">:</span> <span class="n">shapely</span><span class="o">.</span><span class="n">Geometry</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">shapely</span><span class="o">.</span><span class="n">Geometry</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Cut an unwrapped shape into 360 degree strips and move each into [-180, 180]."""</span>
+    <span class="n">west</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">east</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">shape</span><span class="o">.</span><span class="n">bounds</span>
+    <span class="n">pieces</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span>
+        <span class="n">math</span><span class="o">.</span><span class="n">floor</span><span class="p">((</span><span class="n">west</span> <span class="o">+</span> <span class="mf">180.0</span><span class="p">)</span> <span class="o">/</span> <span class="mf">360.0</span><span class="p">),</span> <span class="n">math</span><span class="o">.</span><span class="n">ceil</span><span class="p">((</span><span class="n">east</span> <span class="o">-</span> <span class="mf">180.0</span><span class="p">)</span> <span class="o">/</span> <span class="mf">360.0</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span>
+    <span class="p">):</span>
+        <span class="n">strip</span> <span class="o">=</span> <span class="n">shapely</span><span class="o">.</span><span class="n">box</span><span class="p">(</span><span class="mf">360.0</span> <span class="o">*</span> <span class="n">k</span> <span class="o">-</span> <span class="mf">180.0</span><span class="p">,</span> <span class="o">-</span><span class="mf">90.0</span><span class="p">,</span> <span class="mf">360.0</span> <span class="o">*</span> <span class="n">k</span> <span class="o">+</span> <span class="mf">180.0</span><span class="p">,</span> <span class="mf">90.0</span><span class="p">)</span>
+        <span class="n">piece</span> <span class="o">=</span> <span class="n">shapely</span><span class="o">.</span><span class="n">intersection</span><span class="p">(</span><span class="n">shape</span><span class="p">,</span> <span class="n">strip</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">piece</span><span class="o">.</span><span class="n">is_empty</span><span class="p">:</span>
+            <span class="n">pieces</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">_shift</span><span class="p">(</span><span class="n">piece</span><span class="p">,</span> <span class="o">-</span><span class="mf">360.0</span> <span class="o">*</span> <span class="n">k</span><span class="p">))</span>
+    <span class="k">return</span> <span class="n">_polygonal</span><span class="p">(</span><span class="n">shapely</span><span class="o">.</span><span class="n">union_all</span><span class="p">(</span><span class="n">pieces</span><span class="p">))</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_ring</span><span class="p">(</span><span class="n">coords</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">shapely</span><span class="o">.</span><span class="n">Geometry</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""One closed ring of positions, unwrapped, repaired and cut at +-180.</span>
+
+<span class="sd">    Each step between vertices is taken the short way, except that a step of</span>
+<span class="sd">    exactly 180 degrees and a full-turn step of exactly 360 degrees keep the</span>
+<span class="sd">    direction they were written in (fixture 22). Every vertex is its wrapped</span>
+<span class="sd">    longitude plus whole turns, so no rounding error builds up along the ring.</span>
+<span class="sd">    """</span>
+    <span class="n">lon</span><span class="p">,</span> <span class="n">lat</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">([</span><span class="n">c</span><span class="p">[:</span><span class="mi">2</span><span class="p">]</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">coords</span><span class="p">][:</span><span class="o">-</span><span class="mi">1</span><span class="p">],</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">)</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span><span class="o">.</span><span class="n">T</span>
+    <span class="k">if</span> <span class="n">lon</span><span class="o">.</span><span class="n">size</span> <span class="o">&lt;</span> <span class="mi">3</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">np</span><span class="o">.</span><span class="n">isfinite</span><span class="p">([</span><span class="n">lon</span><span class="p">,</span> <span class="n">lat</span><span class="p">])</span><span class="o">.</span><span class="n">all</span><span class="p">():</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"a ring needs three vertices with finite coordinates"</span><span class="p">)</span>
+    <span class="n">wrapped</span> <span class="o">=</span> <span class="n">wrap_lon</span><span class="p">(</span><span class="n">lon</span><span class="p">)</span>
+    <span class="n">steps</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">diff</span><span class="p">(</span><span class="n">lon</span><span class="p">,</span> <span class="n">append</span><span class="o">=</span><span class="n">lon</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>  <span class="c1"># the last one closes the ring</span>
+    <span class="n">steps</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">steps</span><span class="p">)</span> <span class="o">==</span> <span class="mf">360.0</span><span class="p">,</span> <span class="n">steps</span><span class="p">,</span> <span class="n">wrap_lon</span><span class="p">(</span><span class="n">steps</span><span class="p">))</span>
+    <span class="n">lands</span> <span class="o">=</span> <span class="n">wrapped</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="n">np</span><span class="o">.</span><span class="n">cumsum</span><span class="p">(</span><span class="n">steps</span><span class="p">)</span>  <span class="c1"># where each step lands, before rounding</span>
+    <span class="n">u</span> <span class="o">=</span> <span class="n">wrapped</span> <span class="o">+</span> <span class="mf">360.0</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">round</span><span class="p">((</span><span class="n">np</span><span class="o">.</span><span class="n">r_</span><span class="p">[</span><span class="n">wrapped</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">lands</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">]]</span> <span class="o">-</span> <span class="n">wrapped</span><span class="p">)</span> <span class="o">/</span> <span class="mf">360.0</span><span class="p">)</span>
+    <span class="k">if</span> <span class="nb">round</span><span class="p">((</span><span class="n">lands</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">-</span> <span class="n">wrapped</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span> <span class="o">/</span> <span class="mf">360.0</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">"the ring goes around the globe, so it encloses a pole, which is not "</span>
+            <span class="s2">"supported; close it along latitude 90 or -90 first, as in (-180, 70), "</span>
+            <span class="s2">"(180, 70), (180, 90), (-180, 90)"</span>
+        <span class="p">)</span>
+    <span class="n">shape</span> <span class="o">=</span> <span class="n">_polygonal</span><span class="p">(</span><span class="n">shapely</span><span class="o">.</span><span class="n">make_valid</span><span class="p">(</span><span class="n">shapely</span><span class="o">.</span><span class="n">Polygon</span><span class="p">(</span><span class="nb">zip</span><span class="p">(</span><span class="n">u</span><span class="p">,</span> <span class="n">_lat</span><span class="p">(</span><span class="n">lat</span><span class="p">)))))</span>
+    <span class="k">if</span> <span class="n">shape</span><span class="o">.</span><span class="n">is_empty</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"the ring encloses no area"</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">_split_at_seam</span><span class="p">(</span><span class="n">shape</span><span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_finish</span><span class="p">(</span><span class="n">geometry</span><span class="p">:</span> <span class="n">shapely</span><span class="o">.</span><span class="n">Geometry</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Space</span><span class="p">:</span>
+    <span class="n">geometry</span> <span class="o">=</span> <span class="n">shapely</span><span class="o">.</span><span class="n">orient_polygons</span><span class="p">(</span><span class="n">geometry</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">Space</span><span class="p">(</span><span class="s2">"polygon"</span><span class="p">,</span> <span class="n">geometry</span><span class="p">,</span> <span class="n">area_km2</span><span class="p">(</span><span class="n">geometry</span><span class="p">))</span>
+
+
+<span class="c1"># ---- space helpers ---------------------------------------------------------------</span>
+<div class="viewcode-block" id="point">
+<a class="viewcode-back" href="../../api.html#queryearth.point">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">point</span><span class="p">(</span><span class="n">lon</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">lat</span><span class="p">:</span> <span class="nb">float</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Space</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""A point, such as a station or a grid cell centre."""</span>
+    <span class="n">lon</span><span class="p">,</span> <span class="n">lat</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">lon</span><span class="p">),</span> <span class="n">_lat</span><span class="p">(</span><span class="n">lat</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span><span class="n">math</span><span class="o">.</span><span class="n">isfinite</span><span class="p">(</span><span class="n">lon</span><span class="p">)</span> <span class="ow">and</span> <span class="n">math</span><span class="o">.</span><span class="n">isfinite</span><span class="p">(</span><span class="n">lat</span><span class="p">)):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"a point needs finite coordinates, got </span><span class="si">{</span><span class="n">lon</span><span class="si">!r}</span><span class="s2">, </span><span class="si">{</span><span class="n">lat</span><span class="si">!r}</span><span class="s2">"</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">Space</span><span class="p">(</span><span class="s2">"point"</span><span class="p">,</span> <span class="n">shapely</span><span class="o">.</span><span class="n">Point</span><span class="p">(</span><span class="n">wrap_lon</span><span class="p">(</span><span class="n">lon</span><span class="p">),</span> <span class="n">lat</span><span class="p">))</span></div>
+
+
+
+<div class="viewcode-block" id="box">
+<a class="viewcode-back" href="../../api.html#queryearth.box">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">box</span><span class="p">(</span><span class="n">west</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">south</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">east</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">north</span><span class="p">:</span> <span class="nb">float</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Space</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""A box from west to east between two latitudes.</span>
+
+<span class="sd">    west &gt; east crosses the antimeridian and gives two parts, and -180 to 180</span>
+<span class="sd">    is a full latitude band, for a domain periodic in longitude.</span>
+<span class="sd">    """</span>
+    <span class="n">west</span><span class="p">,</span> <span class="n">east</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">west</span><span class="p">),</span> <span class="nb">float</span><span class="p">(</span><span class="n">east</span><span class="p">)</span>
+    <span class="n">width</span> <span class="o">=</span> <span class="n">east</span> <span class="o">-</span> <span class="n">west</span> <span class="k">if</span> <span class="n">east</span> <span class="o">&gt;</span> <span class="n">west</span> <span class="k">else</span> <span class="n">east</span> <span class="o">-</span> <span class="n">west</span> <span class="o">+</span> <span class="mf">360.0</span>
+    <span class="k">if</span> <span class="n">east</span> <span class="o">==</span> <span class="n">west</span> <span class="ow">or</span> <span class="ow">not</span> <span class="mf">0.0</span> <span class="o">&lt;</span> <span class="n">width</span> <span class="o">&lt;=</span> <span class="mf">360.0</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">"a box needs west != east, at most 360 degrees apart (-180 to 180 is "</span>
+            <span class="sa">f</span><span class="s2">"a latitude band), got </span><span class="si">{</span><span class="n">west</span><span class="si">!r}</span><span class="s2">, </span><span class="si">{</span><span class="n">east</span><span class="si">!r}</span><span class="s2">"</span>
+        <span class="p">)</span>
+    <span class="n">south</span><span class="p">,</span> <span class="n">north</span> <span class="o">=</span> <span class="n">_lat</span><span class="p">(</span><span class="n">south</span><span class="p">),</span> <span class="n">_lat</span><span class="p">(</span><span class="n">north</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">south</span> <span class="o">&lt;</span> <span class="n">north</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"need south &lt; north, got </span><span class="si">{</span><span class="n">south</span><span class="si">!r}</span><span class="s2">, </span><span class="si">{</span><span class="n">north</span><span class="si">!r}</span><span class="s2">"</span><span class="p">)</span>
+    <span class="n">west</span> <span class="o">=</span> <span class="o">-</span><span class="mf">180.0</span> <span class="k">if</span> <span class="n">width</span> <span class="o">==</span> <span class="mf">360.0</span> <span class="k">else</span> <span class="n">wrap_lon</span><span class="p">(</span><span class="n">west</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">_finish</span><span class="p">(</span><span class="n">_split_at_seam</span><span class="p">(</span><span class="n">shapely</span><span class="o">.</span><span class="n">box</span><span class="p">(</span><span class="n">west</span><span class="p">,</span> <span class="n">south</span><span class="p">,</span> <span class="n">west</span> <span class="o">+</span> <span class="n">width</span><span class="p">,</span> <span class="n">north</span><span class="p">)))</span></div>
+
+
+
+<div class="viewcode-block" id="polygon">
+<a class="viewcode-back" href="../../api.html#queryearth.polygon">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">polygon</span><span class="p">(</span><span class="n">shape</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Space</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""A normalised polygon from shapely, GeoJSON or a list of (lon, lat) positions.</span>
+
+<span class="sd">    Longitudes may use any convention; holes are normalised as separate rings</span>
+<span class="sd">    and subtracted. A ring that goes around a pole raises ValueError.</span>
+<span class="sd">    """</span>
+    <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">shape</span><span class="p">,</span> <span class="s2">"__geo_interface__"</span><span class="p">):</span>
+        <span class="n">shape</span> <span class="o">=</span> <span class="n">shape</span><span class="o">.</span><span class="n">__geo_interface__</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">shape</span><span class="p">,</span> <span class="n">Mapping</span><span class="p">)</span> <span class="ow">and</span> <span class="n">shape</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"type"</span><span class="p">)</span> <span class="o">==</span> <span class="s2">"Feature"</span><span class="p">:</span>
+        <span class="n">shape</span> <span class="o">=</span> <span class="n">shape</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"geometry"</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">shape</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"no geometry given; a rule without one is global"</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">shape</span><span class="p">,</span> <span class="n">Mapping</span><span class="p">):</span>
+        <span class="n">shape</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"type"</span><span class="p">:</span> <span class="s2">"Polygon"</span><span class="p">,</span> <span class="s2">"coordinates"</span><span class="p">:</span> <span class="p">[</span><span class="n">shape</span><span class="p">]}</span>  <span class="c1"># one ring</span>
+    <span class="k">if</span> <span class="n">shape</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"type"</span><span class="p">)</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"Polygon"</span><span class="p">,</span> <span class="s2">"MultiPolygon"</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">"expected a Polygon or MultiPolygon, got </span><span class="si">{</span><span class="n">shape</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">'type'</span><span class="p">)</span><span class="si">!r}</span><span class="s2">"</span>
+        <span class="p">)</span>
+    <span class="n">parts</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">part</span> <span class="ow">in</span> <span class="n">shapely</span><span class="o">.</span><span class="n">get_parts</span><span class="p">(</span><span class="n">shapely</span><span class="o">.</span><span class="n">geometry</span><span class="o">.</span><span class="n">shape</span><span class="p">(</span><span class="n">shape</span><span class="p">)):</span>
+        <span class="n">exterior</span> <span class="o">=</span> <span class="n">_ring</span><span class="p">(</span><span class="n">part</span><span class="o">.</span><span class="n">exterior</span><span class="o">.</span><span class="n">coords</span><span class="p">)</span>
+        <span class="n">holes</span> <span class="o">=</span> <span class="n">shapely</span><span class="o">.</span><span class="n">union_all</span><span class="p">([</span><span class="n">_ring</span><span class="p">(</span><span class="n">h</span><span class="o">.</span><span class="n">coords</span><span class="p">)</span> <span class="k">for</span> <span class="n">h</span> <span class="ow">in</span> <span class="n">part</span><span class="o">.</span><span class="n">interiors</span><span class="p">])</span>
+        <span class="n">parts</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">shapely</span><span class="o">.</span><span class="n">difference</span><span class="p">(</span><span class="n">exterior</span><span class="p">,</span> <span class="n">holes</span><span class="p">))</span>
+    <span class="n">geometry</span> <span class="o">=</span> <span class="n">_polygonal</span><span class="p">(</span><span class="n">shapely</span><span class="o">.</span><span class="n">union_all</span><span class="p">(</span><span class="n">parts</span><span class="p">))</span>
+    <span class="k">if</span> <span class="n">geometry</span><span class="o">.</span><span class="n">is_empty</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"the shape encloses no area"</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">_finish</span><span class="p">(</span><span class="n">geometry</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="edge">
+<a class="viewcode-back" href="../../api.html#queryearth.edge">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">edge</span><span class="p">(</span><span class="n">space</span><span class="p">:</span> <span class="n">Space</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">shapely</span><span class="o">.</span><span class="n">Geometry</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""A polygon's edges on the globe, as lines.</span>
+
+<span class="sd">    That is its boundary without the cuts at +-180, which join two parts of one</span>
+<span class="sd">    shape, and without lines along latitude 90 or -90, which are a single point</span>
+<span class="sd">    on the globe: the edge of a polar cap is its one circle of latitude.</span>
+<span class="sd">    """</span>
+    <span class="k">if</span> <span class="n">space</span><span class="o">.</span><span class="n">kind</span> <span class="o">!=</span> <span class="s2">"polygon"</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"only a polygon has an edge, not a </span><span class="si">{</span><span class="n">space</span><span class="o">.</span><span class="n">kind</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+    <span class="n">lines</span> <span class="o">=</span> <span class="n">_lines</span><span class="p">(</span><span class="n">shapely</span><span class="o">.</span><span class="n">boundary</span><span class="p">(</span><span class="n">space</span><span class="o">.</span><span class="n">geometry</span><span class="p">))</span>
+    <span class="n">east</span> <span class="o">=</span> <span class="n">_lines</span><span class="p">(</span><span class="n">shapely</span><span class="o">.</span><span class="n">intersection</span><span class="p">(</span><span class="n">lines</span><span class="p">,</span> <span class="n">_EAST</span><span class="p">))</span>
+    <span class="n">west</span> <span class="o">=</span> <span class="n">_lines</span><span class="p">(</span><span class="n">shapely</span><span class="o">.</span><span class="n">intersection</span><span class="p">(</span><span class="n">lines</span><span class="p">,</span> <span class="n">_shift</span><span class="p">(</span><span class="n">_EAST</span><span class="p">,</span> <span class="o">-</span><span class="mf">360.0</span><span class="p">)))</span>
+    <span class="n">cut</span> <span class="o">=</span> <span class="n">_lines</span><span class="p">(</span><span class="n">shapely</span><span class="o">.</span><span class="n">intersection</span><span class="p">(</span><span class="n">east</span><span class="p">,</span> <span class="n">_shift</span><span class="p">(</span><span class="n">west</span><span class="p">,</span> <span class="mf">360.0</span><span class="p">)))</span>  <span class="c1"># on both sides</span>
+    <span class="n">seams</span> <span class="o">=</span> <span class="n">shapely</span><span class="o">.</span><span class="n">union_all</span><span class="p">([</span><span class="n">cut</span><span class="p">,</span> <span class="n">_shift</span><span class="p">(</span><span class="n">cut</span><span class="p">,</span> <span class="o">-</span><span class="mf">360.0</span><span class="p">),</span> <span class="n">_POLES</span><span class="p">])</span>
+    <span class="k">return</span> <span class="n">_lines</span><span class="p">(</span><span class="n">shapely</span><span class="o">.</span><span class="n">difference</span><span class="p">(</span><span class="n">lines</span><span class="p">,</span> <span class="n">seams</span><span class="p">))</span></div>
+
+
+
+<span class="c1"># ---- areas (design.md section 6.3) ---------------------------------------------</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">_ring_area</span><span class="p">(</span><span class="n">coords</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Signed area of a closed ring with straight lon/lat edges; CCW is positive.</span>
+
+<span class="sd">    Each edge contributes dlon * sin(mean latitude) * sin(dlat / 2) / (dlat / 2),</span>
+<span class="sd">    in radians, which is exact for a straight edge; an edge along a pole gives a</span>
+<span class="sd">    pole cap its area.</span>
+<span class="sd">    """</span>
+    <span class="c1"># math, not numpy: the caps of fixture 22 must agree with 2 pi R^2 (1 - sin) to 1e-15</span>
+    <span class="n">points</span> <span class="o">=</span> <span class="p">[(</span><span class="nb">float</span><span class="p">(</span><span class="n">p</span><span class="p">[</span><span class="mi">0</span><span class="p">]),</span> <span class="nb">float</span><span class="p">(</span><span class="n">p</span><span class="p">[</span><span class="mi">1</span><span class="p">]))</span> <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">coords</span><span class="p">]</span>
+    <span class="n">terms</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="p">(</span><span class="n">lon1</span><span class="p">,</span> <span class="n">lat1</span><span class="p">),</span> <span class="p">(</span><span class="n">lon2</span><span class="p">,</span> <span class="n">lat2</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">points</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">],</span> <span class="n">points</span><span class="p">[</span><span class="mi">1</span><span class="p">:]):</span>
+        <span class="n">half</span> <span class="o">=</span> <span class="n">math</span><span class="o">.</span><span class="n">radians</span><span class="p">(</span><span class="n">lat2</span> <span class="o">-</span> <span class="n">lat1</span><span class="p">)</span> <span class="o">/</span> <span class="mf">2.0</span>
+        <span class="n">sinc</span> <span class="o">=</span> <span class="n">math</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">half</span><span class="p">)</span> <span class="o">/</span> <span class="n">half</span> <span class="k">if</span> <span class="n">half</span> <span class="k">else</span> <span class="mf">1.0</span>
+        <span class="n">mid</span> <span class="o">=</span> <span class="n">math</span><span class="o">.</span><span class="n">radians</span><span class="p">(</span><span class="n">lat1</span> <span class="o">+</span> <span class="n">lat2</span><span class="p">)</span> <span class="o">/</span> <span class="mf">2.0</span>
+        <span class="n">terms</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">math</span><span class="o">.</span><span class="n">radians</span><span class="p">(</span><span class="n">lon2</span> <span class="o">-</span> <span class="n">lon1</span><span class="p">)</span> <span class="o">*</span> <span class="n">math</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">mid</span><span class="p">)</span> <span class="o">*</span> <span class="n">sinc</span><span class="p">)</span>
+    <span class="k">return</span> <span class="o">-</span><span class="p">(</span><span class="n">R_KM</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span> <span class="o">*</span> <span class="n">math</span><span class="o">.</span><span class="n">fsum</span><span class="p">(</span><span class="n">terms</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="area_km2">
+<a class="viewcode-back" href="../../api.html#queryearth.area_km2">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">area_km2</span><span class="p">(</span><span class="n">geometry</span><span class="p">:</span> <span class="n">shapely</span><span class="o">.</span><span class="n">Geometry</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Spherical area of the polygon parts of a geometry, holes subtracted."""</span>
+    <span class="k">if</span> <span class="n">shapely</span><span class="o">.</span><span class="n">get_type_id</span><span class="p">(</span><span class="n">geometry</span><span class="p">)</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="mi">6</span><span class="p">)</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">shapely</span><span class="o">.</span><span class="n">is_valid</span><span class="p">(</span><span class="n">geometry</span><span class="p">):</span>
+        <span class="n">geometry</span> <span class="o">=</span> <span class="n">_polygonal</span><span class="p">(</span><span class="n">geometry</span><span class="p">)</span>  <span class="c1"># valid (multi)polygons have no overlaps</span>
+    <span class="n">total</span> <span class="o">=</span> <span class="mf">0.0</span>
+    <span class="k">for</span> <span class="n">part</span> <span class="ow">in</span> <span class="n">shapely</span><span class="o">.</span><span class="n">get_parts</span><span class="p">(</span><span class="n">geometry</span><span class="p">):</span>
+        <span class="n">holes</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span><span class="nb">abs</span><span class="p">(</span><span class="n">_ring_area</span><span class="p">(</span><span class="n">h</span><span class="o">.</span><span class="n">coords</span><span class="p">))</span> <span class="k">for</span> <span class="n">h</span> <span class="ow">in</span> <span class="n">part</span><span class="o">.</span><span class="n">interiors</span><span class="p">)</span>
+        <span class="n">total</span> <span class="o">+=</span> <span class="nb">abs</span><span class="p">(</span><span class="n">_ring_area</span><span class="p">(</span><span class="n">part</span><span class="o">.</span><span class="n">exterior</span><span class="o">.</span><span class="n">coords</span><span class="p">))</span> <span class="o">-</span> <span class="n">holes</span>
+    <span class="k">return</span> <span class="n">total</span></div>
+
+
+
+<span class="c1"># ---- closed-set predicates and measures (design.md sections 4.4 and 6.3) -------</span>
+<span class="n">Rule</span> <span class="o">=</span> <span class="n">Space</span> <span class="o">|</span> <span class="n">shapely</span><span class="o">.</span><span class="n">Geometry</span> <span class="o">|</span> <span class="kc">None</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_shape</span><span class="p">(</span><span class="n">rule</span><span class="p">:</span> <span class="n">Space</span> <span class="o">|</span> <span class="n">shapely</span><span class="o">.</span><span class="n">Geometry</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">shapely</span><span class="o">.</span><span class="n">Geometry</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""The prepared geometry of a rule shape."""</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">rule</span><span class="p">,</span> <span class="n">Space</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">rule</span><span class="o">.</span><span class="n">kind</span> <span class="o">!=</span> <span class="s2">"polygon"</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"a rule shape is a polygon, not a </span><span class="si">{</span><span class="n">rule</span><span class="o">.</span><span class="n">kind</span><span class="si">!r}</span><span class="s2"> space"</span><span class="p">)</span>
+        <span class="n">rule</span> <span class="o">=</span> <span class="n">rule</span><span class="o">.</span><span class="n">geometry</span>
+    <span class="n">shapely</span><span class="o">.</span><span class="n">prepare</span><span class="p">(</span><span class="n">rule</span><span class="p">)</span>  <span class="c1"># preparing a prepared geometry does nothing</span>
+    <span class="k">return</span> <span class="n">rule</span>
+
+
+<div class="viewcode-block" id="points_mask">
+<a class="viewcode-back" href="../../api.html#queryearth.points_mask">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">points_mask</span><span class="p">(</span><span class="n">rule</span><span class="p">:</span> <span class="n">Rule</span><span class="p">,</span> <span class="n">lon</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">lat</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Closed-set membership of points in a rule shape, shaped like lon.</span>
+
+<span class="sd">    The points inside the shape's bounding box are tested with prepared</span>
+<span class="sd">    intersects_xy, never contains_xy, so points on an edge are inside; points</span>
+<span class="sd">    at +-180 also test the other side of the seam. Points with a NaN coordinate</span>
+<span class="sd">    are inside no rule.</span>
+<span class="sd">    """</span>
+    <span class="n">lon</span><span class="p">,</span> <span class="n">lat</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">wrap_lon</span><span class="p">(</span><span class="n">lon</span><span class="p">)),</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">_lat</span><span class="p">(</span><span class="n">lat</span><span class="p">))</span>
+    <span class="k">if</span> <span class="n">lon</span><span class="o">.</span><span class="n">shape</span> <span class="o">!=</span> <span class="n">lat</span><span class="o">.</span><span class="n">shape</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"lon has shape </span><span class="si">{</span><span class="n">lon</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2"> but lat </span><span class="si">{</span><span class="n">lat</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">rule</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">isfinite</span><span class="p">(</span><span class="n">lon</span><span class="p">)</span> <span class="o">&amp;</span> <span class="n">np</span><span class="o">.</span><span class="n">isfinite</span><span class="p">(</span><span class="n">lat</span><span class="p">)</span>
+    <span class="n">shape</span> <span class="o">=</span> <span class="n">_shape</span><span class="p">(</span><span class="n">rule</span><span class="p">)</span>
+    <span class="n">x0</span><span class="p">,</span> <span class="n">y0</span><span class="p">,</span> <span class="n">x1</span><span class="p">,</span> <span class="n">y1</span> <span class="o">=</span> <span class="n">shape</span><span class="o">.</span><span class="n">bounds</span>
+    <span class="n">seam</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">lon</span><span class="p">)</span> <span class="o">==</span> <span class="mf">180.0</span>
+    <span class="n">near</span> <span class="o">=</span> <span class="p">(</span><span class="n">lat</span> <span class="o">&gt;=</span> <span class="n">y0</span><span class="p">)</span> <span class="o">&amp;</span> <span class="p">(</span><span class="n">lat</span> <span class="o">&lt;=</span> <span class="n">y1</span><span class="p">)</span> <span class="o">&amp;</span> <span class="p">((</span><span class="n">lon</span> <span class="o">&gt;=</span> <span class="n">x0</span><span class="p">)</span> <span class="o">&amp;</span> <span class="p">(</span><span class="n">lon</span> <span class="o">&lt;=</span> <span class="n">x1</span><span class="p">)</span> <span class="o">|</span> <span class="n">seam</span><span class="p">)</span>
+    <span class="n">mask</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">lon</span><span class="o">.</span><span class="n">shape</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">bool</span><span class="p">)</span>
+    <span class="n">mask</span><span class="p">[</span><span class="n">near</span><span class="p">]</span> <span class="o">=</span> <span class="n">shapely</span><span class="o">.</span><span class="n">intersects_xy</span><span class="p">(</span><span class="n">shape</span><span class="p">,</span> <span class="n">lon</span><span class="p">[</span><span class="n">near</span><span class="p">],</span> <span class="n">lat</span><span class="p">[</span><span class="n">near</span><span class="p">])</span>
+    <span class="n">seam</span> <span class="o">&amp;=</span> <span class="n">near</span>
+    <span class="n">mask</span><span class="p">[</span><span class="n">seam</span><span class="p">]</span> <span class="o">|=</span> <span class="n">shapely</span><span class="o">.</span><span class="n">intersects_xy</span><span class="p">(</span><span class="n">shape</span><span class="p">,</span> <span class="o">-</span><span class="n">lon</span><span class="p">[</span><span class="n">seam</span><span class="p">],</span> <span class="n">lat</span><span class="p">[</span><span class="n">seam</span><span class="p">])</span>
+    <span class="k">return</span> <span class="n">mask</span></div>
+
+
+
+<div class="viewcode-block" id="meets">
+<a class="viewcode-back" href="../../api.html#queryearth.meets">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">meets</span><span class="p">(</span><span class="n">rule</span><span class="p">:</span> <span class="n">Rule</span><span class="p">,</span> <span class="n">query</span><span class="p">:</span> <span class="n">Space</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Whether a query space meets a normalised rule shape, as closed sets.</span>
+
+<span class="sd">    rule is a polygon Space or shapely geometry, or None for a global rule. A</span>
+<span class="sd">    point on an edge meets the shape, and shapes that touch across +-180 meet</span>
+<span class="sd">    there.</span>
+<span class="sd">    """</span>
+    <span class="k">if</span> <span class="n">rule</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">True</span>
+    <span class="n">shape</span><span class="p">,</span> <span class="n">other</span> <span class="o">=</span> <span class="n">_shape</span><span class="p">(</span><span class="n">rule</span><span class="p">),</span> <span class="n">query</span><span class="o">.</span><span class="n">geometry</span>
+    <span class="k">if</span> <span class="n">query</span><span class="o">.</span><span class="n">kind</span> <span class="o">==</span> <span class="s2">"point"</span><span class="p">:</span>
+        <span class="k">return</span> <span class="nb">bool</span><span class="p">(</span><span class="n">points_mask</span><span class="p">(</span><span class="n">shape</span><span class="p">,</span> <span class="p">[</span><span class="n">other</span><span class="o">.</span><span class="n">x</span><span class="p">],</span> <span class="p">[</span><span class="n">other</span><span class="o">.</span><span class="n">y</span><span class="p">])[</span><span class="mi">0</span><span class="p">])</span>
+    <span class="k">if</span> <span class="n">shapely</span><span class="o">.</span><span class="n">intersects</span><span class="p">(</span><span class="n">shape</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
+        <span class="k">return</span> <span class="kc">True</span>
+    <span class="n">x0</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">x1</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">other</span><span class="o">.</span><span class="n">bounds</span>
+    <span class="k">return</span> <span class="p">(</span><span class="n">x0</span> <span class="o">==</span> <span class="o">-</span><span class="mf">180.0</span> <span class="ow">and</span> <span class="n">shapely</span><span class="o">.</span><span class="n">intersects</span><span class="p">(</span><span class="n">shape</span><span class="p">,</span> <span class="n">_shift</span><span class="p">(</span><span class="n">other</span><span class="p">,</span> <span class="mf">360.0</span><span class="p">)))</span> <span class="ow">or</span> <span class="p">(</span>
+        <span class="n">x1</span> <span class="o">==</span> <span class="mf">180.0</span> <span class="ow">and</span> <span class="n">shapely</span><span class="o">.</span><span class="n">intersects</span><span class="p">(</span><span class="n">shape</span><span class="p">,</span> <span class="n">_shift</span><span class="p">(</span><span class="n">other</span><span class="p">,</span> <span class="o">-</span><span class="mf">360.0</span><span class="p">))</span>
+    <span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="edge_meets">
+<a class="viewcode-back" href="../../api.html#queryearth.edge_meets">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">edge_meets</span><span class="p">(</span><span class="n">rule</span><span class="p">:</span> <span class="n">Space</span> <span class="o">|</span> <span class="n">shapely</span><span class="o">.</span><span class="n">Geometry</span><span class="p">,</span> <span class="n">query</span><span class="p">:</span> <span class="n">Space</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Whether the edge of a query polygon (edge()) meets a rule shape, as</span>
+<span class="sd">    closed sets. A point has no edge, so it meets no rule this way."""</span>
+    <span class="k">if</span> <span class="n">query</span><span class="o">.</span><span class="n">kind</span> <span class="o">!=</span> <span class="s2">"polygon"</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">False</span>
+    <span class="n">shape</span><span class="p">,</span> <span class="n">line</span> <span class="o">=</span> <span class="n">_shape</span><span class="p">(</span><span class="n">rule</span><span class="p">),</span> <span class="n">edge</span><span class="p">(</span><span class="n">query</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">line</span><span class="o">.</span><span class="n">is_empty</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">False</span>
+    <span class="k">if</span> <span class="n">shapely</span><span class="o">.</span><span class="n">intersects</span><span class="p">(</span><span class="n">shape</span><span class="p">,</span> <span class="n">line</span><span class="p">):</span>
+        <span class="k">return</span> <span class="kc">True</span>
+    <span class="n">x0</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">x1</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">line</span><span class="o">.</span><span class="n">bounds</span>
+    <span class="k">return</span> <span class="p">(</span><span class="n">x0</span> <span class="o">==</span> <span class="o">-</span><span class="mf">180.0</span> <span class="ow">and</span> <span class="n">shapely</span><span class="o">.</span><span class="n">intersects</span><span class="p">(</span><span class="n">shape</span><span class="p">,</span> <span class="n">_shift</span><span class="p">(</span><span class="n">line</span><span class="p">,</span> <span class="mf">360.0</span><span class="p">)))</span> <span class="ow">or</span> <span class="p">(</span>
+        <span class="n">x1</span> <span class="o">==</span> <span class="mf">180.0</span> <span class="ow">and</span> <span class="n">shapely</span><span class="o">.</span><span class="n">intersects</span><span class="p">(</span><span class="n">shape</span><span class="p">,</span> <span class="n">_shift</span><span class="p">(</span><span class="n">line</span><span class="p">,</span> <span class="o">-</span><span class="mf">360.0</span><span class="p">))</span>
+    <span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="measure">
+<a class="viewcode-back" href="../../api.html#queryearth.measure">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">measure</span><span class="p">(</span><span class="n">rule</span><span class="p">:</span> <span class="n">Rule</span><span class="p">,</span> <span class="n">query</span><span class="p">:</span> <span class="n">Space</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">"""(area_fraction, overlap_km2) of a query space against a rule shape.</span>
+
+<span class="sd">    area_fraction is 1.0 or 0.0 for a point, and for a polygon the spherical</span>
+<span class="sd">    area of the intersection over the query's area. overlap_km2 is None for a</span>
+<span class="sd">    point. A global rule (None) covers all.</span>
+<span class="sd">    """</span>
+    <span class="k">if</span> <span class="n">query</span><span class="o">.</span><span class="n">kind</span> <span class="o">==</span> <span class="s2">"point"</span><span class="p">:</span>
+        <span class="k">return</span> <span class="p">(</span><span class="mf">1.0</span> <span class="k">if</span> <span class="n">meets</span><span class="p">(</span><span class="n">rule</span><span class="p">,</span> <span class="n">query</span><span class="p">)</span> <span class="k">else</span> <span class="mf">0.0</span><span class="p">),</span> <span class="kc">None</span>
+    <span class="k">if</span> <span class="n">rule</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="mf">1.0</span><span class="p">,</span> <span class="n">query</span><span class="o">.</span><span class="n">area_km2</span>
+    <span class="n">shape</span><span class="p">,</span> <span class="n">other</span> <span class="o">=</span> <span class="n">_shape</span><span class="p">(</span><span class="n">rule</span><span class="p">),</span> <span class="n">_shape</span><span class="p">(</span><span class="n">query</span><span class="o">.</span><span class="n">geometry</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">shapely</span><span class="o">.</span><span class="n">covers</span><span class="p">(</span><span class="n">shape</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
+        <span class="k">return</span> <span class="mf">1.0</span><span class="p">,</span> <span class="n">query</span><span class="o">.</span><span class="n">area_km2</span>
+    <span class="k">if</span> <span class="n">shapely</span><span class="o">.</span><span class="n">covers</span><span class="p">(</span><span class="n">other</span><span class="p">,</span> <span class="n">shape</span><span class="p">):</span>
+        <span class="n">shared</span> <span class="o">=</span> <span class="n">area_km2</span><span class="p">(</span><span class="n">shape</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">shared</span> <span class="o">=</span> <span class="n">area_km2</span><span class="p">(</span><span class="n">shapely</span><span class="o">.</span><span class="n">intersection</span><span class="p">(</span><span class="n">shape</span><span class="p">,</span> <span class="n">other</span><span class="p">))</span>
+    <span class="k">return</span> <span class="nb">min</span><span class="p">(</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">shared</span> <span class="o">/</span> <span class="n">query</span><span class="o">.</span><span class="n">area_km2</span><span class="p">),</span> <span class="n">shared</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2026, Manish Venumuddula.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
