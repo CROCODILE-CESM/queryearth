@@ -95,6 +95,16 @@ def test_next_code_skips_withdrawn_numbers():
     assert registry.next_code("ITF") == "ITF003"
 
 
+def test_next_code_skips_codes_kept_as_aliases_or_superseded():
+    registry = qe.Registry("mine")
+    registry.add(rule("OBC006", aliases=["ITF009", "not a code"]))
+    registry.add(rule("ITF001", supersedes=["ITF012"]))
+    assert registry.next_code("ITF") == "ITF013"
+    registry = qe.Registry("mine")
+    registry.add(rule("OBC006", aliases=["ITF009"]))  # a rule moved out of ITF
+    assert registry.next_code("ITF") == "ITF010"
+
+
 def test_next_code_hyphenates_a_prefix_that_ends_in_a_digit():
     registry = qe.Registry("mine")
     registry.add(rule("ERA5-014"))

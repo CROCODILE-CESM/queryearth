@@ -83,6 +83,14 @@ class _Entry:
     supersedes: tuple[str, ...]
 
 
+def _split(code: Any) -> tuple[str | None, int]:
+    """A code's prefix and number, or (None, 0) for a string that is not one."""
+    try:
+        return split_code(code)
+    except ValueError:
+        return None, 0
+
+
 def _strings(value: Any) -> tuple[str, ...]:
     return (value,) if isinstance(value, str) else tuple(value or ())
 
@@ -289,14 +297,18 @@ class Registry:
 
     def next_code(self, prefix: str) -> str:
         """The code for a new rule in a category: one more than the highest number
-        any rule here has with that prefix, withdrawn ones too, so no number is
-        given twice. ITF001 when the category has no rules yet."""
+        with that prefix among the rules here, withdrawn ones too, and the codes
+        they keep as aliases or supersede, so no number is given twice. ITF001
+        when the category has none yet."""
         check_prefix(prefix)
         if self._categories and prefix not in self._categories:
             raise UnknownNameError(
                 f"undeclared category {prefix!r}; declared: {list(self._categories)}"
             )
-        numbers = [n for p, n in map(split_code, self._codes) if p == prefix]
+        used = set(self._codes)
+        for entry in self._entries:
+            used.update(entry.supersedes, _strings(getattr(entry.rule, "aliases", ())))
+        numbers = [n for p, n in map(_split, used) if p == prefix]
         return make_code(prefix, max(numbers, default=0) + 1)
 
     def add(self, rule: Any) -> None:
