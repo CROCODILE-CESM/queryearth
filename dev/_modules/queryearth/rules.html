@@ -5,14 +5,14 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>queryearth.rules &mdash; queryearth 0.5.0</title>
+  <title>queryearth.rules &mdash; queryearth 0.5.1.dev5</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
 
   
       <script src="../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../_static/documentation_options.js?v=1dd76d02"></script>
+      <script src="../../_static/documentation_options.js?v=79570a69"></script>
       <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../_static/versions.js?v=58ec1786"></script>
@@ -111,7 +111,7 @@
 <span class="n">RuleFunc</span> <span class="o">=</span> <span class="n">Callable</span><span class="p">[[</span><span class="n">Query</span><span class="p">,</span> <span class="n">Match</span><span class="p">],</span> <span class="n">CheckResult</span><span class="p">]</span>
 
 <span class="c1"># A prefix plus three or four digits, with a hyphen after a prefix that ends in</span>
-<span class="c1"># a digit, so every code parses one way (Q8). The prefix is the rule's group.</span>
+<span class="c1"># a digit, so every code parses one way (Q8). The prefix is the rule's category.</span>
 <span class="n">CODE</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span>
     <span class="sa">r</span><span class="s2">"(?:([A-Z][A-Z0-9]{0,10}[A-Z])-?|([A-Z][A-Z0-9]{0,10}[0-9])-)([0-9]{3,4})"</span>
 <span class="p">)</span>
@@ -128,7 +128,7 @@
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">split_code</span><span class="p">(</span><span class="n">code</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">]:</span>
-<span class="w">    </span><span class="sd">"""A valid code's prefix, which is its group, and its number: ("ERA5", 14)</span>
+<span class="w">    </span><span class="sd">"""A valid code's prefix, which is its category, and its number: ("ERA5", 14)</span>
 <span class="sd">    for ERA5-014."""</span>
     <span class="n">check_code</span><span class="p">(</span><span class="n">code</span><span class="p">)</span>
     <span class="n">found</span> <span class="o">=</span> <span class="n">CODE</span><span class="o">.</span><span class="n">fullmatch</span><span class="p">(</span><span class="n">code</span><span class="p">)</span>
@@ -148,7 +148,7 @@
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">check_prefix</span><span class="p">(</span><span class="n">prefix</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">"""Raise ValueError unless prefix is a code's prefix, and so a group."""</span>
+<span class="w">    </span><span class="sd">"""Raise ValueError unless prefix is a code's prefix, and so a category."""</span>
     <span class="n">code</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">prefix</span><span class="si">}</span><span class="s2">-001"</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">prefix</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="k">else</span> <span class="kc">None</span>
     <span class="n">found</span> <span class="o">=</span> <span class="n">CODE</span><span class="o">.</span><span class="n">fullmatch</span><span class="p">(</span><span class="n">code</span><span class="p">)</span> <span class="k">if</span> <span class="n">code</span> <span class="k">else</span> <span class="kc">None</span>
     <span class="k">if</span> <span class="n">found</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="p">(</span><span class="n">found</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="ow">or</span> <span class="n">found</span><span class="p">[</span><span class="mi">2</span><span class="p">])</span> <span class="o">!=</span> <span class="n">prefix</span><span class="p">:</span>

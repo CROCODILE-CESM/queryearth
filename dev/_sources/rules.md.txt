@@ -1,6 +1,6 @@
 # Writing rules
 
-There are three ways to write a rule: a {class}`~queryearth.Rule` built in Python, a computed rule whose outcome depends on the query, or a record in a GeoJSON **rule file**. All three end up on a {class}`~queryearth.Registry`, the object you query.
+There are three ways to write a rule: a {class}`~queryearth.Rule` built in Python, a computed rule whose outcome depends on the query, or a record in a GeoJSON **rule file** or a **pack**, a folder with a file per rule. All three end up on a {class}`~queryearth.Registry`, the rules in memory that you query, loaded from any number of rule files and packs.
 
 ## Rules in Python
 
@@ -50,17 +50,17 @@ The function runs only when the scope matches definitely. It returns `True` (one
 
 A rule file is a GeoJSON file holding a FeatureCollection of records, or a single record. Besides `features`, a FeatureCollection can have three top-level members:
 
-- `queryearth`: the release whose file format the file uses, such as `"0.5"`. A file that needs a later release than the one installed is refused, with a message that says so; a file without it is read as it is.
-- `groups`: the [groups](concepts.md#rules-and-their-scope) of its rules, each code prefix with its title, or with its title and parent for a group in a group: `{"DOMAIN": "Domain design", "OBC": {"title": "Open boundaries", "parent": "DOMAIN"}}`.
+- `queryearth`: the release whose file format the file uses, such as `"0.6"`. A file that needs a later release than the one installed is refused, with a message that says so; a file without it is read as it is.
+- `categories`: the [categories](concepts.md#rules-and-their-scope) of its rules, each code prefix with its title, or with its title and parent for a subcategory (files from before 0.6 call this member `groups`, and are read as they are): `{"DOMAIN": "Domain design", "OBC": {"title": "Open boundaries", "parent": "DOMAIN"}}`.
 - `dimensions`: the [dimensions](concepts.md#dimensions) its rules use, such as `[{"name": "resolution", "kind": "axis", "unit": "km"}, {"name": "product", "kind": "labels"}]`. Each has a `name`, a `kind` (`axis`, `labels` or `versions`), a `unit` for an axis, and optionally a `description`.
 
-{meth}`Registry.from_file() <queryearth.Registry.from_file>` makes a Registry with those groups and dimensions and loads the rules:
+{meth}`Registry.from_file() <queryearth.Registry.from_file>` makes a Registry with those categories and dimensions and loads the rules:
 
 ```python
 registry = qe.Registry.from_file("examples/toy/rules.geojson")
 ```
 
-It takes several files too, and a file can be an http(s) URL, such as a raw link to a file in a GitHub repository or gist. The Registry then holds every file's groups and dimensions, which must agree where two files share a name, and a code must be unique across the files. Each finding's `source` names the file its rule came from, so rules kept in separate files, such as one file per author, stay told apart:
+It takes several files too, and a file can be an http(s) URL, such as a raw link to a file in a GitHub repository or gist. The Registry then holds every file's categories and dimensions, which must agree where two files share a name, and a code must be unique across the files. Each finding's `source` names the file its rule came from, so rules kept in separate files, such as one file per author, stay told apart:
 
 ```python
 registry = qe.Registry.from_file(
@@ -71,7 +71,7 @@ registry = qe.Registry.from_file(
 
 Loading a URL needs the network when it runs, so pin the link to a commit when results must be reproducible.
 
-{meth}`Registry.load() <queryearth.Registry.load>` adds a file's rules, from a path or a URL, to a Registry you already have, and returns their codes. That Registry must declare every dimension the records use; a file that declares its dimensions must declare them as the Registry does, and its groups must be declared on the Registry:
+{meth}`Registry.load() <queryearth.Registry.load>` adds a file's rules, from a path or a URL, to a Registry you already have, and returns their codes. That Registry must declare every dimension the records use; a file that declares its dimensions must declare them as the Registry does, and its categories must be declared on the Registry:
 
 ```python
 codes = registry.load("mine.geojson")
@@ -83,7 +83,7 @@ Loading never runs code. Every problem is reported at once in a `LoadError` that
 
 Each rule is one GeoJSON Feature. Its `geometry` is a Polygon, a MultiPolygon or null (null means everywhere). Its time goes in the top-level JSON-FG `time` member: `{"interval": ["2000-01-01", "2003-12-31"]}`, `{"date": ...}`, `{"timestamp": ...}` or null. The rest is in `properties`:
 
-| Group | Properties |
+| Topic | Properties |
 |---|---|
 | Identity and outcome | `code`, `title` and `message`, all required; `level` (`info`, `warning` or `error`; optional, with [a default](concepts.md#rules-and-their-scope)) |
 | Advice | `instruction`, `confidence`, `action`, and `changes` (a list of `{target, key, value, rationale}` objects) |
@@ -123,9 +123,40 @@ The values in `dimensions` take the forms in the [table of dimensions](concepts.
 
 {meth}`Rule.to_feature() <queryearth.Rule.to_feature>` turns a rule back into a record, leaving out the fields at their defaults and writing the scope's `dimensions` as given, so that `Rule.from_feature(rule.to_feature())` gives the same rule. A `box` is written as its polygon, split at ±180, and time as the `time` member plus `periods` and `recurrence` where needed. A rule whose space is a point, or whose level is not info, warning or error, has no record form and raises `ValueError`. A computed rule is code, so it has no record form either.
 
-{meth}`Registry.to_file() <queryearth.Registry.to_file>` writes a Registry's rule file: the `queryearth` release of its format, its groups and dimensions, and a record for each rule, in the order they were added. Computed rules are left out. {meth}`Registry.to_collection() <queryearth.Registry.to_collection>` gives the same FeatureCollection as a dict.
+{meth}`Registry.to_file() <queryearth.Registry.to_file>` writes a Registry's rule file: the `queryearth` release of its format, its categories and dimensions, and a record for each rule, in the order they were added, as indented JSON with each point on one line. Computed rules are left out. {meth}`Registry.to_collection() <queryearth.Registry.to_collection>` gives the same FeatureCollection as a dict.
 
 ```python
 registry.to_file("mine.geojson")
 again = qe.Registry.from_file("mine.geojson")
 ```
+
+## Packs
+
+A large ruleset is easier to keep as a **pack**: a folder that holds the same rules as a rule file, laid out by category, with one file per rule.
+
+```
+crocodash_rules/
+  pack.json            {"queryearth": "0.6", "dimensions": [...]}
+  DOMAIN/
+    category.json      {"title": "Domain design"}
+    OBC/
+      category.json    {"title": "Open boundaries"}
+      OBC001.geojson   one rule: a GeoJSON Feature
+      OBC002.geojson
+  REGION/
+    ITF/ …
+```
+
+- `pack.json` holds the pack's `queryearth` release and its `dimensions`, as a rule file's top-level members do.
+- Each category is a folder named by its prefix, with a `category.json` holding its title; a subcategory's folder sits inside its parent's. The folders are the category tree, so a pack needs no `parent` fields.
+- Each rule is a file named by its code, holding one Feature, in its category's folder.
+- Other files, such as a README or images, are left alone.
+
+{meth}`Registry.from_file() <queryearth.Registry.from_file>` and {meth}`Registry.load() <queryearth.Registry.load>` read a pack from its folder, alongside rule files; a finding's `source` is the folder's name. {meth}`Registry.to_pack() <queryearth.Registry.to_pack>` writes one, and updates a pack that is already there: it removes the rule files and categories that are gone and keeps everything else, so a pack in git shows each change as a change to one rule's file. A rule file and a pack hold the same rules, so either converts to the other:
+
+```python
+qe.Registry.from_file("crocodash_rules/").to_file("crocodash_rules.geojson")  # to share or link
+qe.Registry.from_file("crocodash_rules.geojson").to_pack("crocodash_rules/")  # to organize
+```
+
+A web link points at one file, so share a ruleset as a rule file; a pack is read from disk. Loading a pack checks its layout: a rule file whose name is not its code, a rule in another category's folder, or a folder of rules without a `category.json` is reported with the rest of the load's problems.

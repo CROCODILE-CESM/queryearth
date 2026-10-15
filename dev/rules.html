@@ -6,14 +6,14 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Writing rules &mdash; queryearth 0.5.0</title>
+  <title>Writing rules &mdash; queryearth 0.5.1.dev5</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
 
   
       <script src="_static/jquery.js?v=5d32c60e"></script>
       <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="_static/documentation_options.js?v=1dd76d02"></script>
+      <script src="_static/documentation_options.js?v=79570a69"></script>
       <script src="_static/doctools.js?v=fd6eb6e6"></script>
       <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="_static/versions.js?v=58ec1786"></script>
@@ -53,6 +53,7 @@
 <li class="toctree-l3"><a class="reference internal" href="#writing-records">Writing records</a></li>
 </ul>
 </li>
+<li class="toctree-l2"><a class="reference internal" href="#packs">Packs</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="results.html">Using findings</a></li>
@@ -87,7 +88,7 @@
              
   <section id="writing-rules">
 <h1>Writing rules<a class="headerlink" href="#writing-rules" title="Link to this heading"></a></h1>
-<p>There are three ways to write a rule: a <a class="reference internal" href="api.html#queryearth.Rule" title="queryearth.Rule"><code class="xref py py-class docutils literal notranslate"><span class="pre">Rule</span></code></a> built in Python, a computed rule whose outcome depends on the query, or a record in a GeoJSON <strong>rule file</strong>. All three end up on a <a class="reference internal" href="api.html#queryearth.Registry" title="queryearth.Registry"><code class="xref py py-class docutils literal notranslate"><span class="pre">Registry</span></code></a>, the object you query.</p>
+<p>There are three ways to write a rule: a <a class="reference internal" href="api.html#queryearth.Rule" title="queryearth.Rule"><code class="xref py py-class docutils literal notranslate"><span class="pre">Rule</span></code></a> built in Python, a computed rule whose outcome depends on the query, or a record in a GeoJSON <strong>rule file</strong> or a <strong>pack</strong>, a folder with a file per rule. All three end up on a <a class="reference internal" href="api.html#queryearth.Registry" title="queryearth.Registry"><code class="xref py py-class docutils literal notranslate"><span class="pre">Registry</span></code></a>, the rules in memory that you query, loaded from any number of rule files and packs.</p>
 <section id="rules-in-python">
 <h2>Rules in Python<a class="headerlink" href="#rules-in-python" title="Link to this heading"></a></h2>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">queryearth</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">qe</span>
@@ -133,15 +134,15 @@
 <h2>Rule files<a class="headerlink" href="#rule-files" title="Link to this heading"></a></h2>
 <p>A rule file is a GeoJSON file holding a FeatureCollection of records, or a single record. Besides <code class="docutils literal notranslate"><span class="pre">features</span></code>, a FeatureCollection can have three top-level members:</p>
 <ul class="simple">
-<li><p><code class="docutils literal notranslate"><span class="pre">queryearth</span></code>: the release whose file format the file uses, such as <code class="docutils literal notranslate"><span class="pre">&quot;0.5&quot;</span></code>. A file that needs a later release than the one installed is refused, with a message that says so; a file without it is read as it is.</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">groups</span></code>: the <a class="reference internal" href="concepts.html#rules-and-their-scope"><span class="std std-ref">groups</span></a> of its rules, each code prefix with its title, or with its title and parent for a group in a group: <code class="docutils literal notranslate"><span class="pre">{&quot;DOMAIN&quot;:</span> <span class="pre">&quot;Domain</span> <span class="pre">design&quot;,</span> <span class="pre">&quot;OBC&quot;:</span> <span class="pre">{&quot;title&quot;:</span> <span class="pre">&quot;Open</span> <span class="pre">boundaries&quot;,</span> <span class="pre">&quot;parent&quot;:</span> <span class="pre">&quot;DOMAIN&quot;}}</span></code>.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">queryearth</span></code>: the release whose file format the file uses, such as <code class="docutils literal notranslate"><span class="pre">&quot;0.6&quot;</span></code>. A file that needs a later release than the one installed is refused, with a message that says so; a file without it is read as it is.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">categories</span></code>: the <a class="reference internal" href="concepts.html#rules-and-their-scope"><span class="std std-ref">categories</span></a> of its rules, each code prefix with its title, or with its title and parent for a subcategory (files from before 0.6 call this member <code class="docutils literal notranslate"><span class="pre">groups</span></code>, and are read as they are): <code class="docutils literal notranslate"><span class="pre">{&quot;DOMAIN&quot;:</span> <span class="pre">&quot;Domain</span> <span class="pre">design&quot;,</span> <span class="pre">&quot;OBC&quot;:</span> <span class="pre">{&quot;title&quot;:</span> <span class="pre">&quot;Open</span> <span class="pre">boundaries&quot;,</span> <span class="pre">&quot;parent&quot;:</span> <span class="pre">&quot;DOMAIN&quot;}}</span></code>.</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">dimensions</span></code>: the <a class="reference internal" href="concepts.html#dimensions"><span class="std std-ref">dimensions</span></a> its rules use, such as <code class="docutils literal notranslate"><span class="pre">[{&quot;name&quot;:</span> <span class="pre">&quot;resolution&quot;,</span> <span class="pre">&quot;kind&quot;:</span> <span class="pre">&quot;axis&quot;,</span> <span class="pre">&quot;unit&quot;:</span> <span class="pre">&quot;km&quot;},</span> <span class="pre">{&quot;name&quot;:</span> <span class="pre">&quot;product&quot;,</span> <span class="pre">&quot;kind&quot;:</span> <span class="pre">&quot;labels&quot;}]</span></code>. Each has a <code class="docutils literal notranslate"><span class="pre">name</span></code>, a <code class="docutils literal notranslate"><span class="pre">kind</span></code> (<code class="docutils literal notranslate"><span class="pre">axis</span></code>, <code class="docutils literal notranslate"><span class="pre">labels</span></code> or <code class="docutils literal notranslate"><span class="pre">versions</span></code>), a <code class="docutils literal notranslate"><span class="pre">unit</span></code> for an axis, and optionally a <code class="docutils literal notranslate"><span class="pre">description</span></code>.</p></li>
 </ul>
-<p><a class="reference internal" href="api.html#queryearth.Registry.from_file" title="queryearth.Registry.from_file"><code class="xref py py-meth docutils literal notranslate"><span class="pre">Registry.from_file()</span></code></a> makes a Registry with those groups and dimensions and loads the rules:</p>
+<p><a class="reference internal" href="api.html#queryearth.Registry.from_file" title="queryearth.Registry.from_file"><code class="xref py py-meth docutils literal notranslate"><span class="pre">Registry.from_file()</span></code></a> makes a Registry with those categories and dimensions and loads the rules:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">registry</span> <span class="o">=</span> <span class="n">qe</span><span class="o">.</span><span class="n">Registry</span><span class="o">.</span><span class="n">from_file</span><span class="p">(</span><span class="s2">"examples/toy/rules.geojson"</span><span class="p">)</span>
 </pre></div>
 </div>
-<p>It takes several files too, and a file can be an http(s) URL, such as a raw link to a file in a GitHub repository or gist. The Registry then holds every file’s groups and dimensions, which must agree where two files share a name, and a code must be unique across the files. Each finding’s <code class="docutils literal notranslate"><span class="pre">source</span></code> names the file its rule came from, so rules kept in separate files, such as one file per author, stay told apart:</p>
+<p>It takes several files too, and a file can be an http(s) URL, such as a raw link to a file in a GitHub repository or gist. The Registry then holds every file’s categories and dimensions, which must agree where two files share a name, and a code must be unique across the files. Each finding’s <code class="docutils literal notranslate"><span class="pre">source</span></code> names the file its rule came from, so rules kept in separate files, such as one file per author, stay told apart:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">registry</span> <span class="o">=</span> <span class="n">qe</span><span class="o">.</span><span class="n">Registry</span><span class="o">.</span><span class="n">from_file</span><span class="p">(</span>
     <span class="s2">"my_rules.geojson"</span><span class="p">,</span>
     <span class="s2">"https://raw.githubusercontent.com/me/rules/main/more_rules.geojson"</span><span class="p">,</span>
@@ -149,7 +150,7 @@
 </pre></div>
 </div>
 <p>Loading a URL needs the network when it runs, so pin the link to a commit when results must be reproducible.</p>
-<p><a class="reference internal" href="api.html#queryearth.Registry.load" title="queryearth.Registry.load"><code class="xref py py-meth docutils literal notranslate"><span class="pre">Registry.load()</span></code></a> adds a file’s rules, from a path or a URL, to a Registry you already have, and returns their codes. That Registry must declare every dimension the records use; a file that declares its dimensions must declare them as the Registry does, and its groups must be declared on the Registry:</p>
+<p><a class="reference internal" href="api.html#queryearth.Registry.load" title="queryearth.Registry.load"><code class="xref py py-meth docutils literal notranslate"><span class="pre">Registry.load()</span></code></a> adds a file’s rules, from a path or a URL, to a Registry you already have, and returns their codes. That Registry must declare every dimension the records use; a file that declares its dimensions must declare them as the Registry does, and its categories must be declared on the Registry:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">codes</span> <span class="o">=</span> <span class="n">registry</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s2">"mine.geojson"</span><span class="p">)</span>
 </pre></div>
 </div>
@@ -159,7 +160,7 @@
 <p>Each rule is one GeoJSON Feature. Its <code class="docutils literal notranslate"><span class="pre">geometry</span></code> is a Polygon, a MultiPolygon or null (null means everywhere). Its time goes in the top-level JSON-FG <code class="docutils literal notranslate"><span class="pre">time</span></code> member: <code class="docutils literal notranslate"><span class="pre">{&quot;interval&quot;:</span> <span class="pre">[&quot;2000-01-01&quot;,</span> <span class="pre">&quot;2003-12-31&quot;]}</span></code>, <code class="docutils literal notranslate"><span class="pre">{&quot;date&quot;:</span> <span class="pre">...}</span></code>, <code class="docutils literal notranslate"><span class="pre">{&quot;timestamp&quot;:</span> <span class="pre">...}</span></code> or null. The rest is in <code class="docutils literal notranslate"><span class="pre">properties</span></code>:</p>
 <table class="docutils align-default">
 <thead>
-<tr class="row-odd"><th class="head"><p>Group</p></th>
+<tr class="row-odd"><th class="head"><p>Topic</p></th>
 <th class="head"><p>Properties</p></th>
 </tr>
 </thead>
@@ -213,12 +214,40 @@
 <section id="writing-records">
 <h3>Writing records<a class="headerlink" href="#writing-records" title="Link to this heading"></a></h3>
 <p><a class="reference internal" href="api.html#queryearth.Rule.to_feature" title="queryearth.Rule.to_feature"><code class="xref py py-meth docutils literal notranslate"><span class="pre">Rule.to_feature()</span></code></a> turns a rule back into a record, leaving out the fields at their defaults and writing the scope’s <code class="docutils literal notranslate"><span class="pre">dimensions</span></code> as given, so that <code class="docutils literal notranslate"><span class="pre">Rule.from_feature(rule.to_feature())</span></code> gives the same rule. A <code class="docutils literal notranslate"><span class="pre">box</span></code> is written as its polygon, split at ±180, and time as the <code class="docutils literal notranslate"><span class="pre">time</span></code> member plus <code class="docutils literal notranslate"><span class="pre">periods</span></code> and <code class="docutils literal notranslate"><span class="pre">recurrence</span></code> where needed. A rule whose space is a point, or whose level is not info, warning or error, has no record form and raises <code class="docutils literal notranslate"><span class="pre">ValueError</span></code>. A computed rule is code, so it has no record form either.</p>
-<p><a class="reference internal" href="api.html#queryearth.Registry.to_file" title="queryearth.Registry.to_file"><code class="xref py py-meth docutils literal notranslate"><span class="pre">Registry.to_file()</span></code></a> writes a Registry’s rule file: the <code class="docutils literal notranslate"><span class="pre">queryearth</span></code> release of its format, its groups and dimensions, and a record for each rule, in the order they were added. Computed rules are left out. <a class="reference internal" href="api.html#queryearth.Registry.to_collection" title="queryearth.Registry.to_collection"><code class="xref py py-meth docutils literal notranslate"><span class="pre">Registry.to_collection()</span></code></a> gives the same FeatureCollection as a dict.</p>
+<p><a class="reference internal" href="api.html#queryearth.Registry.to_file" title="queryearth.Registry.to_file"><code class="xref py py-meth docutils literal notranslate"><span class="pre">Registry.to_file()</span></code></a> writes a Registry’s rule file: the <code class="docutils literal notranslate"><span class="pre">queryearth</span></code> release of its format, its categories and dimensions, and a record for each rule, in the order they were added, as indented JSON with each point on one line. Computed rules are left out. <a class="reference internal" href="api.html#queryearth.Registry.to_collection" title="queryearth.Registry.to_collection"><code class="xref py py-meth docutils literal notranslate"><span class="pre">Registry.to_collection()</span></code></a> gives the same FeatureCollection as a dict.</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">registry</span><span class="o">.</span><span class="n">to_file</span><span class="p">(</span><span class="s2">"mine.geojson"</span><span class="p">)</span>
 <span class="n">again</span> <span class="o">=</span> <span class="n">qe</span><span class="o">.</span><span class="n">Registry</span><span class="o">.</span><span class="n">from_file</span><span class="p">(</span><span class="s2">"mine.geojson"</span><span class="p">)</span>
 </pre></div>
 </div>
 </section>
+</section>
+<section id="packs">
+<h2>Packs<a class="headerlink" href="#packs" title="Link to this heading"></a></h2>
+<p>A large ruleset is easier to keep as a <strong>pack</strong>: a folder that holds the same rules as a rule file, laid out by category, with one file per rule.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>crocodash_rules/
+  pack.json            {"queryearth": "0.6", "dimensions": [...]}
+  DOMAIN/
+    category.json      {"title": "Domain design"}
+    OBC/
+      category.json    {"title": "Open boundaries"}
+      OBC001.geojson   one rule: a GeoJSON Feature
+      OBC002.geojson
+  REGION/
+    ITF/ …
+</pre></div>
+</div>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">pack.json</span></code> holds the pack’s <code class="docutils literal notranslate"><span class="pre">queryearth</span></code> release and its <code class="docutils literal notranslate"><span class="pre">dimensions</span></code>, as a rule file’s top-level members do.</p></li>
+<li><p>Each category is a folder named by its prefix, with a <code class="docutils literal notranslate"><span class="pre">category.json</span></code> holding its title; a subcategory’s folder sits inside its parent’s. The folders are the category tree, so a pack needs no <code class="docutils literal notranslate"><span class="pre">parent</span></code> fields.</p></li>
+<li><p>Each rule is a file named by its code, holding one Feature, in its category’s folder.</p></li>
+<li><p>Other files, such as a README or images, are left alone.</p></li>
+</ul>
+<p><a class="reference internal" href="api.html#queryearth.Registry.from_file" title="queryearth.Registry.from_file"><code class="xref py py-meth docutils literal notranslate"><span class="pre">Registry.from_file()</span></code></a> and <a class="reference internal" href="api.html#queryearth.Registry.load" title="queryearth.Registry.load"><code class="xref py py-meth docutils literal notranslate"><span class="pre">Registry.load()</span></code></a> read a pack from its folder, alongside rule files; a finding’s <code class="docutils literal notranslate"><span class="pre">source</span></code> is the folder’s name. <a class="reference internal" href="api.html#queryearth.Registry.to_pack" title="queryearth.Registry.to_pack"><code class="xref py py-meth docutils literal notranslate"><span class="pre">Registry.to_pack()</span></code></a> writes one, and updates a pack that is already there: it removes the rule files and categories that are gone and keeps everything else, so a pack in git shows each change as a change to one rule’s file. A rule file and a pack hold the same rules, so either converts to the other:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">qe</span><span class="o">.</span><span class="n">Registry</span><span class="o">.</span><span class="n">from_file</span><span class="p">(</span><span class="s2">"crocodash_rules/"</span><span class="p">)</span><span class="o">.</span><span class="n">to_file</span><span class="p">(</span><span class="s2">"crocodash_rules.geojson"</span><span class="p">)</span>  <span class="c1"># to share or link</span>
+<span class="n">qe</span><span class="o">.</span><span class="n">Registry</span><span class="o">.</span><span class="n">from_file</span><span class="p">(</span><span class="s2">"crocodash_rules.geojson"</span><span class="p">)</span><span class="o">.</span><span class="n">to_pack</span><span class="p">(</span><span class="s2">"crocodash_rules/"</span><span class="p">)</span>  <span class="c1"># to organize</span>
+</pre></div>
+</div>
+<p>A web link points at one file, so share a ruleset as a rule file; a pack is read from disk. Loading a pack checks its layout: a rule file whose name is not its code, a rule in another category’s folder, or a folder of rules without a <code class="docutils literal notranslate"><span class="pre">category.json</span></code> is reported with the rest of the load’s problems.</p>
 </section>
 </section>
 
