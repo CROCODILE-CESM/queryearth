@@ -1,10 +1,10 @@
 # queryearth
 
-queryearth matches rules to a query. A rule says something worth knowing, such as "tidal mixing dominates here, so force tides", and is scoped by **dimensions**: where (space), when (time), and anything else that matters, such as grid resolution or forcing product. A query gives values on any of the dimensions and gets back the rules that apply. Rules live in GeoJSON files, so any GIS tool can show where they apply.
+queryearth matches rules to a query. A rule says something worth knowing, such as "tidal mixing dominates here, so force tides", and is scoped by [dimensions](docs/source/dimensions.md): where (space), when (time), and anything else that matters, such as grid resolution or forcing product. A query gives values on any of the dimensions and gets back the rules that apply. Rules live in GeoJSON [rule files](docs/source/rules.md), so any GIS tool can show where they apply.
 
 Space, time and numeric axes are the base dimensions, and labels come with them. **Defining your own dimension is a few lines of Python**, written on the same three-method class the built-in ones use.
 
-**Documentation:** https://crocodile-cesm.github.io/queryearth/
+**Documentation:** <https://crocodile-cesm.github.io/queryearth/>. Language models and other programs: [llms.txt](https://crocodile-cesm.github.io/queryearth/llms.txt) describes rule files and the API on one page.
 
 ## A first query
 
@@ -41,7 +41,9 @@ print([rule.code for rule in findings])  # ['GULF001', 'GRID001'], warnings firs
 print(findings[0].to_feature())  # a finding, as the GeoJSON Feature of its rule
 ```
 
-A rule applies when, on every dimension it constrains, the query gives a value and the two overlap. A dimension the rule leaves out matches anything; a dimension the rule constrains and the query leaves out does not match.
+GULF001 applies because the query's box overlaps the rule's and the product is glorys; GRID001 because a grid from 5 to 9 km has cells below 8 km. Neither rule constrains time, so any time matches.
+
+A rule applies when, on every dimension it constrains, the query gives a value and the two overlap. A dimension the rule leaves out matches anything; a dimension the rule constrains and the query leaves out does not match. [Rules and queries](docs/source/concepts.md) has the details.
 
 ## Define your own dimension
 
@@ -89,7 +91,7 @@ class Labels(Dimension):
 - A value derived from your case is computed when you build the query, and given to an `Axis` or your own dimension: CrocoDash computes `cell_size_ratio = largest / smallest` from its grid's cells and queries an Axis with it.
 - Advice is a rule: plain data in a rule file, which never runs code.
 
-Declare a dimension when you make the Registry, `qe.Registry([qe.Labels("product")])`; its name is its key in rules, queries and rule files. [Dimensions](https://crocodile-cesm.github.io/queryearth/dimensions.html) walks through it.
+Declare a dimension when you make the Registry, `qe.Registry([qe.Labels("product")])`; its name is its key in rules, queries and rule files. [Dimensions](docs/source/dimensions.md) walks through it.
 
 ## Rule files
 
@@ -103,6 +105,8 @@ dimensions = [qe.Axis("resolution", "km"), qe.Labels("product")]
 registry = qe.Registry.from_file("rules.geojson", "more.geojson", dimensions=dimensions)
 ```
 
+To see rules on a globe, check which apply to an area you draw, and edit them, open a rule file in [vizqueryearth](https://github.com/CROCODILE-CESM/vizqueryearth), a web page that runs in your browser. For a sample, [CrocoDash's rules](https://crocodile-cesm.github.io/vizqueryearth/sites/crocodash/) are advice for regional ocean model cases: grids, open boundaries and regions such as the Indonesian Throughflow.
+
 ## Install
 
 ```bash
@@ -113,7 +117,7 @@ queryearth needs Python 3.11 or later, numpy and shapely 2.1 or later.
 
 ## The growth path
 
-This is the core of queryearth, cut back from 0.6.0 to what is realistic to review. [docs/growth.md](docs/growth.md) lists what 0.6.0 had beyond it, kept at the tag v0.6.0: what has come back into the core since (categories, version enforcement), then what is planned, parked and dropped.
+This is the core of queryearth, cut back from 0.6.0 to what is realistic to review. [docs/growth.md](https://github.com/CROCODILE-CESM/queryearth/blob/main/docs/growth.md) lists what 0.6.0 had beyond it, kept at the tag v0.6.0: what has come back into the core since (categories, version enforcement), then what is planned, parked and dropped.
 
 ## Development
 

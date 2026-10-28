@@ -31,7 +31,7 @@ This is the core, cut back from 0.6.0 to what is realistic to review. `docs/grow
 | `queryearth/rules.py` | `Rule`, a frozen dataclass: code, title, message, level, scope, properties; `category`, derived from a path code; `from_feature` and `to_feature`, the GeoJSON Feature form |
 | `queryearth/registry.py` | `Registry`: `add`, `query`, `rules`, `to_file`, `from_file`; the rule file (`FORMAT`); `DuplicateCodeError` |
 | `tests/` | `test_space.py`, `test_dimensions.py`, `test_queries.py`, `test_files.py`, and `test_docs.py`, which runs `docs/source/llms.txt` and checks the README's copy of `Labels` |
-| `docs/source/` | The public user docs (Sphinx with MyST Markdown): index, dimensions, concepts, rule files, API, and `llms.txt`. Built and deployed to GitHub Pages by `.github/workflows/docs.yml`, one folder per release (`vX.Y.Z/`) plus `dev/` for `main`; `.github/docs_versions.py` keeps the version list |
+| `docs/source/` | The public user docs (Sphinx with MyST Markdown): index, dimensions, concepts, rule files, API, and `llms.txt`. The index includes `README.md`, so the README is the docs' home page: link a docs page from it by its path (`docs/source/rules.md`), anything else by its full URL. Built and deployed to GitHub Pages by `.github/workflows/docs.yml`, one folder per release (`vX.Y.Z/`) plus `dev/` for `main`; `.github/docs_versions.py` keeps the version list |
 | `docs/growth.md` | The growth path: what 0.6.0 had beyond the core, where it lives at the tag, and how it would plug in |
 
 ## Concepts worth knowing before changing the engine
