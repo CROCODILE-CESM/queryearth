@@ -1,6 +1,10 @@
 # queryearth
 
-queryearth matches rules to a query. A rule says something worth knowing, such as "tidal mixing dominates here, so force tides", and is scoped by [dimensions](docs/source/dimensions.md): where (space), when (time), and anything else that matters, such as grid resolution or forcing product. A query gives values on any of the dimensions and gets back the rules that apply. Rules live in GeoJSON [rule files](docs/source/rules.md), so any GIS tool can show where they apply.
+## Mission
+
+queryearth is a rules engine that searches in space and time (and any other custom dimension wanted). It's an extremely lighweight package that only depends on numpy & shapely (for polygons), to solve the issue of space & time based flags, warnings, or comments. For example, if ERA5 has biases over Antartica, you could create a rule to highlight that area. It's designed to be used for earth scientists that don't want to worry about the finicky parts of coding something like this. It's not a complicated piece of code! Any programmer can see the intuitive way to set this up! (Registry, Dimension, and Rules Classes). The idea here is to create one simplfying layer that can be used in many contexts without being too heavy and saving folks time. 
+
+The only coding user's have to do is in custom dimensions. A rule says something worth knowing, such as "tidal mixing dominates here, so force tides", and is scoped by [dimensions](docs/source/dimensions.md): where (space), when (time), and anything else that matters, such as grid resolution or forcing product. A query gives values on any of the dimensions and gets back the rules that apply. Rules live in GeoJSON [rule files](docs/source/rules.md), so any GIS tool can show where they apply.
 
 Space, time and numeric axes are the base dimensions, and labels come with them. **Defining your own dimension is a few lines of Python**, written on the same three-method class the built-in ones use.
 
