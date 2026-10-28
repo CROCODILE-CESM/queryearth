@@ -6,14 +6,14 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>queryearth &mdash; queryearth 0.7.1.dev1</title>
+  <title>queryearth &mdash; queryearth 0.7.1.dev2</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
 
   
       <script src="_static/jquery.js?v=5d32c60e"></script>
       <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="_static/documentation_options.js?v=7cbf45d0"></script>
+      <script src="_static/documentation_options.js?v=4b47cfba"></script>
       <script src="_static/doctools.js?v=fd6eb6e6"></script>
       <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="_static/versions.js?v=58ec1786"></script>
@@ -75,9 +75,13 @@
              
   <section id="queryearth">
 <h1>queryearth<a class="headerlink" href="#queryearth" title="Link to this heading"></a></h1>
-<p>queryearth matches rules to a query. A rule says something worth knowing, such as “tidal mixing dominates here, so force tides”, and is scoped by <a class="reference internal" href="dimensions.html"><span class="std std-doc">dimensions</span></a>: where (space), when (time), and anything else that matters, such as grid resolution or forcing product. A query gives values on any of the dimensions and gets back the rules that apply. Rules live in GeoJSON <a class="reference internal" href="rules.html"><span class="std std-doc">rule files</span></a>, so any GIS tool can show where they apply.</p>
+<section id="mission">
+<h2>Mission<a class="headerlink" href="#mission" title="Link to this heading"></a></h2>
+<p>queryearth is a rules engine that searches in space and time (and any other custom dimension wanted). It’s an extremely lighweight package that only depends on numpy &amp; shapely (for polygons), to solve the issue of space &amp; time based flags, warnings, or comments. For example, if ERA5 has biases over Antartica, you could create a rule to highlight that area. It’s designed to be used for earth scientists that don’t want to worry about the finicky parts of coding something like this. It’s not a complicated piece of code! Any programmer can see the intuitive way to set this up! (Registry, Dimension, and Rules Classes). The idea here is to create one simplfying layer that can be used in many contexts without being too heavy and saving folks time.</p>
+<p>The only coding user’s have to do is in custom dimensions. A rule says something worth knowing, such as “tidal mixing dominates here, so force tides”, and is scoped by <a class="reference internal" href="dimensions.html"><span class="std std-doc">dimensions</span></a>: where (space), when (time), and anything else that matters, such as grid resolution or forcing product. A query gives values on any of the dimensions and gets back the rules that apply. Rules live in GeoJSON <a class="reference internal" href="rules.html"><span class="std std-doc">rule files</span></a>, so any GIS tool can show where they apply.</p>
 <p>Space, time and numeric axes are the base dimensions, and labels come with them. <strong>Defining your own dimension is a few lines of Python</strong>, written on the same three-method class the built-in ones use.</p>
 <p><strong>Documentation:</strong> <a class="reference external" href="https://crocodile-cesm.github.io/queryearth/">https://crocodile-cesm.github.io/queryearth/</a>. Language models and other programs: <a class="reference external" href="https://crocodile-cesm.github.io/queryearth/llms.txt">llms.txt</a> describes rule files and the API on one page.</p>
+</section>
 <section id="a-first-query">
 <h2>A first query<a class="headerlink" href="#a-first-query" title="Link to this heading"></a></h2>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">queryearth</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">qe</span>
