@@ -6,14 +6,14 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>queryearth &mdash; queryearth 0.6.1.dev3</title>
+  <title>queryearth &mdash; queryearth 0.7.1.dev1</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
 
   
       <script src="_static/jquery.js?v=5d32c60e"></script>
       <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="_static/documentation_options.js?v=93f3e12c"></script>
+      <script src="_static/documentation_options.js?v=7cbf45d0"></script>
       <script src="_static/doctools.js?v=fd6eb6e6"></script>
       <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="_static/versions.js?v=58ec1786"></script>
@@ -76,14 +76,8 @@
   <section id="queryearth">
 <h1>queryearth<a class="headerlink" href="#queryearth" title="Link to this heading"></a></h1>
 <p>queryearth matches rules to a query. A rule says something worth knowing, such as “tidal mixing dominates here, so force tides”, and is scoped by <a class="reference internal" href="dimensions.html"><span class="std std-doc">dimensions</span></a>: where (space), when (time), and anything else that matters, such as grid resolution or forcing product. A query gives values on any of the dimensions and gets back the rules that apply. Rules live in GeoJSON <a class="reference internal" href="rules.html"><span class="std std-doc">rule files</span></a>, so any GIS tool can show where they apply.</p>
-<p>Space, time and numeric axes are the base dimensions, and labels come with them. Defining your own dimension is a few lines of Python, written on the same three-method class the built-in ones use: see <a class="reference internal" href="dimensions.html"><span class="std std-doc">Dimensions</span></a>.</p>
-<section id="install">
-<h2>Install<a class="headerlink" href="#install" title="Link to this heading"></a></h2>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span>queryearth
-</pre></div>
-</div>
-<p>queryearth needs Python 3.11 or later, numpy, and shapely 2.1 or later.</p>
-</section>
+<p>Space, time and numeric axes are the base dimensions, and labels come with them. <strong>Defining your own dimension is a few lines of Python</strong>, written on the same three-method class the built-in ones use.</p>
+<p><strong>Documentation:</strong> <a class="reference external" href="https://crocodile-cesm.github.io/queryearth/">https://crocodile-cesm.github.io/queryearth/</a>. Language models and other programs: <a class="reference external" href="https://crocodile-cesm.github.io/queryearth/llms.txt">llms.txt</a> describes rule files and the API on one page.</p>
 <section id="a-first-query">
 <h2>A first query<a class="headerlink" href="#a-first-query" title="Link to this heading"></a></h2>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">queryearth</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">qe</span>
@@ -115,49 +109,103 @@
     <span class="n">product</span><span class="o">=</span><span class="s2">"glorys"</span><span class="p">,</span>
 <span class="p">)</span>
 <span class="nb">print</span><span class="p">([</span><span class="n">rule</span><span class="o">.</span><span class="n">code</span> <span class="k">for</span> <span class="n">rule</span> <span class="ow">in</span> <span class="n">findings</span><span class="p">])</span>  <span class="c1"># ['GULF001', 'GRID001'], warnings first</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">findings</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">to_feature</span><span class="p">())</span>  <span class="c1"># a finding, as the GeoJSON Feature of its rule</span>
 </pre></div>
 </div>
-<p>GULF001 applies because the query’s box overlaps the rule’s and the product is glorys; GRID001 because a grid from 5 to 9 km has cells below 8 km. Neither rule constrains time, so any time matches. See <a class="reference internal" href="concepts.html"><span class="std std-doc">Rules and queries</span></a> for the matching rule.</p>
-<p>Language models and other programs: <a href="llms.txt">llms.txt</a> describes rule files and the API on one page.</p>
+<p>GULF001 applies because the query’s box overlaps the rule’s and the product is glorys; GRID001 because a grid from 5 to 9 km has cells below 8 km. Neither rule constrains time, so any time matches.</p>
+<p>A rule applies when, on every dimension it constrains, the query gives a value and the two overlap. A dimension the rule leaves out matches anything; a dimension the rule constrains and the query leaves out does not match. <a class="reference internal" href="concepts.html"><span class="std std-doc">Rules and queries</span></a> has the details.</p>
+</section>
+<section id="define-your-own-dimension">
+<h2>Define your own dimension<a class="headerlink" href="#define-your-own-dimension" title="Link to this heading"></a></h2>
+<p>A dimension subclasses <code class="docutils literal notranslate"><span class="pre">qe.Dimension</span></code>, sets its <code class="docutils literal notranslate"><span class="pre">name</span></code> and implements three methods:</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Method</p></th>
+<th class="head"><p>Does</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">parse_rule(value)</span></code></p></td>
+<td><p>checks a rule’s value, from Python or from a rule file’s JSON, and returns it in the form <code class="docutils literal notranslate"><span class="pre">matches</span></code> takes</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">parse_query(value)</span></code></p></td>
+<td><p>the same for a query’s value</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">matches(rule,</span> <span class="pre">query)</span></code></p></td>
+<td><p>says whether the two share at least one value</p></td>
+</tr>
+</tbody>
+</table>
+<p>A value can be anything the dimension knows how to parse from JSON: a number, a range, a shape, or a mapping of several fields, such as <code class="docutils literal notranslate"><span class="pre">{&quot;depth&quot;:</span> <span class="pre">4000,</span> <span class="pre">&quot;slope&quot;:</span> <span class="pre">8}</span></code>. A dimension sees only its own value, so inputs it needs together go in that one value. A rule keeps each value as you gave it, and a rule file holds it that way, so a value you give in Python is plain JSON, apart from space and time.</p>
+<p>Space, time and <code class="docutils literal notranslate"><span class="pre">Axis</span></code> are written this way, and so is <code class="docutils literal notranslate"><span class="pre">Labels</span></code>, which comes with queryearth as the worked example:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">Labels</span><span class="p">(</span><span class="n">Dimension</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Names, such as a forcing product or a model option.</span>
+
+<span class="sd">    A rule gives a name or a list of names, which may use the wildcards * and</span>
+<span class="sd">    ? (case-sensitive), such as ["jra", "era5*"]; a query gives a name or a</span>
+<span class="sd">    list of names. They match when a query name matches one of the rule's.</span>
+<span class="sd">    """</span>
+
+    <span class="n">name</span><span class="p">:</span> <span class="nb">str</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">parse_rule</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="o">...</span><span class="p">]:</span>
+        <span class="n">names</span> <span class="o">=</span> <span class="p">[</span><span class="n">value</span><span class="p">]</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="k">else</span> <span class="n">value</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">names</span><span class="p">,</span> <span class="p">(</span><span class="nb">list</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">))</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">names</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"labels </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="si">!r}</span><span class="s2"> takes a name or a list of names"</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">all</span><span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">n</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">and</span> <span class="n">n</span> <span class="k">for</span> <span class="n">n</span> <span class="ow">in</span> <span class="n">names</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"labels </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="si">!r}</span><span class="s2"> takes names, not </span><span class="si">{</span><span class="n">value</span><span class="si">!r}</span><span class="s2">"</span><span class="p">)</span>
+        <span class="k">return</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">names</span><span class="p">)</span>
+
+    <span class="n">parse_query</span> <span class="o">=</span> <span class="n">parse_rule</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">matches</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">rule</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span> <span class="n">query</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="o">...</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+        <span class="k">return</span> <span class="nb">any</span><span class="p">(</span><span class="n">fnmatchcase</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">pattern</span><span class="p">)</span> <span class="k">for</span> <span class="n">pattern</span> <span class="ow">in</span> <span class="n">rule</span> <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">query</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><strong>Rules are data; code lives in dimensions.</strong></p>
+<ul class="simple">
+<li><p>A new kind of value, or a new way to compare values, is a new dimension.</p></li>
+<li><p>A value derived from your case is computed when you build the query, and given to an <code class="docutils literal notranslate"><span class="pre">Axis</span></code> or your own dimension: CrocoDash computes <code class="docutils literal notranslate"><span class="pre">cell_size_ratio</span> <span class="pre">=</span> <span class="pre">largest</span> <span class="pre">/</span> <span class="pre">smallest</span></code> from its grid’s cells and queries an Axis with it.</p></li>
+<li><p>Advice is a rule: plain data in a rule file, which never runs code.</p></li>
+</ul>
+<p>Declare a dimension when you make the Registry, <code class="docutils literal notranslate"><span class="pre">qe.Registry([qe.Labels(&quot;product&quot;)])</span></code>; its name is its key in rules, queries and rule files. <a class="reference internal" href="dimensions.html"><span class="std std-doc">Dimensions</span></a> walks through it.</p>
+</section>
+<section id="rule-files">
+<h2>Rule files<a class="headerlink" href="#rule-files" title="Link to this heading"></a></h2>
+<p>A rule file is a GeoJSON FeatureCollection with one Feature per rule. Its geometry is the rule’s space, its JSON-FG <code class="docutils literal notranslate"><span class="pre">time</span></code> member the rule’s time, and its properties hold the code, title, message, level, the value on each other dimension under <code class="docutils literal notranslate"><span class="pre">&quot;dimensions&quot;</span></code>, as the rule gives it, and anything else, such as an instruction or references, which queryearth keeps unchanged. <code class="docutils literal notranslate"><span class="pre">Rule.from_feature()</span></code> reads one Feature and <code class="docutils literal notranslate"><span class="pre">rule.to_feature()</span></code> writes it; <code class="docutils literal notranslate"><span class="pre">Registry.from_file()</span></code> and <code class="docutils literal notranslate"><span class="pre">registry.to_file()</span></code> read and write a whole file.</p>
+<p>A code may be a path, such as <code class="docutils literal notranslate"><span class="pre">REGION/ITF/ITF001</span></code>: its category, <code class="docutils literal notranslate"><span class="pre">rule.category</span></code>, is the path before the last slash. To keep the findings in one category, filter on the code: <code class="docutils literal notranslate"><span class="pre">[r</span> <span class="pre">for</span> <span class="pre">r</span> <span class="pre">in</span> <span class="pre">findings</span> <span class="pre">if</span> <span class="pre">r.code.startswith(&quot;REGION/&quot;)]</span></code>.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">registry</span><span class="o">.</span><span class="n">to_file</span><span class="p">(</span><span class="s2">"rules.geojson"</span><span class="p">)</span>
+<span class="n">dimensions</span> <span class="o">=</span> <span class="p">[</span><span class="n">qe</span><span class="o">.</span><span class="n">Axis</span><span class="p">(</span><span class="s2">"resolution"</span><span class="p">,</span> <span class="s2">"km"</span><span class="p">),</span> <span class="n">qe</span><span class="o">.</span><span class="n">Labels</span><span class="p">(</span><span class="s2">"product"</span><span class="p">)]</span>
+<span class="n">registry</span> <span class="o">=</span> <span class="n">qe</span><span class="o">.</span><span class="n">Registry</span><span class="o">.</span><span class="n">from_file</span><span class="p">(</span><span class="s2">"rules.geojson"</span><span class="p">,</span> <span class="s2">"more.geojson"</span><span class="p">,</span> <span class="n">dimensions</span><span class="o">=</span><span class="n">dimensions</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>To see rules on a globe, check which apply to an area you draw, and edit them, open a rule file in <a class="reference external" href="https://github.com/CROCODILE-CESM/vizqueryearth">vizqueryearth</a>, a web page that runs in your browser. For a sample, <a class="reference external" href="https://crocodile-cesm.github.io/vizqueryearth/sites/crocodash/">CrocoDash’s rules</a> are advice for regional ocean model cases: grids, open boundaries and regions such as the Indonesian Throughflow.</p>
+</section>
+<section id="install">
+<h2>Install<a class="headerlink" href="#install" title="Link to this heading"></a></h2>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span>queryearth
+</pre></div>
+</div>
+<p>queryearth needs Python 3.11 or later, numpy and shapely 2.1 or later.</p>
+</section>
+<section id="the-growth-path">
+<h2>The growth path<a class="headerlink" href="#the-growth-path" title="Link to this heading"></a></h2>
+<p>This is the core of queryearth, cut back from 0.6.0 to what is realistic to review. <a class="reference external" href="https://github.com/CROCODILE-CESM/queryearth/blob/main/docs/growth.md">docs/growth.md</a> lists what 0.6.0 had beyond it, kept at the tag v0.6.0: what has come back into the core since (categories, version enforcement), then what is planned, parked and dropped.</p>
+</section>
+<section id="development">
+<h2>Development<a class="headerlink" href="#development" title="Link to this heading"></a></h2>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span><span class="s2">".[test]"</span>
+pytest
+black<span class="w"> </span>.
+</pre></div>
+</div>
+<p>Versions come from git tags through setuptools-scm. Every push to <code class="docutils literal notranslate"><span class="pre">main</span></code> builds the package, and every GitHub release tagged <code class="docutils literal notranslate"><span class="pre">vX.Y.Z</span></code> publishes version X.Y.Z to PyPI.</p>
+</section>
+<section id="licence">
+<h2>Licence<a class="headerlink" href="#licence" title="Link to this heading"></a></h2>
+<p>Apache-2.0.</p>
 <div class="toctree-wrapper compound">
-<ul>
-<li class="toctree-l1"><a class="reference internal" href="dimensions.html">Dimensions</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="dimensions.html#what-comes-with-queryearth">What comes with queryearth</a></li>
-<li class="toctree-l2"><a class="reference internal" href="dimensions.html#the-contract">The contract</a></li>
-<li class="toctree-l2"><a class="reference internal" href="dimensions.html#a-worked-example-labels">A worked example: Labels</a></li>
-<li class="toctree-l2"><a class="reference internal" href="dimensions.html#writing-your-own">Writing your own</a></li>
-</ul>
-</li>
-<li class="toctree-l1"><a class="reference internal" href="concepts.html">Rules and queries</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="concepts.html#rules">Rules</a></li>
-<li class="toctree-l2"><a class="reference internal" href="concepts.html#categories">Categories</a></li>
-<li class="toctree-l2"><a class="reference internal" href="concepts.html#queries">Queries</a></li>
-<li class="toctree-l2"><a class="reference internal" href="concepts.html#findings">Findings</a></li>
-<li class="toctree-l2"><a class="reference internal" href="concepts.html#space">Space</a></li>
-<li class="toctree-l2"><a class="reference internal" href="concepts.html#time">Time</a></li>
-</ul>
-</li>
-<li class="toctree-l1"><a class="reference internal" href="rules.html">Rule files</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="rules.html#reading-and-writing">Reading and writing</a></li>
-<li class="toctree-l2"><a class="reference internal" href="rules.html#properties-from-queryearth-0-6">Properties from queryearth 0.6</a></li>
-</ul>
-</li>
-<li class="toctree-l1"><a class="reference internal" href="api.html">API reference</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="api.html#queryearth.Axis"><code class="docutils literal notranslate"><span class="pre">Axis</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="api.html#queryearth.Dimension"><code class="docutils literal notranslate"><span class="pre">Dimension</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="api.html#queryearth.DuplicateCodeError"><code class="docutils literal notranslate"><span class="pre">DuplicateCodeError</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="api.html#queryearth.Interval"><code class="docutils literal notranslate"><span class="pre">Interval</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="api.html#queryearth.Labels"><code class="docutils literal notranslate"><span class="pre">Labels</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="api.html#queryearth.Registry"><code class="docutils literal notranslate"><span class="pre">Registry</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="api.html#queryearth.Rule"><code class="docutils literal notranslate"><span class="pre">Rule</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="api.html#queryearth.Space"><code class="docutils literal notranslate"><span class="pre">Space</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="api.html#queryearth.SpaceDimension"><code class="docutils literal notranslate"><span class="pre">SpaceDimension</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="api.html#queryearth.TimeDimension"><code class="docutils literal notranslate"><span class="pre">TimeDimension</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="api.html#queryearth.interval"><code class="docutils literal notranslate"><span class="pre">interval()</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="api.html#module-queryearth.space">queryearth.space</a></li>
-</ul>
-</li>
-</ul>
 </div>
 </section>
 </section>
