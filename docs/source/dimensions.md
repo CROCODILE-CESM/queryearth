@@ -25,6 +25,8 @@ registry = qe.Registry([qe.Axis("resolution", "km"), qe.Labels("product")])
 - A value derived from your case is computed when you build the query, and given to an `Axis` or your own dimension: CrocoDash computes `cell_size_ratio = largest / smallest` from its grid's cells and queries an Axis with it.
 - Advice is a rule: plain data in a rule file, which never runs code.
 
+**No custom rules: write a custom dimension.** Whatever decides whether a rule applies goes in a dimension, so a rule never needs code of its own. A rule's text is data too: a number the advice depends on, such as a time step worked out from your grid, is computed by your code after the query. queryearth 0.6 had computed rules; dimensions replace them.
+
 ## The contract
 
 A dimension subclasses {class}`~queryearth.Dimension`, sets `name`, and implements three methods. Python refuses to create one that leaves any out.
