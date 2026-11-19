@@ -13,8 +13,8 @@ def registry_with(*rules):
     return registry
 
 
-def codes(findings):
-    return [rule.code for rule in findings]
+def names(findings):
+    return [rule.name for rule in findings]
 
 
 gulf = qe.Rule(
@@ -33,7 +33,7 @@ def test_a_rule_applies_when_every_dimension_it_constrains_overlaps():
     registry = registry_with(gulf)
     domain = sp.box(-90, 20, -70, 30)  # half in the gulf
     year = qe.interval("2005-01-01", "2005-12-31")
-    assert codes(registry.query(space=domain, time=year, resolution=8)) == ["GULF001"]
+    assert names(registry.query(space=domain, time=year, resolution=8)) == ["GULF001"]
     assert registry.query(space=domain, time=year, resolution=12) == []
     assert registry.query(space=sp.point(0, 0), time=year, resolution=8) == []
 
@@ -41,8 +41,8 @@ def test_a_rule_applies_when_every_dimension_it_constrains_overlaps():
 def test_a_dimension_the_rule_leaves_out_matches_anything():
     fine = qe.Rule("GRID001", "Fine grid", "...", scope={"resolution": {"lt": 8}})
     registry = registry_with(fine)
-    assert codes(registry.query(resolution=5, product="glorys")) == ["GRID001"]
-    assert codes(registry.query(resolution=5, space=sp.point(10, 10))) == ["GRID001"]
+    assert names(registry.query(resolution=5, product="glorys")) == ["GRID001"]
+    assert names(registry.query(resolution=5, space=sp.point(10, 10))) == ["GRID001"]
 
 
 def test_a_dimension_the_query_leaves_out_does_not_match():
@@ -53,8 +53,8 @@ def test_a_dimension_the_query_leaves_out_does_not_match():
 
 def test_a_rule_without_a_scope_applies_to_every_query():
     registry = registry_with(qe.Rule("ALL001", "Always", "..."))
-    assert codes(registry.query()) == ["ALL001"]
-    assert codes(registry.query(product="glorys")) == ["ALL001"]
+    assert names(registry.query()) == ["ALL001"]
+    assert names(registry.query(product="glorys")) == ["ALL001"]
 
 
 def test_undeclared_names_are_refused_in_rules_and_queries():
@@ -72,7 +72,7 @@ def test_findings_come_highest_level_first_then_by_code():
         qe.Rule("A", "a", "...", level="info"),
         qe.Rule("D", "d", "...", level="error"),
     )
-    assert codes(registry.query()) == ["D", "C", "A", "B"]
+    assert names(registry.query()) == ["D", "C", "A", "B"]
 
 
 def test_the_level_is_warning_unless_given_as_a_name():
@@ -81,8 +81,8 @@ def test_the_level_is_warning_unless_given_as_a_name():
         qe.Rule("X", "x", "...", level="WARNING")
 
 
-# ---- categories: a code may be a path ---------------------------------------------
-def test_a_rules_category_is_the_path_before_the_last_slash_of_its_code():
+# ---- categories: a name may be a path ---------------------------------------------
+def test_a_rules_category_is_the_path_before_the_last_slash_of_its_name():
     assert qe.Rule("REGION/ITF/ITF001", "i", "...").category == "REGION/ITF"
     assert qe.Rule("ITF001", "i", "...").category is None
     for bad in ("", "/REGION/X1", "REGION/", "REGION//X1", 5):
@@ -93,6 +93,6 @@ def test_a_rules_category_is_the_path_before_the_last_slash_of_its_code():
 def test_rules_in_different_categories_may_share_a_name():
     registry = registry_with(qe.Rule("REGION/ITF/001", "i", "..."))
     registry.add(qe.Rule("DOMAIN/OBC/001", "o", "..."))
-    assert codes(registry.query()) == ["DOMAIN/OBC/001", "REGION/ITF/001"]
-    with pytest.raises(qe.DuplicateCodeError):
+    assert names(registry.query()) == ["DOMAIN/OBC/001", "REGION/ITF/001"]
+    with pytest.raises(qe.DuplicateNameError):
         registry.add(qe.Rule("DOMAIN/OBC/001", "again", "..."))

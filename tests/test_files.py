@@ -16,7 +16,7 @@ ARCTIC = {
     },
     "time": None,
     "properties": {
-        "code": "POLAR001",
+        "name": "POLAR001",
         "title": "Consider active sea ice",
         "message": "Sea ice forms poleward of 60 degrees.",
         "dimensions": {"ice": ["sice"]},
@@ -53,10 +53,10 @@ def test_a_rule_file_reads_back_exactly_as_written(tmp_path):
     again.to_file(tmp_path / "again.geojson")
     text = (tmp_path / "rules.geojson").read_text()
     assert (tmp_path / "again.geojson").read_text() == text
-    assert '"queryearth": "0.7"' in text and "[165.0, 52.0]" in text
+    assert '"queryearth": "0.8"' in text and "[165.0, 52.0]" in text
     query = dict(space=sp.point(-170, 60), resolution=25, ice="sice")
     query["time"] = qe.interval("2020-01-01", "2020-12-31")
-    assert [r.code for r in again.query(**query)] == ["POLAR001", "BERING001"]
+    assert [r.name for r in again.query(**query)] == ["POLAR001", "BERING001"]
 
 
 def test_properties_the_core_does_not_use_pass_through_unchanged(tmp_path):
@@ -85,17 +85,17 @@ def test_a_rule_writes_its_values_as_given_with_no_registry():
 
 
 def test_several_files_load_into_one_registry(tmp_path):
-    claude = dict(ARCTIC, properties=dict(ARCTIC["properties"], code="CLAUDE001"))
+    claude = dict(ARCTIC, properties=dict(ARCTIC["properties"], name="CLAUDE001"))
     mine = write(tmp_path / "mine.geojson", ARCTIC)
     theirs = write(tmp_path / "claude.geojson", claude)
     registry = qe.Registry.from_file(mine, theirs, dimensions=DIMENSIONS)
-    assert [r.code for r in registry.rules] == ["POLAR001", "CLAUDE001"]
+    assert [r.name for r in registry.rules] == ["POLAR001", "CLAUDE001"]
 
 
 def test_a_file_that_needs_a_later_queryearth_is_refused(tmp_path):
     path = tmp_path / "new.geojson"
-    path.write_text(json.dumps({"type": "FeatureCollection", "queryearth": "0.8"}))
-    with pytest.raises(ValueError, match="needs queryearth 0.8 or later"):
+    path.write_text(json.dumps({"type": "FeatureCollection", "queryearth": "0.9"}))
+    with pytest.raises(ValueError, match="needs queryearth 0.9 or later"):
         qe.Registry.from_file(path)
     path.write_text(json.dumps({"type": "FeatureCollection", "queryearth": "0.6"}))
     assert qe.Registry.from_file(path).rules == []  # an older format reads as it is
@@ -104,10 +104,10 @@ def test_a_file_that_needs_a_later_queryearth_is_refused(tmp_path):
 def test_a_code_can_only_be_added_once(tmp_path):
     registry = qe.Registry(DIMENSIONS)
     registry.add(qe.Rule.from_feature(ARCTIC))
-    with pytest.raises(qe.DuplicateCodeError, match="POLAR001"):
+    with pytest.raises(qe.DuplicateNameError, match="POLAR001"):
         registry.add(qe.Rule.from_feature(ARCTIC))
     twice = write(tmp_path / "twice.geojson", ARCTIC, ARCTIC)
-    with pytest.raises(qe.DuplicateCodeError, match="twice.geojson: feature 1"):
+    with pytest.raises(qe.DuplicateNameError, match="twice.geojson: feature 1"):
         qe.Registry.from_file(twice, dimensions=DIMENSIONS)
 
 
@@ -117,16 +117,16 @@ def test_a_file_that_uses_an_undeclared_dimension_is_refused(tmp_path):
         qe.Registry.from_file(path)  # ice is not declared
 
 
-def test_record_mistakes_are_refused_with_the_code(tmp_path):
-    no_title = dict(ARCTIC, properties={"code": "X1", "message": "..."})
+def test_record_mistakes_are_refused_with_the_name(tmp_path):
+    no_title = dict(ARCTIC, properties={"name": "X1", "message": "..."})
     typo = dict(ARCTIC, tme={"interval": ["2000-01-01", ".."]})
     edge = dict(ARCTIC, properties=dict(ARCTIC["properties"], edge=True))
     category = dict(ARCTIC, properties=dict(ARCTIC["properties"], category="POLAR"))
     for feature, problem in [
-        (no_title, "needs a code, a title"),
+        (no_title, "needs a name, a title"),
         (typo, "unknown Feature members \\['tme'\\]"),
         (edge, "\\['edge'\\] changed which rules apply in queryearth 0.6"),
-        (category, "category is the path of its code"),
+        (category, "category is the path of its name"),
     ]:
         with pytest.raises(ValueError, match=problem):
             qe.Registry.from_file(

@@ -16,11 +16,11 @@ from typing import Any
 from queryearth.dimensions import Dimension, SpaceDimension, TimeDimension, applies
 from queryearth.rules import LEVELS, Rule
 
-__all__ = ["DuplicateCodeError", "Registry"]
+__all__ = ["DuplicateNameError", "Registry"]
 
 # The release that last changed the rule file format. to_file() writes it in the
 # "queryearth" member, and from_file() refuses a file that needs a later release.
-FORMAT = "0.7"
+FORMAT = "0.8"
 # A list of numbers, such as a point, as json.dumps(indent=2) spreads it over
 # lines. A JSON string never holds a newline, so only real lists match.
 _NUMBERS = re.compile(
@@ -28,8 +28,8 @@ _NUMBERS = re.compile(
 )
 
 
-class DuplicateCodeError(ValueError):
-    """A code the Registry already holds was added again."""
+class DuplicateNameError(ValueError):
+    """A rule name the Registry already holds was added again."""
 
 
 class Registry:
@@ -67,24 +67,24 @@ class Registry:
 
         Each scope value is parsed by its dimension. A name the Registry does
         not have is refused, so a misspelt one never matches by accident, and
-        a code already here raises DuplicateCodeError.
+        a rule name already here raises DuplicateNameError.
         """
         if not isinstance(rule, Rule):
             raise TypeError(f"cannot add {rule!r}: not a Rule")
-        if rule.code in self._rules:
-            raise DuplicateCodeError(f"{rule.code}: this code is already a rule here")
+        if rule.name in self._rules:
+            raise DuplicateNameError(f"{rule.name}: this name is already a rule here")
         values = {}
         for name, value in rule.scope.items():
             if value is not None:
                 try:
                     values[name] = self._dimension(name).parse_rule(value)
                 except (ValueError, TypeError) as err:
-                    err.args = (f"{rule.code}: {name}: {err}",)
+                    err.args = (f"{rule.name}: {name}: {err}",)
                     raise
-        self._rules[rule.code] = (rule, values)
+        self._rules[rule.name] = (rule, values)
 
     def query(self, **values: Any) -> list[Rule]:
-        """The rules that apply to a query, highest level first, then by code.
+        """The rules that apply to a query, highest level first, then by name.
 
         values gives the query's value on any of the dimensions, by name, such
         as space=sp.box(-60, 30, -50, 40), time=qe.interval("2020-01-01",
@@ -101,7 +101,7 @@ class Registry:
             for r, scope in self._rules.values()
             if applies(self.dimensions, scope, query)
         ]
-        return sorted(found, key=lambda rule: (LEVELS.index(rule.level), rule.code))
+        return sorted(found, key=lambda rule: (LEVELS.index(rule.level), rule.name))
 
     # ---- rule files ---------------------------------------------------------------
     def to_file(self, path: str | os.PathLike[str]) -> None:
@@ -120,9 +120,9 @@ class Registry:
         """A Registry with the rules of one or more rule files.
 
         dimensions declares the dimensions other than space and time, as
-        Registry() does; a rule that uses any other is refused. Codes must be
-        unique across the files. Raises ValueError naming the file, the
-        feature's position and its code; nothing is returned unless every
+        Registry() does; a rule that uses any other is refused. Rule names must
+        be unique across the files. Raises ValueError naming the file, the
+        feature's position and its name; nothing is returned unless every
         rule was read.
         """
         registry = cls(dimensions)

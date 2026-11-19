@@ -25,11 +25,11 @@ def test_llms_txt_runs_as_written(tmp_path):
             exec(code, namespace)
     finally:
         os.chdir(here)
-    assert [rule.code for rule in namespace["findings"]] == ["MINE002", "MINE001"]
+    assert [rule.name for rule in namespace["findings"]] == ["MINE002", "MINE001"]
     written = qe.Registry.from_file(
         tmp_path / "mine.geojson", dimensions=[qe.Axis("resolution", "km")]
     )
-    assert [rule.code for rule in written.rules] == ["ARCTIC001"]
+    assert [rule.name for rule in written.rules] == ["ARCTIC001"]
 
 
 def test_the_readme_shows_the_source_of_labels():

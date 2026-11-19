@@ -8,9 +8,9 @@ The core grows in three places: a new `Dimension` subclass (its three methods), 
 
 ### Categories
 
-A code may be a path, such as `REGION/ITF/ITF001`; its category, `rule.category`, is the path before the last slash. Categories need no declaring: the path is the hierarchy. Codes are unique as whole paths, so two categories can each have a rule named `001`. A `category` property is refused, so it can never disagree with the code. A query is about dimensions only; keeping the findings in one category is one line on the results, `[r for r in found if r.code.startswith("REGION/")]`. A `category` filter on `query()` and a `categories` listing are easy to add if a user interface needs them.
+A rule's name may be a path, such as `REGION/ITF/ITF001`; its category, `rule.category`, is the path before the last slash. Categories need no declaring: the path is the hierarchy. Names are unique as whole paths, so two categories can each have a rule named `001`. A `category` property is refused, so it can never disagree with the name. A query is about dimensions only; keeping the findings in one category is one line on the results, `[r for r in found if r.name.startswith("REGION/")]`. A `category` filter on `query()` and a `categories` listing are easy to add if a user interface needs them.
 
-The trade-off: moving a rule to another category changes its code, and aliases, which kept a rule's old codes in 0.6.0, are parked.
+The trade-off: moving a rule to another category changes its name, and aliases, which kept a rule's old codes in 0.6.0, are parked.
 
 At v0.6.0 a category was the code's prefix (ITF001 in ITF), declared on the Registry with a title and a parent, and `next_code()` numbered rules within it: `queryearth/registry.py`: `add_category`, `categories`, `category_path`, `next_code`; `queryearth/rules.py`: `check_code`, `split_code`, `make_code`. Titles and `next_code()` stay at the tag.
 
@@ -48,11 +48,11 @@ At v0.6.0 a category was the code's prefix (ITF001 in ITF), declared on the Regi
 
 ### Packs
 
-**What.** A ruleset as a folder: `pack.json`, a folder per category with `category.json`, and a file per rule named by its code, so a rule set in git shows each change as a change to one file. `to_pack` wrote or updated one.
+**What.** A ruleset as a folder: `pack.json`, a folder per category with `category.json`, and a file per rule named after it, so a rule set in git shows each change as a change to one file. `to_pack` wrote or updated one.
 
 **At v0.6.0.** `queryearth/registry.py`: `_read_pack`, `Registry.to_pack`, `PACK`, `CATEGORY`. Tests: `tests/test_packs.py`.
 
-**Plugs in.** A reader that maps each category path to a folder and each code's last part to a file name, turning the folder into the FeatureCollection `from_file` reads, and a writer from `Rule.to_feature`. Until then, a folder of Feature files converts to a rule file by gathering its Features, which is how CrocoDash's two packs were converted for the core.
+**Plugs in.** A reader that maps each category path to a folder and the last part of each rule's name to a file name, turning the folder into the FeatureCollection `from_file` reads, and a writer from `Rule.to_feature`. Until then, a folder of Feature files converts to a rule file by gathering its Features, which is how CrocoDash's two packs were converted for the core.
 
 ### Features for AI agents
 

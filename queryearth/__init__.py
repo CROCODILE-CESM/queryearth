@@ -21,7 +21,7 @@ from queryearth.dimensions import (
     SpaceDimension,
     TimeDimension,
 )
-from queryearth.registry import DuplicateCodeError, Registry
+from queryearth.registry import DuplicateNameError, Registry
 from queryearth.rules import Rule
 from queryearth.space import Space
 from queryearth.time import Interval, interval
@@ -29,7 +29,7 @@ from queryearth.time import Interval, interval
 __all__ = [
     "Axis",
     "Dimension",
-    "DuplicateCodeError",
+    "DuplicateNameError",
     "Interval",
     "Labels",
     "Registry",

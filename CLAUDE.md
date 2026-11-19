@@ -4,7 +4,7 @@ Guidance for Claude Code (and anyone else) working in this repository.
 
 ## What queryearth is
 
-A small engine that matches rules to a query. A rule has a code, a title, a message, a level (`info`, `warning` or `error`, default `warning`) and a scope. A code may be a path, such as `REGION/ITF/ITF001`, whose part before the last slash is the rule's category. The scope is a value on each dimension it constrains. Space and time are on every Registry; `Axis` (numbers in a unit) and `Labels` (names with wildcards) are declared on it, and so is any dimension a user writes. A query gives values on any of the dimensions and gets back the rules that apply. Rules are data, kept in GeoJSON rule files; code lives in dimensions. It is general-purpose, not tied to earth system modelling. Its first consumer is CrocoDash, which queries once in `Case()` and once in `configure_forcings()`.
+A small engine that matches rules to a query. A rule has a name, a title, a message, a level (`info`, `warning` or `error`, default `warning`) and a scope. A name may be a path, such as `REGION/ITF/ITF001`, whose part before the last slash is the rule's category. The scope is a value on each dimension it constrains. Space and time are on every Registry; `Axis` (numbers in a unit) and `Labels` (names with wildcards) are declared on it, and so is any dimension a user writes. A query gives values on any of the dimensions and gets back the rules that apply. Rules are data, kept in GeoJSON rule files; code lives in dimensions. It is general-purpose, not tied to earth system modelling. Its first consumer is CrocoDash, which queries once in `Case()` and once in `configure_forcings()`.
 
 It is an engine only: the package ships no curated rules. Rule files belong to their users.
 
@@ -28,8 +28,8 @@ This is the core, cut back from 0.6.0 to what is realistic to review. `docs/grow
 | `queryearth/space.py` | `Space` (point or polygon; `to_json()` gives its GeoJSON geometry) and `point`, `box`, `polygon`: longitudes wrapped, rings cut at ±180, invalid rings repaired, a ring around a pole refused; `meets`, closed-set and across the seam |
 | `queryearth/time.py` | `Interval` (half-open integer-second keys, day or second precision; `to_json()` gives its JSON-FG time member) and `interval()`; one calendar, proleptic Gregorian |
 | `queryearth/dimensions.py` | `Dimension` (the three-method contract), `applies()` (the matching rule, in one place), `SpaceDimension`, `TimeDimension`, `Axis`, `Labels` |
-| `queryearth/rules.py` | `Rule`, a frozen dataclass: code, title, message, level, scope, properties; `category`, derived from a path code; `from_feature` and `to_feature`, the GeoJSON Feature form |
-| `queryearth/registry.py` | `Registry`: `add`, `query`, `rules`, `to_file`, `from_file`; the rule file (`FORMAT`); `DuplicateCodeError` |
+| `queryearth/rules.py` | `Rule`, a frozen dataclass: name, title, message, level, scope, properties; `category`, derived from a path name; `from_feature` and `to_feature`, the GeoJSON Feature form |
+| `queryearth/registry.py` | `Registry`: `add`, `query`, `rules`, `to_file`, `from_file`; the rule file (`FORMAT`); `DuplicateNameError` |
 | `tests/` | `test_space.py`, `test_dimensions.py`, `test_queries.py`, `test_files.py`, and `test_docs.py`, which runs `docs/source/llms.txt` and checks the README's copy of `Labels` |
 | `docs/source/` | The public user docs (Sphinx with MyST Markdown): index, dimensions, concepts, rule files, API, and `llms.txt`. The index includes `README.md`, so the README is the docs' home page: link a docs page from it by its path (`docs/source/rules.md`), anything else by its full URL. Built and deployed to GitHub Pages by `.github/workflows/docs.yml`, one folder per release (`vX.Y.Z/`) plus `dev/` for `main`; `.github/docs_versions.py` keeps the version list |
 | `docs/growth.md` | The growth path: what 0.6.0 had beyond the core, where it lives at the tag, and how it would plug in |
@@ -37,8 +37,8 @@ This is the core, cut back from 0.6.0 to what is realistic to review. `docs/grow
 ## Concepts worth knowing before changing the engine
 
 - A rule applies when, on every dimension its scope constrains, the query gives a value and the dimension's `matches()` is true: they share at least one value. A dimension the rule leaves out matches anything. A dimension the rule constrains and the query leaves out does not match. There are no conditional findings.
-- A code may be a slash path; `rule.category` is the part before the last slash, codes are unique as whole paths, and a `category` property is refused. A query is about dimensions only: filtering by category is one line on the results.
-- `Registry.add` parses each scope value with its dimension and refuses an undeclared name, as `Registry.query` does for the query's values. Findings are the `Rule` objects that apply, sorted by level (error first), then code. They print as GeoJSON with `Rule.to_feature`.
+- A rule's name may be a slash path; `rule.category` is the part before the last slash, names are unique as whole paths, and a `category` property is refused. A query is about dimensions only: filtering by category is one line on the results.
+- `Registry.add` parses each scope value with its dimension and refuses an undeclared dimension, as `Registry.query` does for the query's values. Findings are the `Rule` objects that apply, sorted by level (error first), then name. They print as GeoJSON with `Rule.to_feature`.
 - A rule file is one FeatureCollection. A rule's space is the Feature's `geometry`, its time the JSON-FG `time` member (`{"interval": [start, end]}`), and every other dimension's value is in `properties.dimensions`. A rule keeps every value as given and writes it back so, which is why writing needs no dimension; `Space` and `Interval` objects write themselves, and every other value given in Python is plain JSON. Dimensions are needed only to add (parse and check) and to query. Every other property passes through unread and is written back unchanged, except `box`, `edge`, `periods`, `recurrence`, `time_start`, `time_end`, `withdrawn` and `supersedes`, which changed which rules apply in 0.6 and are refused.
 - Files never declare dimensions: the caller passes them to `Registry.from_file(*paths, dimensions=[...])`, and a rule that names an undeclared one is refused. A file is read whole or not at all.
 - `to_file` writes `FORMAT`, the release that last changed the rule file format, in the `queryearth` member, and `from_file` refuses a file that names a later one. When a change alters the file format, set `FORMAT` to the release that will ship it.
@@ -57,7 +57,7 @@ pip install -e ".[docs]" && sphinx-build -W -b html docs/source docs/_build
 - **CI.** It runs pytest on Python 3.11 to 3.14 on every push to every branch and on pull requests. Black is checked on pull requests.
 - **Versions** come from git tags through setuptools-scm.
 - **Builds and releases.** Every push to `main` builds the package. A GitHub release tagged `vX.Y.Z` publishes to PyPI through trusted publishing; there is no TestPyPI job.
-- **Style.** Match the existing code: frozen dataclasses, error messages that name the rule code, short comments only where the reason is not obvious.
+- **Style.** Match the existing code: frozen dataclasses, error messages that start with the rule's name, short comments only where the reason is not obvious.
 - **Behaviour changes.** Update the tests, and `docs/source/`, `README.md`, `docs/growth.md` and this file as needed.
 - **NCAR GLADE.** The `dev_cd` conda env has numpy and shapely, so you can run against the checkout without installing: `PYTHONPATH=$PWD conda run -n dev_cd python -c "import queryearth"`.
 - **For AI agents.** `docs/source/llms.txt` is a one-page guide for language models, served at the docs root. `tests/test_docs.py` runs its rule file and Python as written, so keep it exact when the API changes.

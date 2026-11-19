@@ -19,7 +19,7 @@ from queryearth import space as sp
 registry = qe.Registry([qe.Axis("resolution", "km"), qe.Labels("product")])
 registry.add(
     qe.Rule(
-        code="GULF001",
+        name="GULF001",
         title="glorys is too fresh off the Mississippi",
         message="Near the delta, glorys surface salinity runs low.",
         scope={"space": sp.box(-92, 27, -87, 30.5), "product": "glorys"},
@@ -27,7 +27,7 @@ registry.add(
 )
 registry.add(
     qe.Rule(
-        code="GRID001",
+        name="GRID001",
         title="Turn off GM at high resolution",
         message="Below 8 km eddies are partly resolved: set THICKNESSDIFFUSE = False.",
         level="info",
@@ -41,7 +41,7 @@ findings = registry.query(
     resolution=(5, 9),  # the grid's smallest and largest cells, in km
     product="glorys",
 )
-print([rule.code for rule in findings])  # ['GULF001', 'GRID001'], warnings first
+print([rule.name for rule in findings])  # ['GULF001', 'GRID001'], warnings first
 print(findings[0].to_feature())  # a finding, as the GeoJSON Feature of its rule
 ```
 
@@ -101,9 +101,9 @@ Declare a dimension when you make the Registry, `qe.Registry([qe.Labels("product
 
 ## Rule files
 
-A rule file is a GeoJSON FeatureCollection with one Feature per rule. Its geometry is the rule's space, its JSON-FG `time` member the rule's time, and its properties hold the code, title, message, level, the value on each other dimension under `"dimensions"`, as the rule gives it, and anything else, such as an instruction or references, which queryearth keeps unchanged. `Rule.from_feature()` reads one Feature and `rule.to_feature()` writes it; `Registry.from_file()` and `registry.to_file()` read and write a whole file.
+A rule file is a GeoJSON FeatureCollection with one Feature per rule. Its geometry is the rule's space, its JSON-FG `time` member the rule's time, and its properties hold the name, title, message, level, the value on each other dimension under `"dimensions"`, as the rule gives it, and anything else, such as an instruction or references, which queryearth keeps unchanged. `Rule.from_feature()` reads one Feature and `rule.to_feature()` writes it; `Registry.from_file()` and `registry.to_file()` read and write a whole file.
 
-A code may be a path, such as `REGION/ITF/ITF001`: its category, `rule.category`, is the path before the last slash. To keep the findings in one category, filter on the code: `[r for r in findings if r.code.startswith("REGION/")]`.
+A rule's name may be a path, such as `REGION/ITF/ITF001`: its category, `rule.category`, is the path before the last slash. To keep the findings in one category, filter on the name: `[r for r in findings if r.name.startswith("REGION/")]`.
 
 ```python
 registry.to_file("rules.geojson")
