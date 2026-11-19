@@ -5,14 +5,14 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>queryearth.registry &mdash; queryearth 0.7.1.dev3</title>
+  <title>queryearth.registry &mdash; queryearth 0.7.1.dev4</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
 
   
       <script src="../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../_static/documentation_options.js?v=ef3f4ba3"></script>
+      <script src="../../_static/documentation_options.js?v=24b6db6e"></script>
       <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../_static/versions.js?v=58ec1786"></script>
@@ -90,11 +90,11 @@
 <span class="kn">from</span><span class="w"> </span><span class="nn">queryearth.dimensions</span><span class="w"> </span><span class="kn">import</span> <span class="n">Dimension</span><span class="p">,</span> <span class="n">SpaceDimension</span><span class="p">,</span> <span class="n">TimeDimension</span><span class="p">,</span> <span class="n">applies</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">queryearth.rules</span><span class="w"> </span><span class="kn">import</span> <span class="n">LEVELS</span><span class="p">,</span> <span class="n">Rule</span>
 
-<span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span><span class="s2">"DuplicateCodeError"</span><span class="p">,</span> <span class="s2">"Registry"</span><span class="p">]</span>
+<span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span><span class="s2">"DuplicateNameError"</span><span class="p">,</span> <span class="s2">"Registry"</span><span class="p">]</span>
 
 <span class="c1"># The release that last changed the rule file format. to_file() writes it in the</span>
 <span class="c1"># "queryearth" member, and from_file() refuses a file that needs a later release.</span>
-<span class="n">FORMAT</span> <span class="o">=</span> <span class="s2">"0.7"</span>
+<span class="n">FORMAT</span> <span class="o">=</span> <span class="s2">"0.8"</span>
 <span class="c1"># A list of numbers, such as a point, as json.dumps(indent=2) spreads it over</span>
 <span class="c1"># lines. A JSON string never holds a newline, so only real lists match.</span>
 <span class="n">_NUMBERS</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span>
@@ -102,10 +102,10 @@
 <span class="p">)</span>
 
 
-<div class="viewcode-block" id="DuplicateCodeError">
-<a class="viewcode-back" href="../../api.html#queryearth.DuplicateCodeError">[docs]</a>
-<span class="k">class</span><span class="w"> </span><span class="nc">DuplicateCodeError</span><span class="p">(</span><span class="ne">ValueError</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">"""A code the Registry already holds was added again."""</span></div>
+<div class="viewcode-block" id="DuplicateNameError">
+<a class="viewcode-back" href="../../api.html#queryearth.DuplicateNameError">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">DuplicateNameError</span><span class="p">(</span><span class="ne">ValueError</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""A rule name the Registry already holds was added again."""</span></div>
 
 
 
@@ -148,27 +148,27 @@
 
 <span class="sd">        Each scope value is parsed by its dimension. A name the Registry does</span>
 <span class="sd">        not have is refused, so a misspelt one never matches by accident, and</span>
-<span class="sd">        a code already here raises DuplicateCodeError.</span>
+<span class="sd">        a rule name already here raises DuplicateNameError.</span>
 <span class="sd">        """</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">rule</span><span class="p">,</span> <span class="n">Rule</span><span class="p">):</span>
             <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"cannot add </span><span class="si">{</span><span class="n">rule</span><span class="si">!r}</span><span class="s2">: not a Rule"</span><span class="p">)</span>
-        <span class="k">if</span> <span class="n">rule</span><span class="o">.</span><span class="n">code</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_rules</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="n">DuplicateCodeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">rule</span><span class="o">.</span><span class="n">code</span><span class="si">}</span><span class="s2">: this code is already a rule here"</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">rule</span><span class="o">.</span><span class="n">name</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_rules</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">DuplicateNameError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">rule</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2">: this name is already a rule here"</span><span class="p">)</span>
         <span class="n">values</span> <span class="o">=</span> <span class="p">{}</span>
         <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">rule</span><span class="o">.</span><span class="n">scope</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
             <span class="k">if</span> <span class="n">value</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
                 <span class="k">try</span><span class="p">:</span>
                     <span class="n">values</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_dimension</span><span class="p">(</span><span class="n">name</span><span class="p">)</span><span class="o">.</span><span class="n">parse_rule</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
                 <span class="k">except</span> <span class="p">(</span><span class="ne">ValueError</span><span class="p">,</span> <span class="ne">TypeError</span><span class="p">)</span> <span class="k">as</span> <span class="n">err</span><span class="p">:</span>
-                    <span class="n">err</span><span class="o">.</span><span class="n">args</span> <span class="o">=</span> <span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">rule</span><span class="o">.</span><span class="n">code</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">err</span><span class="si">}</span><span class="s2">"</span><span class="p">,)</span>
+                    <span class="n">err</span><span class="o">.</span><span class="n">args</span> <span class="o">=</span> <span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">rule</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">err</span><span class="si">}</span><span class="s2">"</span><span class="p">,)</span>
                     <span class="k">raise</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_rules</span><span class="p">[</span><span class="n">rule</span><span class="o">.</span><span class="n">code</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">rule</span><span class="p">,</span> <span class="n">values</span><span class="p">)</span></div>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_rules</span><span class="p">[</span><span class="n">rule</span><span class="o">.</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">rule</span><span class="p">,</span> <span class="n">values</span><span class="p">)</span></div>
 
 
 <div class="viewcode-block" id="Registry.query">
 <a class="viewcode-back" href="../../api.html#queryearth.Registry.query">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">query</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">values</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">Rule</span><span class="p">]:</span>
-<span class="w">        </span><span class="sd">"""The rules that apply to a query, highest level first, then by code.</span>
+<span class="w">        </span><span class="sd">"""The rules that apply to a query, highest level first, then by name.</span>
 
 <span class="sd">        values gives the query's value on any of the dimensions, by name, such</span>
 <span class="sd">        as space=sp.box(-60, 30, -50, 40), time=qe.interval("2020-01-01",</span>
@@ -185,7 +185,7 @@
             <span class="k">for</span> <span class="n">r</span><span class="p">,</span> <span class="n">scope</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_rules</span><span class="o">.</span><span class="n">values</span><span class="p">()</span>
             <span class="k">if</span> <span class="n">applies</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">dimensions</span><span class="p">,</span> <span class="n">scope</span><span class="p">,</span> <span class="n">query</span><span class="p">)</span>
         <span class="p">]</span>
-        <span class="k">return</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">found</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">rule</span><span class="p">:</span> <span class="p">(</span><span class="n">LEVELS</span><span class="o">.</span><span class="n">index</span><span class="p">(</span><span class="n">rule</span><span class="o">.</span><span class="n">level</span><span class="p">),</span> <span class="n">rule</span><span class="o">.</span><span class="n">code</span><span class="p">))</span></div>
+        <span class="k">return</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">found</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">rule</span><span class="p">:</span> <span class="p">(</span><span class="n">LEVELS</span><span class="o">.</span><span class="n">index</span><span class="p">(</span><span class="n">rule</span><span class="o">.</span><span class="n">level</span><span class="p">),</span> <span class="n">rule</span><span class="o">.</span><span class="n">name</span><span class="p">))</span></div>
 
 
     <span class="c1"># ---- rule files ---------------------------------------------------------------</span>
@@ -210,9 +210,9 @@
 <span class="w">        </span><span class="sd">"""A Registry with the rules of one or more rule files.</span>
 
 <span class="sd">        dimensions declares the dimensions other than space and time, as</span>
-<span class="sd">        Registry() does; a rule that uses any other is refused. Codes must be</span>
-<span class="sd">        unique across the files. Raises ValueError naming the file, the</span>
-<span class="sd">        feature's position and its code; nothing is returned unless every</span>
+<span class="sd">        Registry() does; a rule that uses any other is refused. Rule names must</span>
+<span class="sd">        be unique across the files. Raises ValueError naming the file, the</span>
+<span class="sd">        feature's position and its name; nothing is returned unless every</span>
 <span class="sd">        rule was read.</span>
 <span class="sd">        """</span>
         <span class="n">registry</span> <span class="o">=</span> <span class="bp">cls</span><span class="p">(</span><span class="n">dimensions</span><span class="p">)</span>

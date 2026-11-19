@@ -6,14 +6,14 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Rules and queries &mdash; queryearth 0.7.1.dev3</title>
+  <title>Rules and queries &mdash; queryearth 0.7.1.dev4</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
 
   
       <script src="_static/jquery.js?v=5d32c60e"></script>
       <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="_static/documentation_options.js?v=ef3f4ba3"></script>
+      <script src="_static/documentation_options.js?v=24b6db6e"></script>
       <script src="_static/doctools.js?v=fd6eb6e6"></script>
       <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="_static/versions.js?v=58ec1786"></script>
@@ -88,7 +88,7 @@
 <h2>Rules<a class="headerlink" href="#rules" title="Link to this heading"></a></h2>
 <p>A <a class="reference internal" href="api.html#queryearth.Rule" title="queryearth.Rule"><code class="xref py py-class docutils literal notranslate"><span class="pre">Rule</span></code></a> has:</p>
 <ul class="simple">
-<li><p>a <code class="docutils literal notranslate"><span class="pre">code</span></code>, unique on its Registry, which may be a path such as <code class="docutils literal notranslate"><span class="pre">REGION/ITF/ITF004</span></code>: its <a class="reference internal" href="#categories">category</a> is the path before the last slash;</p></li>
+<li><p>a <code class="docutils literal notranslate"><span class="pre">name</span></code>, unique on its Registry, which may be a path such as <code class="docutils literal notranslate"><span class="pre">REGION/ITF/ITF004</span></code>: its <a class="reference internal" href="#categories">category</a> is the path before the last slash;</p></li>
 <li><p>a <code class="docutils literal notranslate"><span class="pre">title</span></code> and a <code class="docutils literal notranslate"><span class="pre">message</span></code>;</p></li>
 <li><p>a <code class="docutils literal notranslate"><span class="pre">level</span></code>: <code class="docutils literal notranslate"><span class="pre">&quot;info&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;warning&quot;</span></code> (the default) or <code class="docutils literal notranslate"><span class="pre">&quot;error&quot;</span></code>;</p></li>
 <li><p>a <code class="docutils literal notranslate"><span class="pre">scope</span></code>, mapping each <a class="reference internal" href="dimensions.html"><span class="std std-doc">dimension</span></a> the rule constrains to its value;</p></li>
@@ -96,7 +96,7 @@
 </ul>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">registry</span> <span class="o">=</span> <span class="n">qe</span><span class="o">.</span><span class="n">Registry</span><span class="p">([</span><span class="n">qe</span><span class="o">.</span><span class="n">Axis</span><span class="p">(</span><span class="s2">"resolution"</span><span class="p">,</span> <span class="s2">"km"</span><span class="p">)])</span>
 <span class="n">rule</span> <span class="o">=</span> <span class="n">qe</span><span class="o">.</span><span class="n">Rule</span><span class="p">(</span>
-    <span class="n">code</span><span class="o">=</span><span class="s2">"REGION/ITF/ITF004"</span><span class="p">,</span>
+    <span class="n">name</span><span class="o">=</span><span class="s2">"REGION/ITF/ITF004"</span><span class="p">,</span>
     <span class="n">title</span><span class="o">=</span><span class="s2">"Lombok Strait spans only a few cells"</span><span class="p">,</span>
     <span class="n">message</span><span class="o">=</span><span class="s2">"Lombok Strait spans only a few cells even at 5 km."</span><span class="p">,</span>
     <span class="n">scope</span><span class="o">=</span><span class="p">{</span><span class="s2">"space"</span><span class="p">:</span> <span class="n">sp</span><span class="o">.</span><span class="n">box</span><span class="p">(</span><span class="mf">115.4</span><span class="p">,</span> <span class="o">-</span><span class="mi">9</span><span class="p">,</span> <span class="mf">116.1</span><span class="p">,</span> <span class="o">-</span><span class="mi">8</span><span class="p">),</span> <span class="s2">"resolution"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"gt"</span><span class="p">:</span> <span class="mi">2</span><span class="p">}},</span>
@@ -105,20 +105,20 @@
 <span class="n">registry</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">rule</span><span class="p">)</span>
 </pre></div>
 </div>
-<p><a class="reference internal" href="api.html#queryearth.Registry.add" title="queryearth.Registry.add"><code class="xref py py-meth docutils literal notranslate"><span class="pre">Registry.add()</span></code></a> checks each scope value with its dimension. A code already on the Registry raises <code class="docutils literal notranslate"><span class="pre">DuplicateCodeError</span></code>. <code class="docutils literal notranslate"><span class="pre">Registry.rules</span></code> lists every rule, in the order added.</p>
+<p><a class="reference internal" href="api.html#queryearth.Registry.add" title="queryearth.Registry.add"><code class="xref py py-meth docutils literal notranslate"><span class="pre">Registry.add()</span></code></a> checks each scope value with its dimension. A name already on the Registry raises <code class="docutils literal notranslate"><span class="pre">DuplicateNameError</span></code>. <code class="docutils literal notranslate"><span class="pre">Registry.rules</span></code> lists every rule, in the order added.</p>
 </section>
 <section id="categories">
 <h2>Categories<a class="headerlink" href="#categories" title="Link to this heading"></a></h2>
-<p>A code may be a path; its category is the path before the last slash. <code class="docutils literal notranslate"><span class="pre">REGION/ITF/ITF004</span></code> is in category <code class="docutils literal notranslate"><span class="pre">REGION/ITF</span></code>, which sits in <code class="docutils literal notranslate"><span class="pre">REGION</span></code>, so categories need no declaring. <code class="docutils literal notranslate"><span class="pre">rule.category</span></code> gives a rule’s category, or None for a code without a slash. Codes are unique as whole paths, so <code class="docutils literal notranslate"><span class="pre">REGION/ITF/001</span></code> and <code class="docutils literal notranslate"><span class="pre">DOMAIN/OBC/001</span></code> can both exist. Moving a rule to another category changes its code.</p>
-<p>A query is about dimensions only. To keep the findings in one category and those below it, filter on the code:</p>
+<p>A rule’s name may be a path; its category is the path before the last slash. <code class="docutils literal notranslate"><span class="pre">REGION/ITF/ITF004</span></code> is in category <code class="docutils literal notranslate"><span class="pre">REGION/ITF</span></code>, which sits in <code class="docutils literal notranslate"><span class="pre">REGION</span></code>, so categories need no declaring. <code class="docutils literal notranslate"><span class="pre">rule.category</span></code> gives a rule’s category, or None for a name without a slash. Names are unique as whole paths, so <code class="docutils literal notranslate"><span class="pre">REGION/ITF/001</span></code> and <code class="docutils literal notranslate"><span class="pre">DOMAIN/OBC/001</span></code> can both exist. Moving a rule to another category changes its name.</p>
+<p>A query is about dimensions only. To keep the findings in one category and those below it, filter on the name:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">findings</span> <span class="o">=</span> <span class="n">registry</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="n">resolution</span><span class="o">=</span><span class="p">(</span><span class="mf">9.1</span><span class="p">,</span> <span class="mf">9.3</span><span class="p">))</span>
-<span class="n">in_region</span> <span class="o">=</span> <span class="p">[</span><span class="n">rule</span> <span class="k">for</span> <span class="n">rule</span> <span class="ow">in</span> <span class="n">findings</span> <span class="k">if</span> <span class="n">rule</span><span class="o">.</span><span class="n">code</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">"REGION/"</span><span class="p">)]</span>
+<span class="n">in_region</span> <span class="o">=</span> <span class="p">[</span><span class="n">rule</span> <span class="k">for</span> <span class="n">rule</span> <span class="ow">in</span> <span class="n">findings</span> <span class="k">if</span> <span class="n">rule</span><span class="o">.</span><span class="n">name</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">"REGION/"</span><span class="p">)]</span>
 </pre></div>
 </div>
 </section>
 <section id="queries">
 <h2>Queries<a class="headerlink" href="#queries" title="Link to this heading"></a></h2>
-<p><a class="reference internal" href="api.html#queryearth.Registry.query" title="queryearth.Registry.query"><code class="xref py py-meth docutils literal notranslate"><span class="pre">Registry.query()</span></code></a> takes the query’s value on any of the dimensions, by name, and returns the rules that apply, highest level first, then by code:</p>
+<p><a class="reference internal" href="api.html#queryearth.Registry.query" title="queryearth.Registry.query"><code class="xref py py-meth docutils literal notranslate"><span class="pre">Registry.query()</span></code></a> takes the query’s value on any of the dimensions, by name, and returns the rules that apply, highest level first, then by name:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">domain</span> <span class="o">=</span> <span class="n">sp</span><span class="o">.</span><span class="n">box</span><span class="p">(</span><span class="mi">105</span><span class="p">,</span> <span class="o">-</span><span class="mi">15</span><span class="p">,</span> <span class="mi">145</span><span class="p">,</span> <span class="mi">10</span><span class="p">)</span>  <span class="c1"># the Indonesian seas</span>
 <span class="n">registry</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="n">space</span><span class="o">=</span><span class="n">domain</span><span class="p">,</span> <span class="n">resolution</span><span class="o">=</span><span class="p">(</span><span class="mf">9.1</span><span class="p">,</span> <span class="mf">9.3</span><span class="p">))</span>  <span class="c1"># [the ITF004 rule]</span>
 </pre></div>

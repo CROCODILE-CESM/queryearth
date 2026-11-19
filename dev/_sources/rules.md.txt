@@ -5,7 +5,7 @@ A rule file is one GeoJSON FeatureCollection with one Feature per rule:
 ```json
 {
   "type": "FeatureCollection",
-  "queryearth": "0.7",
+  "queryearth": "0.8",
   "features": [
     {
       "type": "Feature",
@@ -16,7 +16,7 @@ A rule file is one GeoJSON FeatureCollection with one Feature per rule:
       },
       "time": {"interval": ["1993-01-01", ".."]},
       "properties": {
-        "code": "REGION/POLAR/POLAR001",
+        "name": "REGION/POLAR/POLAR001",
         "title": "Consider active sea ice",
         "message": "Part of this domain is poleward of 60 degrees, where sea ice forms in winter.",
         "level": "warning",
@@ -31,8 +31,8 @@ A rule file is one GeoJSON FeatureCollection with one Feature per rule:
 
 - `geometry` is the rule's space: a Polygon, a MultiPolygon, or null for none. A ring that crosses ±180 is split there, so write a shape across the date line as it runs, such as from 170 to -170.
 - `time` is the rule's time, as a JSON-FG time member: `{"interval": [start, end]}` with ISO 8601 dates or timestamps and `".."` for an open end, or null for none. An end date covers its whole day.
-- `properties` holds `code`, `title` and `message`, all required, where the code may be a path whose part before the last slash is the rule's [category](concepts.md#categories); `level`, `"info"`, `"warning"` (the default) or `"error"`; and `dimensions`, the value on each other [dimension](dimensions.md), as the rule gives it.
-- Every other property, here `instruction` and `references`, is kept as given and written back unchanged. A `category` property is refused, since the category is the code's path.
+- `properties` holds `name`, `title` and `message`, all required, where the name may be a path whose part before the last slash is the rule's [category](concepts.md#categories); `level`, `"info"`, `"warning"` (the default) or `"error"`; and `dimensions`, the value on each other [dimension](dimensions.md), as the rule gives it.
+- Every other property, here `instruction` and `references`, is kept as given and written back unchanged. A `category` property is refused, since the category is the name's path.
 - `queryearth` names the release that last changed the file format. `to_file` writes it, and `from_file` refuses a file that needs a later queryearth than the one installed, saying to upgrade; a file without it is read as it is.
 
 ## Reading and writing
@@ -44,7 +44,7 @@ dimensions = [qe.Axis("resolution", "km"), qe.Labels("ice")]
 registry = qe.Registry.from_file("rules.geojson", "rules_claude.geojson", dimensions=dimensions)
 ```
 
-A file is read whole or not at all. A problem raises `ValueError` naming the file, the Feature's position and its code: a record without a code, title or message; a Feature member other than `type`, `id`, `geometry`, `time`, `properties` and `bbox`; a value its dimension refuses; a dimension the Registry has not declared; or a code already read, which raises `DuplicateCodeError`.
+A file is read whole or not at all. A problem raises `ValueError` naming the file, the Feature's position and its name: a record without a name, title or message; a Feature member other than `type`, `id`, `geometry`, `time`, `properties` and `bbox`; a value its dimension refuses; a dimension the Registry has not declared; or a name already read, which raises `DuplicateNameError`.
 
 {meth}`Registry.to_file() <queryearth.Registry.to_file>` writes every rule, in the order added, as indented JSON with each point on one line, and `from_file` reads it back. One rule's Feature is {meth}`Rule.to_feature() <queryearth.Rule.to_feature>`, and {meth}`Rule.from_feature() <queryearth.Rule.from_feature>` makes a rule from one, to give to {meth}`Registry.add() <queryearth.Registry.add>`. A rule keeps every value as it was given, so writing one needs no Registry, and a rule read from a file writes back unchanged.
 
