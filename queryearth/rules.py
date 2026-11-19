@@ -97,18 +97,18 @@ class Rule:
         props = feature.get("properties") if isinstance(feature, Mapping) else None
         if not isinstance(props, Mapping) or feature.get("type") != "Feature":
             raise ValueError("a rule is a GeoJSON Feature with properties")
-        name = props.get("name", "a rule")
+        where = f"{props['name']}: " if "name" in props else ""  # names the rule
         if unknown := sorted(set(feature) - FEATURE_KEYS):
-            raise ValueError(f"{name}: unknown Feature members {unknown}")
+            raise ValueError(f"{where}unknown Feature members {unknown}")
         if not {"name", "title", "message"} <= set(props) or "geometry" not in feature:
             raise ValueError(
-                f"{name}: a rule needs a name, a title, a message and a "
+                f"{where}a rule needs a name, a title, a message and a "
                 "geometry (null for none)"
             )
         scope = props.get("dimensions", {})
         if not isinstance(scope, Mapping) or {"space", "time"} & set(scope):
             raise ValueError(
-                f"{name}: dimensions maps names to values; space and time go in the "
+                f"{where}dimensions maps names to values; space and time go in the "
                 "geometry and time members"
             )
         scope = dict(scope)

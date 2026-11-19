@@ -119,11 +119,13 @@ def test_a_file_that_uses_an_undeclared_dimension_is_refused(tmp_path):
 
 def test_record_mistakes_are_refused_with_the_name(tmp_path):
     no_title = dict(ARCTIC, properties={"name": "X1", "message": "..."})
+    no_name = dict(ARCTIC, properties={"code": "X1", "title": "T", "message": "..."})
     typo = dict(ARCTIC, tme={"interval": ["2000-01-01", ".."]})
     edge = dict(ARCTIC, properties=dict(ARCTIC["properties"], edge=True))
     category = dict(ARCTIC, properties=dict(ARCTIC["properties"], category="POLAR"))
     for feature, problem in [
-        (no_title, "needs a name, a title"),
+        (no_title, "feature 0: X1: a rule needs a name, a title"),
+        (no_name, "feature 0: a rule needs a name, a title"),  # from 0.7, unnamed
         (typo, "unknown Feature members \\['tme'\\]"),
         (edge, "\\['edge'\\] changed which rules apply in queryearth 0.6"),
         (category, "category is the path of its name"),
