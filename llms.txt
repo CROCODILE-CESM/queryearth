@@ -6,10 +6,10 @@ This page is for language models and other programs that write rules, check them
 
 ## The model
 
-- A rule has a `code` (unique; it may be a path such as `REGION/ITF/ITF001`, whose category is the path before the last slash), a `title`, a `message`, a `level` (`info`, `warning` or `error`; the default is `warning`) and a scope. Rules are data: they never run code.
+- A rule has a `name` (unique; it may be a path such as `REGION/ITF/ITF001`, whose category is the path before the last slash), a `title`, a `message`, a `level` (`info`, `warning` or `error`; the default is `warning`) and a scope. Rules are data: they never run code.
 - A scope gives values on dimensions. Every Registry has space and time; the others are declared on it: `qe.Axis(name, unit)` for numbers, `qe.Labels(name)` for names, or a dimension written in Python.
 - A query gives values on any of the dimensions. A rule applies when, on every dimension it constrains, the query gives a value and the two share at least one value. A dimension the rule leaves out matches anything. A dimension the rule constrains and the query leaves out does not match.
-- Categories need no declaring: `rule.category` is the code's path before the last slash. A query is about dimensions only; to keep the rules in one category, filter the findings: `[r for r in findings if r.code.startswith("REGION/")]`.
+- Categories need no declaring: `rule.category` is the name's path before the last slash. A query is about dimensions only; to keep the rules in one category, filter the findings: `[r for r in findings if r.name.startswith("REGION/")]`.
 - Within a rule, all its dimensions must hold. "Or" across dimensions, such as "the Arctic in northern winter, or the Antarctic in southern winter", is two rules.
 
 ## A rule file
@@ -19,7 +19,7 @@ A rule file is a GeoJSON FeatureCollection; each Feature is one rule.
 ```json
 {
   "type": "FeatureCollection",
-  "queryearth": "0.7",
+  "queryearth": "0.8",
   "features": [
     {
       "type": "Feature",
@@ -27,7 +27,7 @@ A rule file is a GeoJSON FeatureCollection; each Feature is one rule.
       "geometry": null,
       "time": null,
       "properties": {
-        "code": "MINE001",
+        "name": "MINE001",
         "title": "Fine grid: turn off the eddy parametrization",
         "message": "Below 10 km the model starts to resolve eddies: set THICKNESSDIFFUSE = False.",
         "level": "info",
@@ -43,7 +43,7 @@ A rule file is a GeoJSON FeatureCollection; each Feature is one rule.
       },
       "time": {"interval": ["1993-01-01", ".."]},
       "properties": {
-        "code": "MINE002",
+        "name": "MINE002",
         "title": "glorys is too fresh off the Mississippi",
         "message": "Near the Mississippi delta, glorys surface salinity runs low.",
         "dimensions": {"product": ["glorys"]},
@@ -56,7 +56,7 @@ A rule file is a GeoJSON FeatureCollection; each Feature is one rule.
 
 - `geometry` is the rule's space: a Polygon or MultiPolygon in longitude and latitude degrees, or null for none. Edges are straight lines in longitude and latitude. A ring that crosses ±180 is split there, so write a shape across the date line as it runs, for example from 170 to -170. A ring that goes around a pole is refused: write a polar region as a box to latitude 90 or -90, such as `[[-180, 66.5], [180, 66.5], [180, 90], [-180, 90], [-180, 66.5]]`.
 - `time` is the rule's time: `{"interval": [start, end]}` with ISO 8601 dates or timestamps and `".."` for an open end, or null for none. Both ends are inclusive, and an end date covers its whole day.
-- `properties` holds `code`, `title`, `message`, `level`, and `dimensions`, the value on each other dimension by name. Any other property, such as `instruction` or `references`, is kept and written back unchanged, except `box`, `edge`, `periods`, `recurrence`, `time_start`, `time_end`, `withdrawn` and `supersedes`, which queryearth 0.6 used and this version refuses, and `category`, which is the code's path instead.
+- `properties` holds `name`, `title`, `message`, `level`, and `dimensions`, the value on each other dimension by name. Any other property, such as `instruction` or `references`, is kept and written back unchanged, except `box`, `edge`, `periods`, `recurrence`, `time_start`, `time_end`, `withdrawn` and `supersedes`, which queryearth 0.6 used and this version refuses, and `category`, which is the name's path instead.
 - `queryearth` names the release that last changed the file format; a file that needs a later queryearth is refused.
 
 ## Dimension values
@@ -80,7 +80,7 @@ from queryearth import space as sp
 
 dimensions = [qe.Axis("resolution", "km"), qe.Labels("product")]
 registry = qe.Registry.from_file("rules.geojson", dimensions=dimensions)
-# from_file takes several files; a ValueError names the file, the feature and its code
+# from_file takes several files; a ValueError names the file, the feature and its name
 
 findings = registry.query(
     space=sp.box(-98, 18, -80, 31),  # west, south, east, north
@@ -91,7 +91,7 @@ findings = registry.query(
 text = json.dumps([rule.to_feature() for rule in findings])  # as GeoJSON
 ```
 
-`findings` lists the rules that apply, highest level first, then by code: here MINE002, then MINE001. A query or a rule that names a dimension the Registry has not declared raises `ValueError`, and adding a code twice raises `qe.DuplicateCodeError`.
+`findings` lists the rules that apply, highest level first, then by name: here MINE002, then MINE001. A query or a rule that names a dimension the Registry has not declared raises `ValueError`, and adding a name twice raises `qe.DuplicateNameError`.
 
 ## Write rules in Python
 
@@ -99,7 +99,7 @@ text = json.dumps([rule.to_feature() for rule in findings])  # as GeoJSON
 mine = qe.Registry([qe.Axis("resolution", "km")])
 mine.add(
     qe.Rule(
-        code="ARCTIC001",
+        name="ARCTIC001",
         title="Consider active sea ice",
         message="Sea ice forms north of 66.5 degrees in winter.",
         scope={"space": sp.box(-180, 66.5, 180, 90), "resolution": {"gt": 10}},
